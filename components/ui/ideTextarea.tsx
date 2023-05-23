@@ -40,8 +40,9 @@ export default function IdeTextarea(props: any) {
         if (suggestions.length == 0) {
             return;
         }
+        const suggestion = event.target.innerText;
         const textArea = document.getElementById("textarea") as HTMLTextAreaElement;
-        const appendableString = suggestions[0].substring(textArea.value.length - findStartOfLastWord(textArea.value));
+        const appendableString = suggestion.substring(textArea.value.length - findStartOfLastWord(textArea.value));
         textArea.value = textArea.value + appendableString;
         setSuggestions([]);
     };
