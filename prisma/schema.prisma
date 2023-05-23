@@ -16,6 +16,7 @@ model Function {
   description String
   aliases     String[]
   parameters  Parameter[]
+  returnType  Type
 }
 
 model Parameter {
@@ -31,6 +32,8 @@ model Parameter {
 
 enum Type {
   String
-  Number
+  Integer
+  Double
   Boolean
+  CappedValue
 }

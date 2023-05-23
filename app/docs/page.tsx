@@ -18,11 +18,32 @@ export default async function Docs() {
 
     // iterate through functions and create a div for each one
     for (const func of functions) {
+        const parameters = await prisma.parameter.findMany({
+            where: {
+                functionId: func.id,
+            },
+        });
+
+        // returns ()
+        const parameterSuffix = `(${parameters
+            .map((param) => {
+                if (param.required) {
+                    return param.name;
+                } else {
+                    return param.name + "?";
+                }
+            })
+            .join(", ")})`;
+
         const entry = (
             <Card className="bg-gray-800">
                 <CardTitle>
-                    <span className="ml-2">
-                        <span className={robotoMono.className}>{func.name}</span>
+                    <span className={robotoMono.className}>
+                        <span className="ml-2">
+                            {func.name}
+                            {parameterSuffix}
+                        </span>
+                        <span className="float-right">{func.returnType}</span>
                     </span>
                 </CardTitle>
                 <CardDescription>
@@ -33,9 +54,11 @@ export default async function Docs() {
                     <p>Parameters:</p>
                 </CardHeader>
                 <CardContent>
-                    {func.parameters.map((param) => (
-                        <div key={param} className={robotoMono.className}>
-                            - {param}
+                    {parameters.map((param) => (
+                        <div key={param.name}>
+                            - <span className={robotoMono.className}>{param.name} </span> (
+                            <span className={robotoMono.className}>{param.type}</span>,{" "}
+                            {param.required ? "required" : "optional"}) -- {param.description}
                         </div>
                     ))}
                 </CardContent>
@@ -45,8 +68,8 @@ export default async function Docs() {
                 </CardHeader>
                 <CardContent>
                     {func.aliases.map((alias) => (
-                        <div key={alias} className={robotoMono.className}>
-                            - {alias}
+                        <div key={alias}>
+                            - <span className={robotoMono.className}>{alias}</span>
                         </div>
                     ))}
                 </CardContent>
