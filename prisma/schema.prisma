@@ -2,38 +2,61 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+    provider = "prisma-client-js"
 }
 
 datasource db {
-  provider     = "postgresql"
-  url          = env("DATABASE_URL")
+    provider     = "postgresql"
+    url          = env("DATABASE_URL")
 }
 
 model Function {
-  id          Int             @id @default(autoincrement())
-  name        String
-  description String
-  aliases     String[]
-  parameters  Parameter[]
-  returnType  Type
+    id          Int             @id @default(autoincrement())
+    category    Category
+    name        String
+    description String
+    aliases     String[]
+    parameters  Parameter[]
+    returnType  Type
 }
 
 model Parameter {
-  id          Int             @id @default(autoincrement())
-  name        String
-  description String
-  type        Type
-  required    Boolean
-  validInputs String
-  function    Function        @relation(fields: [functionId], references: [id])
-  functionId  Int
+    id          Int             @id @default(autoincrement())
+    name        String
+    description String
+    type        Type
+    required    Boolean
+    default     String?
+    function    Function?       @relation(fields: [functionId], references: [id])
+    functionId  Int?
 }
 
 enum Type {
-  String
-  Integer
-  Double
-  Boolean
-  CappedValue
+    String
+    Integer
+    Double
+    Boolean
+    CappedValue
+}
+
+enum Category {
+    GenericCapped
+    GenericConditional
+    GenericLocation
+    GenericLogic
+    GenericMath
+    GenericString
+    Character
+    Combat
+    CombatXp
+    Environment
+    Horse
+    Inventory
+    Lootrun
+    Minecraft
+    Profession
+    Social
+    Spell
+    War
+    World
 }
