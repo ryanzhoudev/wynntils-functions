@@ -1,6 +1,6 @@
 import prisma from "../../lib/prisma";
-import { Roboto_Mono } from "next/font/google";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Roboto_Mono } from "next/font/google";
 
 const robotoMono = Roboto_Mono({
     weight: "400",
