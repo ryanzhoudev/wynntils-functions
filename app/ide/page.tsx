@@ -8,16 +8,11 @@ const robotoMono = Roboto_Mono({
 });
 
 export default async function IDE() {
-    let functionNames: string[] = [];
-
     const functions = await prisma.function.findMany();
-    if (functions != undefined) {
-        functionNames = functions.map((func) => func.name);
-    }
 
     return (
         <div className="bg-gray-800 text-white w-full h-screen">
-            <IdeTextarea functionNames={functionNames} />
+            <IdeTextarea functions={functions} />
         </div>
     );
 }

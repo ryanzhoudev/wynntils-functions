@@ -16,7 +16,10 @@ export default function IdeTextarea(props: any) {
         const start = findStartOfLastWord(textArea.value);
         const end = textArea.textLength;
         const word = textArea.value.substring(start, end);
-        const suggestions = getSuggestions(word, props.functionNames);
+        const suggestions = getSuggestions(
+            word,
+            props.functions.map((func: any) => func.name),
+        );
         setSuggestions(suggestions);
     };
 
@@ -51,7 +54,7 @@ export default function IdeTextarea(props: any) {
             <div className={robotoMono.className}>
                 <textarea
                     id="textarea"
-                    className="bg-gray-800 text-white w-full h-5/6"
+                    className="bg-gray-800 text-white w-full h-96"
                     onChange={onChange}
                     onKeyDown={onKeyDown}
                 />
