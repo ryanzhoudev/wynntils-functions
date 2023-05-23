@@ -26,7 +26,7 @@ export default async function Docs() {
             },
         });
 
-        // returns ()
+        // returns () if no parameters exist, otherwise returns (param1, param2, param3)
         const parameterSuffix = `(${parameters
             .map((param) => {
                 if (param.required) {
