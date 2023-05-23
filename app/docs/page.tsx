@@ -35,7 +35,7 @@ export default async function Docs() {
                     return param.name + "?";
                 }
             })
-            .join(", ")})`;
+            .join(";")})`;
 
         const entry = (
             <Card className="bg-gray-800">
