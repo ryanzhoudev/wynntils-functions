@@ -14,6 +14,8 @@ export default async function Docs() {
         return <div>Failed to load functions.</div>;
     }
 
+    functions.sort((a, b) => a.id - b.id);
+
     const entries = [];
 
     // iterate through functions and create a div for each one
