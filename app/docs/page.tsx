@@ -43,7 +43,7 @@ export default async function Docs() {
                             {func.name}
                             {parameterSuffix}
                         </span>
-                        <span className="float-right">{func.returnType}</span>
+                        <span className="float-right mr-2">{func.returnType}</span>
                     </span>
                 </CardTitle>
                 <CardDescription>
