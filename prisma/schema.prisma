@@ -23,7 +23,7 @@ model Function {
 model Parameter {
     id          Int             @id @default(autoincrement())
     name        String
-    description String
+    description String?
     type        Type
     required    Boolean
     default     String?
@@ -35,8 +35,10 @@ enum Type {
     String
     Integer
     Double
+    Number
     Boolean
     CappedValue
+    Location
 }
 
 enum Category {
