@@ -15,7 +15,6 @@ export default function IdeTextarea(props: any) {
         const textArea = event.target as HTMLTextAreaElement;
         const start = findStartOfLastWord(textArea.value);
         const end = textArea.textLength;
-        console.log("start: " + start + " end: " + end);
         const word = textArea.value.substring(start, end);
         const suggestions = getSuggestions(word, props.functionNames);
         setSuggestions(suggestions);
@@ -89,7 +88,6 @@ function findStartOfLastWord(text: string) {
 
 function getSuggestions(word: string, functionNames: string[]): string[] {
     if (functionNames.length == 0 || word == "") {
-        console.log("returning empty and word is " + word);
         return [];
     }
     const returnable: string[] = [];
@@ -98,6 +96,5 @@ function getSuggestions(word: string, functionNames: string[]): string[] {
             returnable.push(name);
         }
     }
-    console.log("returning: " + returnable);
     return returnable;
 }
