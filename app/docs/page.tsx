@@ -58,7 +58,8 @@ export default async function Docs() {
                         <div key={param.name}>
                             - <span className={robotoMono.className}>{param.name} </span> (
                             <span className={robotoMono.className}>{param.type}</span>,{" "}
-                            {param.required ? "required" : "optional"}) -- {param.description}
+                            {param.required ? "required" : "optional"})
+                            {param.description == null ? "" : " -- " + param.description}
                         </div>
                     ))}
                 </CardContent>
