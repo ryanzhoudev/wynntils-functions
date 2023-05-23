@@ -15,5 +15,22 @@ model Function {
   name        String
   description String
   aliases     String[]
-  parameters  String[]
+  parameters  Parameter[]
+}
+
+model Parameter {
+  id          Int             @id @default(autoincrement())
+  name        String
+  description String
+  type        Type
+  required    Boolean
+  validInputs String
+  function    Function        @relation(fields: [functionId], references: [id])
+  functionId  Int
+}
+
+enum Type {
+  String
+  Number
+  Boolean
 }
