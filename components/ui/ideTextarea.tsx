@@ -16,9 +16,9 @@ export default function IdeTextarea(props: any) {
         const text = event.target.textContent ?? "";
 
         const caratPosition = window.getSelection()?.getRangeAt(0).startOffset ?? 0;
-        const startOfLastWord = getStartOfLastWord(text, caratPosition);
+        const startOfCurrentWord = getStartOfCurrentWord(text, caratPosition);
 
-        const currentTypedWord = text.substring(startOfLastWord, caratPosition);
+        const currentTypedWord = text.substring(startOfCurrentWord, caratPosition);
 
         const suggestions = getSuggestions(currentTypedWord, props.functions);
         setSuggestions(suggestions);
@@ -34,13 +34,18 @@ export default function IdeTextarea(props: any) {
         const selection = window.getSelection();
         const caratPosition = selection?.getRangeAt(0).startOffset ?? 0;
 
-        const existingStringLength = text.substring(getStartOfLastWord(text, caratPosition), caratPosition).length;
+        const endOfCurrentWord = getEndOfCurrentWord(text, caratPosition);
+        const existingStringLength = text.substring(
+            getStartOfCurrentWord(text, caratPosition),
+            endOfCurrentWord,
+        ).length;
         const appendableString = selectedSuggestion.name.substring(existingStringLength);
 
         // for some reason click events automatically move the carat to the end of the text
-        const newCaratPosition = caratPosition + (isClickEvent ? 0 : appendableString.length);
+        const newCaratPosition = endOfCurrentWord + (isClickEvent ? 0 : appendableString.length);
 
-        textArea.textContent = text.substring(0, caratPosition) + appendableString + text.substring(caratPosition);
+        textArea.textContent =
+            text.substring(0, endOfCurrentWord) + appendableString + text.substring(endOfCurrentWord);
 
         const range = document.createRange();
         range.setStart(textArea.childNodes[0], newCaratPosition);
@@ -119,7 +124,7 @@ function makeHighlightedCode(highlighted: string) {
     return <code className="bg-amber-300 text-zinc-700">{highlighted}</code>;
 }
 
-function getStartOfLastWord(text: string, caratPosition: number) {
+function getStartOfCurrentWord(text: string, caratPosition: number) {
     if (!text.includes(" ")) {
         return 0;
     }
@@ -129,6 +134,18 @@ function getStartOfLastWord(text: string, caratPosition: number) {
         i--;
     }
     return i + 1;
+}
+
+function getEndOfCurrentWord(text: string, caratPosition: number) {
+    if (!text.includes(" ")) {
+        return text.length;
+    }
+
+    let i = caratPosition;
+    while (i < text.length && text[i] != " ") {
+        i++;
+    }
+    return i;
 }
 
 function getSuggestions(word: string, functions: Function[]): Function[] {
