@@ -20,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 function Sidebar() {
     const sections: Record<string, string> = {
+        All: "",
         "Generic Capped": "GenericCapped",
         "Generic Conditional": "GenericConditional",
         "Generic Location": "GenericLocation",
