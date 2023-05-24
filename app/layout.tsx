@@ -20,7 +20,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 function Sidebar() {
     const sections = [
-        "Generic",
+        "Generic Capped",
+        "Generic Conditional",
+        "Generic Location",
+        "Generic Logic",
+        "Generic Math",
+        "Generic String",
         "Character",
         "Combat",
         "Combat XP",
@@ -37,21 +42,24 @@ function Sidebar() {
     ];
 
     return (
-        <div className="flex flex-col fixed h-screen w-48 bg-blue-1000 text-xl font-bold text-white">
+        <div className="flex flex-col fixed h-screen w-48 bg-blue-1000 text-lg text-white">
             {sections.map((section) => (
                 <Link
                     key={section}
-                    className="flex items-center justify-center h-14 hover:bg-blue-950"
+                    className="flex items-center justify-start h-10 hover:bg-blue-950 border-b border-gray-600"
                     href={"/docs#" + section}
                 >
-                    {section}
+                    <p className="ml-2">{section}</p>
                 </Link>
             ))}
 
             <div className="flex flex-grow"></div>
 
-            <Link className="flex items-center justify-center h-14 bg-blue-1050 hover:bg-blue-950" href={"/ide"}>
-                IDE
+            <Link
+                className="flex items-center justify-center h-14 bg-blue-1050 font-bold hover:bg-blue-950"
+                href={"/ide"}
+            >
+                Open IDE
             </Link>
         </div>
     );
