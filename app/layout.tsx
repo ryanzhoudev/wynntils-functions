@@ -3,8 +3,7 @@ import React from "react";
 import Link from "next/link";
 
 export const metadata = {
-    title: "Wynntils Function Reference",
-    description: "A reference and IDE for all Wynntils info functions.",
+    title: "Wynntils Functions",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
