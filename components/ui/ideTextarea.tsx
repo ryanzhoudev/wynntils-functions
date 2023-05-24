@@ -10,6 +10,7 @@ const robotoMono = Roboto_Mono({
 
 export default function IdeTextarea(props: any) {
     const [suggestions, setSuggestions] = useState<Function[]>([]);
+    const [selectedSuggestion, setSelectedSuggestions] = useState<Function | null>(null);
 
     const onChange = (event: any) => {
         const textArea = event.target as HTMLTextAreaElement;
@@ -18,16 +19,17 @@ export default function IdeTextarea(props: any) {
         const word = textArea.value.substring(start, end);
         const suggestions = getSuggestions(word, props.functions);
         setSuggestions(suggestions);
+        setSelectedSuggestions(suggestions[0] ?? null);
     };
 
     const onKeyDown = (event: any) => {
         if (event.key == "Tab") {
             event.preventDefault();
-            if (suggestions.length == 0) {
-                return;
-            }
+            if (selectedSuggestion == null) return;
+
             const textArea = event.target as HTMLTextAreaElement;
-            const appendableString = suggestions[0].name.substring(
+
+            const appendableString = selectedSuggestion.name.substring(
                 textArea.value.length - findStartOfLastWord(textArea.value),
             );
             textArea.value = textArea.value + appendableString;
@@ -58,22 +60,26 @@ export default function IdeTextarea(props: any) {
                 />
                 {suggestions.length > 0 ? (
                     <ul className="top-full mt-1 py-1 px-2 bg-zinc-700">
-                        <li
-                            key={suggestions[0].name}
-                            className="cursor-pointer py-1 px-2 hover:bg-gray-800 text-amber-300"
-                            onClick={onClick}
-                        >
-                            {suggestions[0].name}
-                        </li>
-                        {suggestions.slice(1).map((suggestion) => (
-                            <li
-                                key={suggestion.name}
-                                className="cursor-pointer py-1 px-2 hover:bg-zinc-800"
-                                onClick={onClick}
-                            >
-                                {suggestion.name}
-                            </li>
-                        ))}
+                        {suggestions.map((suggestion) =>
+                            suggestion.name == selectedSuggestion?.name ? (
+                                <li
+                                    key={suggestion.name}
+                                    className="cursor-pointer py-1 px-2 hover:bg-zinc-800 text-amber-300"
+                                    onClick={onClick}
+                                >
+                                    {suggestion.name}
+                                </li>
+                            ) : (
+                                <li
+                                    key={suggestion.name}
+                                    className="cursor-pointer py-1 px-2 hover:bg-zinc-800"
+                                    onClick={onClick}
+                                    onMouseEnter={() => setSelectedSuggestions(suggestion)}
+                                >
+                                    {suggestion.name}
+                                </li>
+                            ),
+                        )}
                     </ul>
                 ) : (
                     <span></span>
