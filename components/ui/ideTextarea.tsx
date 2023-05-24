@@ -68,14 +68,12 @@ export default function IdeTextarea(props: any) {
     };
 
     const onClick = (clickedFunction: Function) => {
-        if (clickedFunction == null) return;
+        if (clickedFunction == null || suggestions.length == 0) return;
         if (clickedFunction != selectedSuggestion) {
+            // This should not really happen since there are onMouseEnter events
             setSelectedSuggestion(clickedFunction);
         } else {
             insertSelectedSuggestion();
-        }
-        if (suggestions.length == 0) {
-            return;
         }
     };
 
