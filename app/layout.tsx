@@ -48,7 +48,7 @@ function Sidebar() {
                 <Link
                     key={section}
                     className="flex items-center justify-start h-10 hover:bg-blue-950 border-b border-gray-600"
-                    href={"/docs/" + category}
+                    href={"/docs#" + category}
                 >
                     <p className="ml-2">{section}</p>
                 </Link>

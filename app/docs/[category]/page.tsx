@@ -3,11 +3,16 @@ import { Category } from "@prisma/client";
 import { makeContentCards } from "@/app/docs/page";
 
 async function getFunctions(category: string) {
-    return await prisma.function.findMany({
-        where: {
-            category: category as Category,
-        },
-    });
+    try {
+        const categoryEnum = category as Category;
+        return await prisma.function.findMany({
+            where: {
+                category: categoryEnum,
+            },
+        });
+    } catch (error) {
+        return await prisma.function.findMany({ take: 0 }); // return empty array if category is invalid
+    }
 }
 
 export default async function CategorizedDocs({ params }: any) {
