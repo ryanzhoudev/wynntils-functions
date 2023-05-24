@@ -36,7 +36,7 @@ export async function makeContentCards(functions: any[]) {
             .join(";")})`;
 
         const entry = (
-            <Card className="bg-gray-800">
+            <Card className="bg-gray-800" id={func.category}>
                 <CardTitle>
                     <span className={robotoMono.className}>
                         <span className="ml-2">
