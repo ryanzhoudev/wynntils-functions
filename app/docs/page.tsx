@@ -1,11 +1,5 @@
 import prisma from "../../lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Roboto_Mono } from "next/font/google";
-
-const robotoMono = Roboto_Mono({
-    weight: "400",
-    subsets: ["latin"],
-});
 
 export async function makeContentCards(functions: any[]) {
     if (functions == undefined) {
@@ -38,13 +32,11 @@ export async function makeContentCards(functions: any[]) {
         const entry = (
             <Card className="bg-gray-800" id={func.category}>
                 <CardTitle>
-                    <span className={robotoMono.className}>
-                        <span className="ml-2">
-                            {func.name}
-                            {parameterSuffix}
-                        </span>
-                        <span className="float-right mr-2">{func.returnType}</span>
-                    </span>
+                    <code className="ml-2 text-lg">
+                        {func.name}
+                        {parameterSuffix}
+                    </code>
+                    <code className="float-right mr-2 text-lg">{func.returnType}</code>
                 </CardTitle>
                 <CardDescription>
                     <p>{func.description}</p>
@@ -56,8 +48,8 @@ export async function makeContentCards(functions: any[]) {
                 <CardContent>
                     {parameters.map((param) => (
                         <div key={param.name}>
-                            - <span className={robotoMono.className}>{param.name} </span> (
-                            <span className={robotoMono.className}>{param.type}</span>,{" "}
+                            - <code>{param.name} </code> (<code>{param.type}</code>
+                            {", "}
                             {param.required ? "required" : "optional"})
                             {param.description == null ? "" : " -- " + param.description}
                         </div>
@@ -70,7 +62,7 @@ export async function makeContentCards(functions: any[]) {
                 <CardContent>
                     {func.aliases.map((alias: string) => (
                         <div key={alias}>
-                            - <span className={robotoMono.className}>{alias}</span>
+                            - <code>{alias}</code>
                         </div>
                     ))}
                 </CardContent>
