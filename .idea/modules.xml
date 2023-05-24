@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/wynntils-function-reference.iml" filepath="$PROJECT_DIR$/.idea/wynntils-function-reference.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/wynntils-functions.iml" filepath="$PROJECT_DIR$/.idea/wynntils-functions.iml" />
     </modules>
   </component>
 </project>
