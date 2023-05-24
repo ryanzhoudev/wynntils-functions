@@ -77,8 +77,10 @@ export default function IdeTextarea(props: any) {
                 onInput={onInput}
                 onKeyDown={onKeyDown}
                 spellCheck={false}
-                className="block bg-zinc-900 w-full text-white h-96 caret-white pl-2 pr-2 pt-1 pb-1 resize-none outline-none m-0 border-r-0"
+                className="block bg-zinc-900 w-full text-white h-96 caret-white p-2 resize-none outline-none m-0 border-r-0"
             >
+                {/*firefox doesn't like empty contentEditable elements, the <br> tags fix it*/}
+                <br></br>
                 {makeHighlightedCode("")}
             </code>
             {suggestions.length > 0 ? (
