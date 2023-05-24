@@ -11,7 +11,7 @@ export default async function IDE() {
     const functions = await prisma.function.findMany();
 
     return (
-        <div className="bg-gray-800 text-white w-full h-screen">
+        <div className="text-white w-full h-screen">
             <IdeTextarea functions={functions} />
         </div>
     );

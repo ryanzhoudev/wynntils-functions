@@ -50,28 +50,36 @@ export default function IdeTextarea(props: any) {
     };
 
     return (
-        <div className="h-screen w-full">
+        <div className="h-screen w-full p-8">
             <div className={robotoMono.className}>
                 <textarea
                     id="textarea"
-                    className="bg-gray-800 text-white w-full h-96"
+                    className="bg-zinc-900 text-white w-full h-96 caret-white p-2"
                     onChange={onChange}
                     onKeyDown={onKeyDown}
                 />
-                <ul className="top-full mt-1 py-1 px-2 bg-zinc-700">
-                    <li
-                        key={suggestions[0]}
-                        className="cursor-pointer py-1 px-2 hover:bg-gray-800 text-amber-300"
-                        onClick={onClick}
-                    >
-                        {suggestions[0]}
-                    </li>
-                    {suggestions.slice(1).map((suggestion) => (
-                        <li key={suggestion} className="cursor-pointer py-1 px-2 hover:bg-zinc-800" onClick={onClick}>
-                            {suggestion}
+                {suggestions.length > 0 ? (
+                    <ul className="top-full mt-1 py-1 px-2 bg-zinc-700">
+                        <li
+                            key={suggestions[0]}
+                            className="cursor-pointer py-1 px-2 hover:bg-gray-800 text-amber-300"
+                            onClick={onClick}
+                        >
+                            {suggestions[0]}
                         </li>
-                    ))}
-                </ul>
+                        {suggestions.slice(1).map((suggestion) => (
+                            <li
+                                key={suggestion}
+                                className="cursor-pointer py-1 px-2 hover:bg-zinc-800"
+                                onClick={onClick}
+                            >
+                                {suggestion}
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <span></span>
+                )}
             </div>
         </div>
     );
