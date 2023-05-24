@@ -67,7 +67,7 @@ export default async function Docs() {
                 </CardContent>
 
                 <CardHeader>
-                    <p>Aliases:</p>
+                    <p>{func.aliases.length == 0 ? "No aliases" : "Aliases:"}</p>
                 </CardHeader>
                 <CardContent>
                     {func.aliases.map((alias) => (
