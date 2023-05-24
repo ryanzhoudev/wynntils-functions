@@ -7,9 +7,7 @@ const robotoMono = Roboto_Mono({
     subsets: ["latin"],
 });
 
-export default async function Docs() {
-    const functions = await prisma.function.findMany();
-
+export async function makeContentCards(functions: any[]) {
     if (functions == undefined) {
         return <div>Failed to load functions.</div>;
     }
@@ -53,7 +51,7 @@ export default async function Docs() {
                 </CardDescription>
 
                 <CardHeader>
-                    <p>Parameters:</p>
+                    <p>{parameters.length == 0 ? "No parameters" : "Parameters:"}</p>
                 </CardHeader>
                 <CardContent>
                     {parameters.map((param) => (
@@ -70,7 +68,7 @@ export default async function Docs() {
                     <p>{func.aliases.length == 0 ? "No aliases" : "Aliases:"}</p>
                 </CardHeader>
                 <CardContent>
-                    {func.aliases.map((alias) => (
+                    {func.aliases.map((alias: string) => (
                         <div key={alias}>
                             - <span className={robotoMono.className}>{alias}</span>
                         </div>
@@ -83,4 +81,10 @@ export default async function Docs() {
     }
 
     return <div className="grid grid-cols-1 text-white bg-card text-card-foreground">{entries}</div>;
+}
+
+export default async function Docs() {
+    const functions = await prisma.function.findMany();
+
+    return await makeContentCards(functions);
 }
