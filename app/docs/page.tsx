@@ -1,7 +1,8 @@
 import prisma from "../../lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Function } from ".prisma/client";
 
-export async function makeContentCards(functions: any[]) {
+export async function makeContentCards(functions: Function[]) {
     if (functions == undefined) {
         return <div>Failed to load functions.</div>;
     }
