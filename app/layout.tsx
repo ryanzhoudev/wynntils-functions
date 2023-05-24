@@ -12,7 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <html lang="en">
             <body className="bg-gray-800">
                 <Sidebar />
-                <div className="grid grid-cols-1 ml-48">{children}</div>
+                <div className="ml-48">{children}</div>
             </body>
         </html>
     );
