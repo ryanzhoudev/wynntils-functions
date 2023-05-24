@@ -1,12 +1,9 @@
 "use client";
-import { Roboto_Mono } from "next/font/google";
+
 import React, { useState } from "react";
 import { Function, Parameter } from ".prisma/client";
 
-const robotoMono = Roboto_Mono({
-    weight: "400",
-    subsets: ["latin"],
-});
+const ideElementId = "ide";
 
 export default function IdeTextarea(props: any) {
     const [suggestions, setSuggestions] = useState<Function[]>([]);
@@ -25,29 +22,25 @@ export default function IdeTextarea(props: any) {
         setSelectedSuggestion(suggestions[0] ?? null);
     };
 
-    function insertSelectedSuggestion(isClickEvent: boolean) {
+    function insertSelectedSuggestion() {
         if (selectedSuggestion == null) return;
 
-        const textArea = document.getElementById("textarea") as HTMLElement;
+        const textArea = document.getElementById(ideElementId) as HTMLElement;
         const text: string = textArea.textContent ?? "";
 
         const selection = window.getSelection();
         const caratPosition = selection?.getRangeAt(0).startOffset ?? 0;
 
+        const startOfCurrentWord = getStartOfCurrentWord(text, caratPosition);
         const endOfCurrentWord = getEndOfCurrentWord(text, caratPosition);
-        const existingStringLength = text.substring(
-            getStartOfCurrentWord(text, caratPosition),
-            endOfCurrentWord,
-        ).length;
+        const existingStringLength = text.substring(startOfCurrentWord, caratPosition).length;
         const appendableString = selectedSuggestion.name.substring(existingStringLength);
 
-        // for some reason click events automatically move the carat to the end of the text
-        const newCaratPosition = endOfCurrentWord + (isClickEvent ? 0 : appendableString.length);
-
-        textArea.textContent =
-            text.substring(0, endOfCurrentWord) + appendableString + text.substring(endOfCurrentWord);
+        const preCaratText = text.substring(0, caratPosition) + appendableString;
+        textArea.textContent = preCaratText + text.substring(endOfCurrentWord);
 
         const range = document.createRange();
+        const newCaratPosition = preCaratText.length;
         range.setStart(textArea.childNodes[0], newCaratPosition);
         range.setEnd(textArea.childNodes[0], newCaratPosition);
         selection?.removeAllRanges();
@@ -59,7 +52,7 @@ export default function IdeTextarea(props: any) {
     const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
         if (event.key == "Tab") {
             event.preventDefault();
-            insertSelectedSuggestion(false);
+            insertSelectedSuggestion();
         }
     };
 
@@ -68,7 +61,7 @@ export default function IdeTextarea(props: any) {
         if (clickedFunction != selectedSuggestion) {
             setSelectedSuggestion(clickedFunction);
         } else {
-            insertSelectedSuggestion(true);
+            insertSelectedSuggestion();
         }
         if (suggestions.length == 0) {
             return;
@@ -77,45 +70,43 @@ export default function IdeTextarea(props: any) {
 
     return (
         <div className="h-screen w-full p-8">
-            <div className={robotoMono.className}>
-                <code
-                    id="textarea"
-                    contentEditable={true}
-                    suppressContentEditableWarning={true} // why do they care that's the entire point of contentEditable
-                    onInput={onInput}
-                    onKeyDown={onKeyDown}
-                    spellCheck={false}
-                    className="block bg-zinc-900 w-full text-white h-96 caret-white pl-2 pr-2 pt-1 pb-1 resize-none outline-none m-0 border-r-0"
-                >
-                    {makeHighlightedCode("")}
-                </code>
-                {suggestions.length > 0 ? (
-                    <ul className="top-full mt-1 py-1 px-2 bg-zinc-700">
-                        {suggestions.map((suggestion) =>
-                            suggestion.name == selectedSuggestion?.name ? (
-                                <li
-                                    key={suggestion.name}
-                                    className="cursor-pointer py-1 px-2 hover:bg-zinc-800 text-amber-300"
-                                    onClick={() => onClick(suggestion)}
-                                >
-                                    {suggestion.name}
-                                </li>
-                            ) : (
-                                <li
-                                    key={suggestion.name}
-                                    className="cursor-pointer py-1 px-2 hover:bg-zinc-800"
-                                    onClick={() => onClick(suggestion)}
-                                    onMouseEnter={() => setSelectedSuggestion(suggestion)}
-                                >
-                                    {suggestion.name}
-                                </li>
-                            ),
-                        )}
-                    </ul>
-                ) : (
-                    <span></span>
-                )}
-            </div>
+            <code
+                id={ideElementId}
+                contentEditable={true}
+                suppressContentEditableWarning={true} // why do they care that's the entire point of contentEditable
+                onInput={onInput}
+                onKeyDown={onKeyDown}
+                spellCheck={false}
+                className="block bg-zinc-900 w-full text-white h-96 caret-white pl-2 pr-2 pt-1 pb-1 resize-none outline-none m-0 border-r-0"
+            >
+                {makeHighlightedCode("")}
+            </code>
+            {suggestions.length > 0 ? (
+                <ul className="top-full mt-1 py-1 px-2 bg-zinc-700">
+                    {suggestions.map((suggestion) =>
+                        suggestion.name == selectedSuggestion?.name ? (
+                            <li
+                                key={suggestion.name}
+                                className="cursor-pointer py-1 px-2 hover:bg-zinc-800 text-amber-300"
+                                onClick={() => onClick(suggestion)}
+                            >
+                                <code>{suggestion.name}</code>
+                            </li>
+                        ) : (
+                            <li
+                                key={suggestion.name}
+                                className="cursor-pointer py-1 px-2 hover:bg-zinc-800"
+                                onClick={() => onClick(suggestion)}
+                                onMouseEnter={() => setSelectedSuggestion(suggestion)}
+                            >
+                                <code>{suggestion.name}</code>
+                            </li>
+                        ),
+                    )}
+                </ul>
+            ) : (
+                <span></span>
+            )}
         </div>
     );
 }
