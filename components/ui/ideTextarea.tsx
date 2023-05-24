@@ -1,6 +1,6 @@
 "use client";
 import { Roboto_Mono } from "next/font/google";
-import { useState } from "react";
+import React, { useState } from "react";
 import { Function, Parameter } from ".prisma/client";
 
 const robotoMono = Roboto_Mono({
@@ -10,54 +10,80 @@ const robotoMono = Roboto_Mono({
 
 export default function IdeTextarea(props: any) {
     const [suggestions, setSuggestions] = useState<Function[]>([]);
-    const [selectedSuggestion, setSelectedSuggestions] = useState<Function | null>(null);
+    const [selectedSuggestion, setSelectedSuggestion] = useState<Function | null>(null);
 
-    const onChange = (event: any) => {
-        const textArea = event.target as HTMLTextAreaElement;
-        const start = findStartOfLastWord(textArea.value);
-        const end = textArea.textLength;
-        const word = textArea.value.substring(start, end);
-        const suggestions = getSuggestions(word, props.functions);
+    const onInput = (event: React.ChangeEvent<HTMLElement>) => {
+        const text = event.target.textContent ?? "";
+
+        const caratPosition = window.getSelection()?.getRangeAt(0).startOffset ?? 0;
+        const startOfLastWord = getStartOfLastWord(text, caratPosition);
+
+        const currentTypedWord = text.substring(startOfLastWord, caratPosition);
+
+        const suggestions = getSuggestions(currentTypedWord, props.functions);
         setSuggestions(suggestions);
-        setSelectedSuggestions(suggestions[0] ?? null);
+        setSelectedSuggestion(suggestions[0] ?? null);
     };
 
-    const onKeyDown = (event: any) => {
+    function insertSelectedSuggestion(isClickEvent: boolean) {
+        if (selectedSuggestion == null) return;
+
+        const textArea = document.getElementById("textarea") as HTMLElement;
+        const text: string = textArea.textContent ?? "";
+
+        const selection = window.getSelection();
+        const caratPosition = selection?.getRangeAt(0).startOffset ?? 0;
+
+        const existingStringLength = text.substring(getStartOfLastWord(text, caratPosition), caratPosition).length;
+        const appendableString = selectedSuggestion.name.substring(existingStringLength);
+
+        // for some reason click events automatically move the carat to the end of the text
+        const newCaratPosition = caratPosition + (isClickEvent ? 0 : appendableString.length);
+
+        textArea.textContent = text.substring(0, caratPosition) + appendableString + text.substring(caratPosition);
+
+        const range = document.createRange();
+        range.setStart(textArea.childNodes[0], newCaratPosition);
+        range.setEnd(textArea.childNodes[0], newCaratPosition);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+
+        setSuggestions([]);
+    }
+
+    const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
         if (event.key == "Tab") {
             event.preventDefault();
-            if (selectedSuggestion == null) return;
-
-            const textArea = event.target as HTMLTextAreaElement;
-
-            const appendableString = selectedSuggestion.name.substring(
-                textArea.value.length - findStartOfLastWord(textArea.value),
-            );
-            textArea.value = textArea.value + appendableString;
-            setSuggestions([]);
+            insertSelectedSuggestion(false);
         }
     };
 
-    const onClick = (event: any) => {
+    const onClick = (clickedFunction: Function) => {
+        if (clickedFunction == null) return;
+        if (clickedFunction != selectedSuggestion) {
+            setSelectedSuggestion(clickedFunction);
+        } else {
+            insertSelectedSuggestion(true);
+        }
         if (suggestions.length == 0) {
             return;
         }
-        const suggestion = event.target.innerText;
-        const textArea = document.getElementById("textarea") as HTMLTextAreaElement;
-        const appendableString = suggestion.substring(textArea.value.length - findStartOfLastWord(textArea.value));
-        textArea.value = textArea.value + appendableString;
-        setSuggestions([]);
     };
 
     return (
         <div className="h-screen w-full p-8">
             <div className={robotoMono.className}>
-                <textarea
+                <code
                     id="textarea"
-                    spellCheck={false}
-                    className="bg-zinc-900 w-full text-white h-96 caret-white pl-2 pr-2 pt-1 pb-1 resize-none outline-none m-0 border-r-0"
-                    onChange={onChange}
+                    contentEditable={true}
+                    suppressContentEditableWarning={true} // why do they care that's the entire point of contentEditable
+                    onInput={onInput}
                     onKeyDown={onKeyDown}
-                />
+                    spellCheck={false}
+                    className="block bg-zinc-900 w-full text-white h-96 caret-white pl-2 pr-2 pt-1 pb-1 resize-none outline-none m-0 border-r-0"
+                >
+                    {makeHighlightedCode("")}
+                </code>
                 {suggestions.length > 0 ? (
                     <ul className="top-full mt-1 py-1 px-2 bg-zinc-700">
                         {suggestions.map((suggestion) =>
@@ -65,7 +91,7 @@ export default function IdeTextarea(props: any) {
                                 <li
                                     key={suggestion.name}
                                     className="cursor-pointer py-1 px-2 hover:bg-zinc-800 text-amber-300"
-                                    onClick={onClick}
+                                    onClick={() => onClick(suggestion)}
                                 >
                                     {suggestion.name}
                                 </li>
@@ -73,8 +99,8 @@ export default function IdeTextarea(props: any) {
                                 <li
                                     key={suggestion.name}
                                     className="cursor-pointer py-1 px-2 hover:bg-zinc-800"
-                                    onClick={onClick}
-                                    onMouseEnter={() => setSelectedSuggestions(suggestion)}
+                                    onClick={() => onClick(suggestion)}
+                                    onMouseEnter={() => setSelectedSuggestion(suggestion)}
                                 >
                                     {suggestion.name}
                                 </li>
@@ -89,12 +115,16 @@ export default function IdeTextarea(props: any) {
     );
 }
 
-function findStartOfLastWord(text: string) {
+function makeHighlightedCode(highlighted: string) {
+    return <code className="bg-amber-300 text-zinc-700">{highlighted}</code>;
+}
+
+function getStartOfLastWord(text: string, caratPosition: number) {
     if (!text.includes(" ")) {
         return 0;
     }
 
-    let i = text.length - 1;
+    let i = caratPosition - 1;
     while (i >= 0 && text[i] != " ") {
         i--;
     }
