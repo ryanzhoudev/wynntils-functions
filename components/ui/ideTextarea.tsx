@@ -54,7 +54,7 @@ export default function IdeTextarea(props: any) {
             <div className={robotoMono.className}>
                 <textarea
                     id="textarea"
-                    className="bg-zinc-900 text-white w-full h-96 caret-white p-2"
+                    className="bg-zinc-900 w-full text-white h-96 caret-white p-2 resize-none outline-none"
                     onChange={onChange}
                     onKeyDown={onKeyDown}
                 />
