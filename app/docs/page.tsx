@@ -1,7 +1,8 @@
 import prisma from "../../lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Function } from ".prisma/client";
 
-export async function makeContentCards(functions: any[]) {
+export async function makeContentCards(functions: Function[]) {
     if (functions == undefined) {
         return <div>Failed to load functions.</div>;
     }
@@ -18,16 +19,17 @@ export async function makeContentCards(functions: any[]) {
             },
         });
 
-        // returns () if no parameters exist, otherwise returns (param1, param2, param3)
-        const parameterSuffix = `(${parameters
-            .map((param) => {
-                if (param.required) {
-                    return param.name;
-                } else {
-                    return param.name + "?";
-                }
-            })
-            .join(";")})`;
+        // returns "" if no parameters exist, otherwise returns (param1, param2, param3)
+        const parameterSuffix =
+            parameters.length == 0
+                ? ""
+                : "(" +
+                  parameters
+                      .map((param) => {
+                          return param.required ? param.name : param.name + "?";
+                      })
+                      .join("; ") +
+                  ")";
 
         const entry = (
             <Card className="bg-gray-800" id={func.category}>
