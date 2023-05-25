@@ -11,7 +11,7 @@ export default function Home() {
                     If you have any suggestions, please contact me on Discord at <code>DonkeyBlaster#4051</code>.
                 </p>
                 <br></br>
-                <ul className="ml">
+                <ul>
                     Planned for the IDE:
                     <li>- Some kind of indenter system, with a &quot;click to copy minified for game&quot; button</li>
                     <li>- Bracket pair detection/highlights</li>
