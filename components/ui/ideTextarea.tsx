@@ -23,7 +23,7 @@ export default function IdeTextarea(props: any) {
 
         const matching = getIndexOfMatchingParenthesis(text, caratPosition - 1);
         const ideArea = document.getElementById(ideElementId) as HTMLElement;
-        if (matching > 0) {
+        if (matching >= 0) {
             const newDisplayedText = getDisplayedText(
                 ideArea.textContent ?? "",
                 Math.min(matching, caratPosition - 1),
@@ -33,7 +33,7 @@ export default function IdeTextarea(props: any) {
 
             // we have to do a bunch of weird stuff with the carat since it is no longer in the same child node after adding highlights
             // this sets it to be between the two highlighted characters
-            moveCarat(2, caratPosition - (newDisplayedText[1] as number));
+            moveCarat(ideArea.childNodes.length - 1, caratPosition - (newDisplayedText[1] as number));
         } else {
             if (ideArea.childNodes[0] != null) {
                 moveCarat(0, caratPosition);
@@ -215,7 +215,7 @@ function getIndexOfMatchingParenthesis(text: string, parenthesisIndex: number) {
     } else if (text[parenthesisIndex] == ")") {
         // we are looking for the opening paren, which should be to the left
         let i = parenthesisIndex - 1; // start at the character to the left of the closing paren, otherwise we will find the closing paren again
-        if (i <= 0) {
+        if (i < 0) {
             // There is definitely not an opening paren to the left since we are already at the start of the string
             return -1;
         }
