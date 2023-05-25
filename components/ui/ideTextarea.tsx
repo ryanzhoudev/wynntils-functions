@@ -50,21 +50,30 @@ export default function IdeTextarea(props: any) {
     }
 
     const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
-        if (event.key == "Tab") {
+        if (event.key == "Tab" || event.key == "Enter") {
             event.preventDefault();
             insertSelectedSuggestion();
+        } else if (event.key == "ArrowUp") {
+            event.preventDefault();
+            setSelectedSuggestion(
+                suggestions[suggestions.indexOf(selectedSuggestion ?? suggestions[0]) - 1] ?? suggestions[0],
+            );
+        } else if (event.key == "ArrowDown") {
+            event.preventDefault();
+            setSelectedSuggestion(
+                suggestions[suggestions.indexOf(selectedSuggestion ?? suggestions[0]) + 1] ??
+                    suggestions[suggestions.length - 1],
+            );
         }
     };
 
     const onClick = (clickedFunction: Function) => {
-        if (clickedFunction == null) return;
+        if (clickedFunction == null || suggestions.length == 0) return;
         if (clickedFunction != selectedSuggestion) {
+            // This should not really happen since there are onMouseEnter events
             setSelectedSuggestion(clickedFunction);
         } else {
             insertSelectedSuggestion();
-        }
-        if (suggestions.length == 0) {
-            return;
         }
     };
 
