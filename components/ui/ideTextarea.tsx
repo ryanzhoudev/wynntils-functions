@@ -22,7 +22,16 @@ export default function IdeTextarea(props: any) {
         setSuggestions(suggestions);
         setSelectedSuggestion(suggestions[0] ?? null);
 
-        setCurrentFunction(getCurrentFunction(text, caratPosition));
+        const newCurrentFunction = getCurrentFunction(text, caratPosition);
+        setCurrentFunction(newCurrentFunction);
+        if (
+            newCurrentFunction != null &&
+            suggestions.filter((suggestion) => suggestion.name != newCurrentFunction.name).length == 0
+        ) {
+            // just manually wrote a valid function, so clear suggestions unless there are other suggestions
+            setSuggestions([]);
+            setSelectedSuggestion(null);
+        }
     };
 
     function insertSelectedSuggestion() {
