@@ -33,14 +33,13 @@ export default function IdeTextarea(props: any) {
 
         const startOfCurrentWord = getStartOfCurrentWord(text, caratPosition);
         const endOfCurrentWord = getEndOfCurrentWord(text, caratPosition);
-        const existingStringLength = text.substring(startOfCurrentWord, caratPosition).length;
-        const appendableString = selectedSuggestion.name.substring(existingStringLength);
 
-        const preCaratText = text.substring(0, caratPosition) + appendableString;
-        textArea.textContent = preCaratText + text.substring(endOfCurrentWord);
+        const preWordText = text.substring(0, startOfCurrentWord);
+        const postWordText = text.substring(endOfCurrentWord);
+        textArea.textContent = preWordText + selectedSuggestion.name + postWordText;
 
+        const newCaratPosition = preWordText.length + selectedSuggestion.name.length;
         const range = document.createRange();
-        const newCaratPosition = preCaratText.length;
         range.setStart(textArea.childNodes[0], newCaratPosition);
         range.setEnd(textArea.childNodes[0], newCaratPosition);
         selection?.removeAllRanges();
