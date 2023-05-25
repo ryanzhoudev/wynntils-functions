@@ -37,30 +37,41 @@ export default function IdeTextarea(props: any) {
     function insertSelectedSuggestion() {
         if (selectedSuggestion == null) return;
 
+        insertText(selectedSuggestion.name + "()", -1, -1);
+
+        setSuggestions([]);
+        const returnable = selectedSuggestion;
+        setSelectedSuggestion(null);
+        return returnable;
+    }
+
+    /**
+     * Inserts the specified text at the current carat position.
+     * Deletes deletePre characters to the left of the carat position before inserting.
+     * If deletePre is -1, deletes the entire current word.
+     * Sets the carat position to the end of the inserted text, plus the specified offset.
+     */
+    function insertText(insertable: string, deletePre: number, caratOffset: number) {
         const textArea = document.getElementById(ideElementId) as HTMLElement;
         const text: string = textArea.textContent ?? "";
 
         const selection = window.getSelection();
         const caratPosition = selection?.getRangeAt(0).startOffset ?? 0;
 
-        const startOfCurrentWord = getStartOfCurrentWord(text, caratPosition);
-        const endOfCurrentWord = getEndOfCurrentWord(text, caratPosition);
+        if (deletePre == -1) {
+            deletePre = getEndOfCurrentWord(text, caratPosition) - getStartOfCurrentWord(text, caratPosition);
+        }
 
-        const preWordText = text.substring(0, startOfCurrentWord);
-        const postWordText = text.substring(endOfCurrentWord);
-        textArea.textContent = preWordText + selectedSuggestion.name + postWordText;
+        const preInsertText = text.substring(0, caratPosition - deletePre);
+        const postInsertText = text.substring(getEndOfCurrentWord(text, caratPosition));
+        textArea.textContent = preInsertText + insertable + postInsertText;
 
-        const newCaratPosition = preWordText.length + selectedSuggestion.name.length;
+        const newCaratPosition = preInsertText.length + insertable.length + caratOffset;
         const range = document.createRange();
         range.setStart(textArea.childNodes[0], newCaratPosition);
         range.setEnd(textArea.childNodes[0], newCaratPosition);
         selection?.removeAllRanges();
         selection?.addRange(range);
-
-        setSuggestions([]);
-        const returnable = selectedSuggestion;
-        setSelectedSuggestion(null);
-        return returnable;
     }
 
     function getCurrentFunction(text: string, caratPosition: number) {
