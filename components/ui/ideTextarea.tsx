@@ -132,6 +132,7 @@ export default function IdeTextarea(props: any) {
                             })}
                         {")"}
                     </code>
+                    <code className="text-amber-300">{" -> " + currentFunction.returnType}</code>
                     <code className="float-right">{currentFunction.aliases.map((alias) => alias).join(", ")}</code>
                     <br></br>
                     <code className="text-gray-400">{currentFunction.description}</code>
