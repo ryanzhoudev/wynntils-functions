@@ -33,14 +33,13 @@ export default function IdeTextarea(props: any) {
 
         const startOfCurrentWord = getStartOfCurrentWord(text, caratPosition);
         const endOfCurrentWord = getEndOfCurrentWord(text, caratPosition);
-        const existingStringLength = text.substring(startOfCurrentWord, caratPosition).length;
-        const appendableString = selectedSuggestion.name.substring(existingStringLength);
 
-        const preCaratText = text.substring(0, caratPosition) + appendableString;
-        textArea.textContent = preCaratText + text.substring(endOfCurrentWord);
+        const preWordText = text.substring(0, startOfCurrentWord);
+        const postWordText = text.substring(endOfCurrentWord);
+        textArea.textContent = preWordText + selectedSuggestion.name + postWordText;
 
+        const newCaratPosition = preWordText.length + selectedSuggestion.name.length;
         const range = document.createRange();
-        const newCaratPosition = preCaratText.length;
         range.setStart(textArea.childNodes[0], newCaratPosition);
         range.setEnd(textArea.childNodes[0], newCaratPosition);
         selection?.removeAllRanges();
@@ -67,15 +66,19 @@ export default function IdeTextarea(props: any) {
         }
     };
 
-    const onClick = (clickedFunction: Function) => {
-        if (clickedFunction == null || suggestions.length == 0) return;
-        if (clickedFunction != selectedSuggestion) {
-            // This should not really happen since there are onMouseEnter events
-            setSelectedSuggestion(clickedFunction);
-        } else {
-            insertSelectedSuggestion();
-        }
-    };
+    function getListElement(suggestion: Function, selected: boolean) {
+        return (
+            <li
+                key={suggestion.name}
+                className={"cursor-pointer py-1 px-2 hover:bg-zinc-800" + (selected ? " text-amber-300" : "")}
+                onClick={() => insertSelectedSuggestion()}
+                onMouseEnter={() => setSelectedSuggestion(suggestion)}
+            >
+                <code>{suggestion.name}</code>
+                <code className="float-right">{suggestion.aliases.map((alias) => alias).join(", ")}</code>
+            </li>
+        );
+    }
 
     return (
         <div className="h-screen w-full p-8">
@@ -90,29 +93,13 @@ export default function IdeTextarea(props: any) {
             >
                 {/*firefox doesn't like empty contentEditable elements, the <br> tags fix it*/}
                 <br></br>
-                {makeHighlightedCode("")}
             </code>
             {suggestions.length > 0 ? (
                 <ul className="top-full mt-1 py-1 px-2 bg-zinc-700">
                     {suggestions.map((suggestion) =>
-                        suggestion.name == selectedSuggestion?.name ? (
-                            <li
-                                key={suggestion.name}
-                                className="cursor-pointer py-1 px-2 hover:bg-zinc-800 text-amber-300"
-                                onClick={() => onClick(suggestion)}
-                            >
-                                <code>{suggestion.name}</code>
-                            </li>
-                        ) : (
-                            <li
-                                key={suggestion.name}
-                                className="cursor-pointer py-1 px-2 hover:bg-zinc-800"
-                                onClick={() => onClick(suggestion)}
-                                onMouseEnter={() => setSelectedSuggestion(suggestion)}
-                            >
-                                <code>{suggestion.name}</code>
-                            </li>
-                        ),
+                        suggestion.name == selectedSuggestion?.name
+                            ? getListElement(suggestion, true)
+                            : getListElement(suggestion, false),
                     )}
                 </ul>
             ) : (
@@ -120,10 +107,6 @@ export default function IdeTextarea(props: any) {
             )}
         </div>
     );
-}
-
-function makeHighlightedCode(highlighted: string) {
-    return <code className="bg-amber-300 text-zinc-700">{highlighted}</code>;
 }
 
 function getStartOfCurrentWord(text: string, caratPosition: number) {
@@ -159,6 +142,13 @@ function getSuggestions(word: string, functions: Function[]): Function[] {
     for (const fn of functions) {
         if (fn.name.startsWith(word)) {
             returnable.push(fn);
+        } else {
+            for (const alias of fn.aliases) {
+                if (alias.startsWith(word) && !returnable.includes(fn)) {
+                    returnable.push(fn);
+                    break; // no need to check the rest of the aliases
+                }
+            }
         }
     }
     return returnable;
