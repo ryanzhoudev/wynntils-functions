@@ -2,12 +2,15 @@
 
 import React, { useState } from "react";
 import { Function, Parameter } from ".prisma/client";
+import { param } from "ts-interface-checker";
+import { run } from "node:test";
 
 const ideElementId = "ide";
 const wordSeparators: string[] = [" ", "(", ")", "{", "}"];
 
 export default function IdeTextarea(props: any) {
     const [suggestions, setSuggestions] = useState<Function[]>([]);
+    const [parameters, setParameters] = useState<Parameter[]>([]);
     const [selectedSuggestion, setSelectedSuggestion] = useState<Function | null>(null);
 
     const onInput = (event: React.ChangeEvent<HTMLElement>) => {
@@ -19,6 +22,7 @@ export default function IdeTextarea(props: any) {
         const currentTypedWord = text.substring(startOfCurrentWord, caratPosition);
 
         const suggestions = getSuggestions(currentTypedWord, props.functions);
+        setParameters(props.parameters);
         setSuggestions(suggestions);
         setSelectedSuggestion(suggestions[0] ?? null);
 
@@ -85,12 +89,18 @@ export default function IdeTextarea(props: any) {
         const startOfCurrentWord = getStartOfCurrentWord(text, caratPosition);
         const endOfCurrentWord = getEndOfCurrentWord(text, caratPosition);
         const existingStringLength = text.substring(startOfCurrentWord, caratPosition).length;
-        const appendableString = selectedSuggestion.name.substring(existingStringLength);
+        let appendableString = selectedSuggestion.name.substring(existingStringLength);
+        if (parameters.filter((parameter) => parameter.functionId == selectedSuggestion.id).length > 0) {
+            appendableString = appendableString + "()";
+        }
 
         const preCaratText = text.substring(0, caratPosition) + appendableString;
         textArea.textContent = preCaratText + text.substring(endOfCurrentWord);
 
-        const newCaratPosition = preCaratText.length;
+        let newCaratPosition = preCaratText.length;
+        if (appendableString.endsWith(")")) {
+            newCaratPosition -= 1;
+        }
         moveCarat(0, newCaratPosition);
 
         setSuggestions([]);
