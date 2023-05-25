@@ -8,6 +8,7 @@ const ideElementId = "ide";
 export default function IdeTextarea(props: any) {
     const [suggestions, setSuggestions] = useState<Function[]>([]);
     const [selectedSuggestion, setSelectedSuggestion] = useState<Function | null>(null);
+    const [currentFunction, setCurrentFunction] = useState<Function | null>(null);
 
     const onInput = (event: React.ChangeEvent<HTMLElement>) => {
         const text = event.target.textContent ?? "";
@@ -20,6 +21,8 @@ export default function IdeTextarea(props: any) {
         const suggestions = getSuggestions(currentTypedWord, props.functions);
         setSuggestions(suggestions);
         setSelectedSuggestion(suggestions[0] ?? null);
+
+        setCurrentFunction(getCurrentFunction(text, caratPosition));
     };
 
     function insertSelectedSuggestion() {
@@ -46,12 +49,27 @@ export default function IdeTextarea(props: any) {
         selection?.addRange(range);
 
         setSuggestions([]);
+        const returnable = selectedSuggestion;
+        setSelectedSuggestion(null);
+        return returnable;
+    }
+
+    function getCurrentFunction(text: string, caratPosition: number) {
+        const startOfCurrentWord = getStartOfCurrentWord(text, caratPosition);
+        const endOfCurrentWord = getEndOfCurrentWord(text, caratPosition);
+
+        const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord);
+
+        return props.functions.find((func: Function) => {
+            return func.name == currentWord || func.aliases.includes(currentWord);
+        });
     }
 
     const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
         if (event.key == "Tab" || event.key == "Enter") {
             event.preventDefault();
-            insertSelectedSuggestion();
+            const justInserted = insertSelectedSuggestion() ?? null;
+            setCurrentFunction(justInserted);
         } else if (event.key == "ArrowUp") {
             event.preventDefault();
             setSelectedSuggestion(
@@ -94,8 +112,36 @@ export default function IdeTextarea(props: any) {
                 {/*firefox doesn't like empty contentEditable elements, the <br> tags fix it*/}
                 <br></br>
             </code>
+            {currentFunction != null ? (
+                <div className="top-full mt-1 py-1 px-2 bg-zinc-700">
+                    <code className="text-amber-300">{currentFunction.name}</code>
+                    <code>
+                        {"("}
+                        {props.parameters
+                            .filter((parameter: Parameter) => {
+                                return parameter.functionId == currentFunction.id;
+                            })
+                            .map((parameter: Parameter) => {
+                                return (
+                                    <span key={parameter.name}>
+                                        {parameter.name}
+                                        <span className="text-gray-400">({parameter.type})</span>
+                                        {"; "}
+                                    </span>
+                                );
+                            })}
+                        {")"}
+                    </code>
+                    <code className="text-amber-300">{" -> " + currentFunction.returnType}</code>
+                    <code className="float-right">{currentFunction.aliases.map((alias) => alias).join(", ")}</code>
+                    <br></br>
+                    <code className="text-gray-400">{currentFunction.description}</code>
+                </div>
+            ) : (
+                <span></span>
+            )}
             {suggestions.length > 0 ? (
-                <ul className="top-full mt-1 py-1 px-2 bg-zinc-700">
+                <ul className="top-full mt-1 bg-zinc-700">
                     {suggestions.map((suggestion) =>
                         suggestion.name == selectedSuggestion?.name
                             ? getListElement(suggestion, true)
