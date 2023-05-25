@@ -143,6 +143,13 @@ function getSuggestions(word: string, functions: Function[]): Function[] {
     for (const fn of functions) {
         if (fn.name.startsWith(word)) {
             returnable.push(fn);
+        } else {
+            for (const alias of fn.aliases) {
+                if (alias.startsWith(word) && !returnable.includes(fn)) {
+                    returnable.push(fn);
+                    break; // no need to check the rest of the aliases
+                }
+            }
         }
     }
     return returnable;
