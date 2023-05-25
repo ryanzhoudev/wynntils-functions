@@ -67,7 +67,7 @@ export default function IdeTextarea(props: any) {
         const startOfCurrentWord = getStartOfCurrentWord(text, caratPosition);
         const endOfCurrentWord = getEndOfCurrentWord(text, caratPosition);
 
-        const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord);
+        const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
 
         return props.functions.find((func: Function) => {
             return func.name == currentWord || func.aliases.includes(currentWord);
