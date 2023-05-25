@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Function, Parameter } from ".prisma/client";
 
 const ideElementId = "ide";
+const wordSeparators: string[] = [" ", "(", ")", "{", "}"];
 
 export default function IdeTextarea(props: any) {
     const [suggestions, setSuggestions] = useState<Function[]>([]);
@@ -242,7 +243,7 @@ function getStartOfCurrentWord(text: string, caratPosition: number) {
     }
 
     let i = caratPosition - 1;
-    while (i >= 0 && text[i] != " ") {
+    while (i >= 0 && !wordSeparators.includes(text[i])) {
         i--;
     }
     return i + 1;
@@ -254,7 +255,7 @@ function getEndOfCurrentWord(text: string, caratPosition: number) {
     }
 
     let i = caratPosition;
-    while (i < text.length && text[i] != " ") {
+    while (i < text.length && !wordSeparators.includes(text[i])) {
         i++;
     }
     return i;
