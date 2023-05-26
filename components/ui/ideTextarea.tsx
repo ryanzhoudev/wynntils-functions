@@ -2,6 +2,12 @@
 
 import React, { useState } from "react";
 import { Function, Parameter } from ".prisma/client";
+import {
+    getTextInCurrentParentheses,
+    getStartOfCurrentWord,
+    getEndOfCurrentWord,
+    getSuggestions,
+} from "@/lib/stringUtils";
 
 const ideElementId = "ide";
 
@@ -89,6 +95,7 @@ export default function IdeTextarea(props: any) {
 
     /**
      * Requires currentFunction to be set and the caret to be inside the current function's parentheses.
+     * Returns the current parameter selected at the caret position, or null if there are no parameters.
      */
     function getCurrentParameter(text: string, caretPosition: number) {
         const parameters: Parameter[] = props.parameters.filter(
@@ -218,88 +225,4 @@ export default function IdeTextarea(props: any) {
             )}
         </div>
     );
-}
-
-/**
- * Should be called when the caret is inside some parentheses.
- */
-function getTextInCurrentParentheses(text: string, caretPosition: number) {
-    let start: number = 0;
-    let end: number = text.length - 1;
-
-    let i = caretPosition;
-    let openParentheses = 0;
-    while (i >= 0) {
-        if (text[i] == ")") {
-            openParentheses++;
-        } else if (text[i] == "(") {
-            openParentheses--;
-        }
-        if (openParentheses == 0) {
-            start = i;
-            break;
-        }
-        i--;
-    }
-
-    i = caretPosition;
-    openParentheses = 1;
-    while (i < text.length) {
-        if (text[i] == "(") {
-            openParentheses++;
-        } else if (text[i] == ")") {
-            openParentheses--;
-        }
-        if (openParentheses == 0) {
-            end = i;
-            break;
-        }
-        i++;
-    }
-    return text.substring(start, end + 1);
-}
-
-function getStartOfCurrentWord(text: string, caretPosition: number) {
-    if (!text.includes(" ")) {
-        return 0;
-    }
-
-    let i = caretPosition - 1;
-    while (i >= 0 && text[i] != " ") {
-        i--;
-    }
-    return i + 1;
-}
-
-function getEndOfCurrentWord(text: string, caretPosition: number) {
-    if (!text.includes(" ")) {
-        return text.length;
-    }
-
-    let i = caretPosition;
-    while (i < text.length && text[i] != " ") {
-        i++;
-    }
-    return i;
-}
-
-function getSuggestions(word: string, functions: Function[]): Function[] {
-    if (functions.length == 0 || word == "") {
-        return [];
-    }
-
-    const returnable: Function[] = [];
-    for (const fn of functions) {
-        if (fn.name.startsWith(word)) {
-            returnable.push(fn);
-        } else {
-            for (const alias of fn.aliases) {
-                if (alias.startsWith(word) && !returnable.includes(fn)) {
-                    returnable.push(fn);
-                    break; // no need to check the rest of the aliases
-                }
-            }
-        }
-    }
-    return returnable;
 }
