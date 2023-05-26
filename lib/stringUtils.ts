@@ -56,24 +56,30 @@ const wordSeparators = [" ", "(", ")"];
 
 /**
  * Returns the index of the first character of the word the caret is currently in. Word separators are " ", "(" and ")".
- * Separators are not included in the returned index. If the characterIndex is a separator, the index of the previous word is returned.
+ * Separators are not included in the returned index. If the given characterIndex is a separator, the start index of the previous word is returned.
  */
 export function getStartIndexOfCurrentWord(text: string, characterIndex: number) {
     let i = characterIndex - 1;
-    while (i >= 0 && !wordSeparators.includes(text[i])) {
+    while (i >= 0) {
+        if (wordSeparators.includes(text[i])) {
+            return i + 1;
+        }
         i--;
     }
-    return i + 1;
+    return 0;
 }
 
+/**
+ * Returns the index of the last character of the word the caret is currently in. Word separators are " ", "(" and ")".
+ * Separators are not included in the returned index. If the given characterIndex is a separator, the end index of the previous word is returned.
+ */
 export function getEndIndexOfCurrentWord(text: string, characterIndex: number) {
-    if (!text.includes(" ")) {
-        return text.length;
-    }
-
     let i = characterIndex;
-    while (i < text.length && text[i] != " ") {
+    while (i < text.length) {
+        if (wordSeparators.includes(text[i])) {
+            return i - 1;
+        }
         i++;
     }
-    return i;
+    return text.length;
 }
