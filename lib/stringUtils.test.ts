@@ -11,6 +11,9 @@ test("getTextInCurrentParentheses", () => {
     );
     expect(getTextInCurrentParentheses("(more ( complex text ( with )) lots of brackets)", 21)).toBe("( with )");
     expect(getTextInCurrentParentheses("(more ( complex text ( with )) lots of brackets)", 22)).toBe("( with )");
+    expect(getTextInCurrentParentheses("(more ( complex text ( with )) lots of brackets)", 8)).toBe(
+        "( complex text ( with ))",
+    );
     expect(getTextInCurrentParentheses("(mismatched parens", 0)).toBe("(mismatched parens");
     expect(getTextInCurrentParentheses("mismatched parens)", 0)).toBe("mismatched parens)");
 });
