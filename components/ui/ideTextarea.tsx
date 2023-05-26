@@ -14,18 +14,18 @@ export default function IdeTextarea(props: any) {
     const onInput = (event: React.ChangeEvent<HTMLElement>) => {
         const text = event.target.textContent ?? "";
 
-        const caratPosition = window.getSelection()?.getRangeAt(0).startOffset ?? 0;
-        const startOfCurrentWord = getStartOfCurrentWord(text, caratPosition);
+        const caretPosition = window.getSelection()?.getRangeAt(0).startOffset ?? 0;
+        const startOfCurrentWord = getStartOfCurrentWord(text, caretPosition);
 
-        const currentTypedWord = text.substring(startOfCurrentWord, caratPosition);
+        const currentTypedWord = text.substring(startOfCurrentWord, caretPosition);
 
         const suggestions = getSuggestions(currentTypedWord, props.functions);
         setSuggestions(suggestions);
         setSelectedSuggestion(suggestions[0] ?? null);
 
-        const newCurrentFunction = getCurrentFunction(text, caratPosition);
+        const newCurrentFunction = getCurrentFunction(text, caretPosition);
         setCurrentFunction(newCurrentFunction);
-        setCurrentFunctionParameter(getCurrentParameter(text, caratPosition));
+        setCurrentFunctionParameter(getCurrentParameter(text, caretPosition));
         if (
             newCurrentFunction != null &&
             suggestions.filter((suggestion) => suggestion.name != newCurrentFunction.name).length == 0
@@ -48,37 +48,37 @@ export default function IdeTextarea(props: any) {
     }
 
     /**
-     * Inserts the specified text at the current carat position.
-     * Deletes deletePre characters to the left of the carat position before inserting.
+     * Inserts the specified text at the current caret position.
+     * Deletes deletePre characters to the left of the caret position before inserting.
      * If deletePre is -1, deletes the entire current word.
-     * Sets the carat position to the end of the inserted text, plus the specified offset.
+     * Sets the caret position to the end of the inserted text, plus the specified offset.
      */
-    function insertText(insertable: string, deletePre: number, caratOffset: number) {
+    function insertText(insertable: string, deletePre: number, caretOffset: number) {
         const textArea = document.getElementById(ideElementId) as HTMLElement;
         const text: string = textArea.textContent ?? "";
 
         const selection = window.getSelection();
-        const caratPosition = selection?.getRangeAt(0).startOffset ?? 0;
+        const caretPosition = selection?.getRangeAt(0).startOffset ?? 0;
 
         if (deletePre == -1) {
-            deletePre = getEndOfCurrentWord(text, caratPosition) - getStartOfCurrentWord(text, caratPosition);
+            deletePre = getEndOfCurrentWord(text, caretPosition) - getStartOfCurrentWord(text, caretPosition);
         }
 
-        const preInsertText = text.substring(0, caratPosition - deletePre);
-        const postInsertText = text.substring(getEndOfCurrentWord(text, caratPosition));
+        const preInsertText = text.substring(0, caretPosition - deletePre);
+        const postInsertText = text.substring(getEndOfCurrentWord(text, caretPosition));
         textArea.textContent = preInsertText + insertable + postInsertText;
 
-        const newCaratPosition = preInsertText.length + insertable.length + caratOffset;
+        const newcaretPosition = preInsertText.length + insertable.length + caretOffset;
         const range = document.createRange();
-        range.setStart(textArea.childNodes[0], newCaratPosition);
-        range.setEnd(textArea.childNodes[0], newCaratPosition);
+        range.setStart(textArea.childNodes[0], newcaretPosition);
+        range.setEnd(textArea.childNodes[0], newcaretPosition);
         selection?.removeAllRanges();
         selection?.addRange(range);
     }
 
-    function getCurrentFunction(text: string, caratPosition: number) {
-        const startOfCurrentWord = getStartOfCurrentWord(text, caratPosition);
-        const endOfCurrentWord = getEndOfCurrentWord(text, caratPosition);
+    function getCurrentFunction(text: string, caretPosition: number) {
+        const startOfCurrentWord = getStartOfCurrentWord(text, caretPosition);
+        const endOfCurrentWord = getEndOfCurrentWord(text, caretPosition);
 
         const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
 
@@ -88,16 +88,16 @@ export default function IdeTextarea(props: any) {
     }
 
     /**
-     * Requires currentFunction to be set and the carat to be inside the current function's parentheses.
+     * Requires currentFunction to be set and the caret to be inside the current function's parentheses.
      */
-    function getCurrentParameter(text: string, caratPosition: number) {
+    function getCurrentParameter(text: string, caretPosition: number) {
         const parameters: Parameter[] = props.parameters.filter(
             (param: Parameter) => param.functionId == currentFunction?.id,
         );
         if (parameters.length == 0) return null;
 
         // we can just get the number of semicolons to the left inside the parentheses to get the current parameter
-        const numberOfSemicolonsToLeft = getTextInCurrentParentheses(text, caratPosition).split(";").length - 1;
+        const numberOfSemicolonsToLeft = getTextInCurrentParentheses(text, caretPosition).split(";").length - 1;
         return parameters[numberOfSemicolonsToLeft];
     }
 
@@ -259,24 +259,24 @@ function getTextInCurrentParentheses(text: string, caretPosition: number) {
     return text.substring(start, end + 1);
 }
 
-function getStartOfCurrentWord(text: string, caratPosition: number) {
+function getStartOfCurrentWord(text: string, caretPosition: number) {
     if (!text.includes(" ")) {
         return 0;
     }
 
-    let i = caratPosition - 1;
+    let i = caretPosition - 1;
     while (i >= 0 && text[i] != " ") {
         i--;
     }
     return i + 1;
 }
 
-function getEndOfCurrentWord(text: string, caratPosition: number) {
+function getEndOfCurrentWord(text: string, caretPosition: number) {
     if (!text.includes(" ")) {
         return text.length;
     }
 
-    let i = caratPosition;
+    let i = caretPosition;
     while (i < text.length && text[i] != " ") {
         i++;
     }
