@@ -9,6 +9,7 @@ export default function IdeTextarea(props: any) {
     const [suggestions, setSuggestions] = useState<Function[]>([]);
     const [selectedSuggestion, setSelectedSuggestion] = useState<Function | null>(null);
     const [currentFunction, setCurrentFunction] = useState<Function | null>(null);
+    const [currentFunctionParameter, setCurrentFunctionParameter] = useState<Parameter | null>(null);
 
     const onInput = (event: React.ChangeEvent<HTMLElement>) => {
         const text = event.target.textContent ?? "";
@@ -24,6 +25,7 @@ export default function IdeTextarea(props: any) {
 
         const newCurrentFunction = getCurrentFunction(text, caratPosition);
         setCurrentFunction(newCurrentFunction);
+        setCurrentFunctionParameter(getCurrentParameter(text, caratPosition));
         if (
             newCurrentFunction != null &&
             suggestions.filter((suggestion) => suggestion.name != newCurrentFunction.name).length == 0
@@ -85,11 +87,28 @@ export default function IdeTextarea(props: any) {
         });
     }
 
+    /**
+     * Requires currentFunction to be set and the carat to be inside the current function's parentheses.
+     */
+    function getCurrentParameter(text: string, caratPosition: number) {
+        const parameters: Parameter[] = props.parameters.filter(
+            (param: Parameter) => param.functionId == currentFunction?.id,
+        );
+        if (parameters.length == 0) return null;
+
+        // we can just get the number of semicolons to the left inside the parentheses to get the current parameter
+        const numberOfSemicolonsToLeft = getTextInCurrentParentheses(text, caratPosition).split(";").length - 1;
+        return parameters[numberOfSemicolonsToLeft];
+    }
+
     const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
         if (event.key == "Tab" || event.key == "Enter") {
             event.preventDefault();
             const justInserted = insertSelectedSuggestion() ?? null;
             setCurrentFunction(justInserted);
+            setCurrentFunctionParameter(
+                props.parameters.filter((param: Parameter) => param.functionId == justInserted?.id)[0],
+            );
         } else if (event.key == "ArrowUp") {
             event.preventDefault();
             setSelectedSuggestion(
@@ -142,10 +161,16 @@ export default function IdeTextarea(props: any) {
                                 return parameter.functionId == currentFunction.id;
                             })
                             .map((parameter: Parameter) => {
-                                return (
-                                    <span key={parameter.name}>
+                                return parameter.name == currentFunctionParameter?.name ? (
+                                    <span key={parameter.name} className="font-bold text-white">
                                         {parameter.name}
-                                        <span className="text-gray-400">({parameter.type})</span>
+                                        <span className="text-gray-600">({parameter.type})</span>
+                                        {"; "}
+                                    </span>
+                                ) : (
+                                    <span key={parameter.name} className="text-gray-300">
+                                        {parameter.name}
+                                        <span className="text-gray-600">({parameter.type})</span>
                                         {"; "}
                                     </span>
                                 );
@@ -173,6 +198,45 @@ export default function IdeTextarea(props: any) {
             )}
         </div>
     );
+}
+
+/**
+ * Should be called when the caret is inside some parentheses.
+ */
+function getTextInCurrentParentheses(text: string, caretPosition: number) {
+    let start: number = 0;
+    let end: number = text.length - 1;
+
+    let i = caretPosition;
+    let openParentheses = 0;
+    while (i >= 0) {
+        if (text[i] == ")") {
+            openParentheses++;
+        } else if (text[i] == "(") {
+            openParentheses--;
+        }
+        if (openParentheses == 0) {
+            start = i;
+            break;
+        }
+        i--;
+    }
+
+    i = caretPosition;
+    openParentheses = 1;
+    while (i < text.length) {
+        if (text[i] == "(") {
+            openParentheses++;
+        } else if (text[i] == ")") {
+            openParentheses--;
+        }
+        if (openParentheses == 0) {
+            end = i;
+            break;
+        }
+        i++;
+    }
+    return text.substring(start, end + 1);
 }
 
 function getStartOfCurrentWord(text: string, caratPosition: number) {
