@@ -181,6 +181,26 @@ export default function IdeTextarea(props: any) {
                     <code className="float-right">{currentFunction.aliases.map((alias) => alias).join(", ")}</code>
                     <br></br>
                     <code className="text-gray-400">{currentFunction.description}</code>
+                    <br></br>
+                    <br></br>
+                    {props.parameters.filter((param: Parameter) => param.functionId == currentFunction.id).length ==
+                    0 ? (
+                        <code className="text-gray-400">No parameters.</code>
+                    ) : (
+                        props.parameters
+                            .filter((param: Parameter) => param.functionId == currentFunction.id)
+                            .map((param: Parameter) => {
+                                return (
+                                    <div key={param.name}>
+                                        <code className="font-bold text-white">
+                                            {param.name}
+                                            {": "}
+                                        </code>
+                                        <code> {param.description ?? "No description."}</code>
+                                    </div>
+                                );
+                            })
+                    )}
                 </div>
             ) : (
                 <span></span>
