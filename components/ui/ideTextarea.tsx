@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Function, Parameter } from ".prisma/client";
+import { getTextInCurrentParentheses, getStartIndexOfCurrentWord, getEndIndexOfCurrentWord } from "@/lib/stringUtils";
 
 const ideElementId = "ide";
 
@@ -15,7 +16,7 @@ export default function IdeTextarea(props: any) {
         const text = event.target.textContent ?? "";
 
         const caretPosition = window.getSelection()?.getRangeAt(0).startOffset ?? 0;
-        const startOfCurrentWord = getStartOfCurrentWord(text, caretPosition);
+        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition);
 
         const currentTypedWord = text.substring(startOfCurrentWord, caretPosition);
 
@@ -61,11 +62,11 @@ export default function IdeTextarea(props: any) {
         const caretPosition = selection?.getRangeAt(0).startOffset ?? 0;
 
         if (deletePre == -1) {
-            deletePre = getEndOfCurrentWord(text, caretPosition) - getStartOfCurrentWord(text, caretPosition);
+            deletePre = getEndIndexOfCurrentWord(text, caretPosition) - getStartIndexOfCurrentWord(text, caretPosition);
         }
 
         const preInsertText = text.substring(0, caretPosition - deletePre);
-        const postInsertText = text.substring(getEndOfCurrentWord(text, caretPosition));
+        const postInsertText = text.substring(getEndIndexOfCurrentWord(text, caretPosition));
         textArea.textContent = preInsertText + insertable + postInsertText;
 
         const newcaretPosition = preInsertText.length + insertable.length + caretOffset;
@@ -77,8 +78,8 @@ export default function IdeTextarea(props: any) {
     }
 
     function getCurrentFunction(text: string, caretPosition: number) {
-        const startOfCurrentWord = getStartOfCurrentWord(text, caretPosition);
-        const endOfCurrentWord = getEndOfCurrentWord(text, caretPosition);
+        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition);
+        const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition);
 
         const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
 
@@ -89,6 +90,7 @@ export default function IdeTextarea(props: any) {
 
     /**
      * Requires currentFunction to be set and the caret to be inside the current function's parentheses.
+     * Returns the current parameter selected at the caret position, or null if there are no parameters.
      */
     function getCurrentParameter(text: string, caretPosition: number) {
         const parameters: Parameter[] = props.parameters.filter(
@@ -218,69 +220,6 @@ export default function IdeTextarea(props: any) {
             )}
         </div>
     );
-}
-
-/**
- * Should be called when the caret is inside some parentheses.
- */
-function getTextInCurrentParentheses(text: string, caretPosition: number) {
-    let start: number = 0;
-    let end: number = text.length - 1;
-
-    let i = caretPosition;
-    let openParentheses = 0;
-    while (i >= 0) {
-        if (text[i] == ")") {
-            openParentheses++;
-        } else if (text[i] == "(") {
-            openParentheses--;
-        }
-        if (openParentheses == 0) {
-            start = i;
-            break;
-        }
-        i--;
-    }
-
-    i = caretPosition;
-    openParentheses = 1;
-    while (i < text.length) {
-        if (text[i] == "(") {
-            openParentheses++;
-        } else if (text[i] == ")") {
-            openParentheses--;
-        }
-        if (openParentheses == 0) {
-            end = i;
-            break;
-        }
-        i++;
-    }
-    return text.substring(start, end + 1);
-}
-
-function getStartOfCurrentWord(text: string, caretPosition: number) {
-    if (!text.includes(" ")) {
-        return 0;
-    }
-
-    let i = caretPosition - 1;
-    while (i >= 0 && text[i] != " ") {
-        i--;
-    }
-    return i + 1;
-}
-
-function getEndOfCurrentWord(text: string, caretPosition: number) {
-    if (!text.includes(" ")) {
-        return text.length;
-    }
-
-    let i = caretPosition;
-    while (i < text.length && text[i] != " ") {
-        i++;
-    }
-    return i;
 }
 
 function getSuggestions(word: string, functions: Function[]): Function[] {
