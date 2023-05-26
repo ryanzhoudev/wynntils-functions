@@ -4,6 +4,10 @@ import { expect } from "@jest/globals";
 test("getTextInCurrentParentheses", () => {
     expect(getTextInCurrentParentheses("()", 1)).toBe("()");
     expect(getTextInCurrentParentheses("(())", 2)).toBe("()");
+    expect(getTextInCurrentParentheses("((((((((", 0)).toBe("((((((((");
+    expect(getTextInCurrentParentheses("((((((((", 7)).toBe("(");
+    expect(getTextInCurrentParentheses("))))))))", 0)).toBe(")");
+    expect(getTextInCurrentParentheses("))))))))", 7)).toBe("))))))))");
     expect(getTextInCurrentParentheses("(this is some text)", 3)).toBe("(this is some text)");
     expect(getTextInCurrentParentheses("(this is some text)", 0)).toBe("(this is some text)");
     expect(getTextInCurrentParentheses("(more ( complex text ( with )) lots of brackets)", 0)).toBe(
