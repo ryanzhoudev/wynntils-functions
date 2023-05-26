@@ -2,12 +2,7 @@
 
 import React, { useState } from "react";
 import { Function, Parameter } from ".prisma/client";
-import {
-    getTextInCurrentParentheses,
-    getStartOfCurrentWord,
-    getEndOfCurrentWord,
-    getSuggestions,
-} from "@/lib/stringUtils";
+import { getTextInCurrentParentheses, getStartIndexOfCurrentWord, getEndIndexOfCurrentWord } from "@/lib/stringUtils";
 
 const ideElementId = "ide";
 
@@ -21,7 +16,7 @@ export default function IdeTextarea(props: any) {
         const text = event.target.textContent ?? "";
 
         const caretPosition = window.getSelection()?.getRangeAt(0).startOffset ?? 0;
-        const startOfCurrentWord = getStartOfCurrentWord(text, caretPosition);
+        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition);
 
         const currentTypedWord = text.substring(startOfCurrentWord, caretPosition);
 
@@ -67,11 +62,11 @@ export default function IdeTextarea(props: any) {
         const caretPosition = selection?.getRangeAt(0).startOffset ?? 0;
 
         if (deletePre == -1) {
-            deletePre = getEndOfCurrentWord(text, caretPosition) - getStartOfCurrentWord(text, caretPosition);
+            deletePre = getEndIndexOfCurrentWord(text, caretPosition) - getStartIndexOfCurrentWord(text, caretPosition);
         }
 
         const preInsertText = text.substring(0, caretPosition - deletePre);
-        const postInsertText = text.substring(getEndOfCurrentWord(text, caretPosition));
+        const postInsertText = text.substring(getEndIndexOfCurrentWord(text, caretPosition));
         textArea.textContent = preInsertText + insertable + postInsertText;
 
         const newcaretPosition = preInsertText.length + insertable.length + caretOffset;
@@ -83,8 +78,8 @@ export default function IdeTextarea(props: any) {
     }
 
     function getCurrentFunction(text: string, caretPosition: number) {
-        const startOfCurrentWord = getStartOfCurrentWord(text, caretPosition);
-        const endOfCurrentWord = getEndOfCurrentWord(text, caretPosition);
+        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition);
+        const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition);
 
         const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
 
@@ -225,4 +220,25 @@ export default function IdeTextarea(props: any) {
             )}
         </div>
     );
+}
+
+function getSuggestions(word: string, functions: Function[]): Function[] {
+    if (functions.length == 0 || word == "") {
+        return [];
+    }
+
+    const returnable: Function[] = [];
+    for (const fn of functions) {
+        if (fn.name.startsWith(word)) {
+            returnable.push(fn);
+        } else {
+            for (const alias of fn.aliases) {
+                if (alias.startsWith(word) && !returnable.includes(fn)) {
+                    returnable.push(fn);
+                    break; // no need to check the rest of the aliases
+                }
+            }
+        }
+    }
+    return returnable;
 }

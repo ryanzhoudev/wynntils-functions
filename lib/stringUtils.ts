@@ -1,5 +1,3 @@
-import { Function } from ".prisma/client";
-
 /**
  * Should be called when the caret is inside some parentheses.
  * Returns the text between the closest left and right parentheses, including the parentheses.
@@ -54,47 +52,28 @@ export function getTextInCurrentParentheses(text: string, characterIndex: number
     return text.substring(start, end + 1);
 }
 
-export function getStartOfCurrentWord(text: string, caretPosition: number) {
-    if (!text.includes(" ")) {
-        return 0;
-    }
+const wordSeparators = [" ", "(", ")"];
 
-    let i = caretPosition - 1;
-    while (i >= 0 && text[i] != " ") {
+/**
+ * Returns the index of the first character of the word the caret is currently in. Word separators are " ", "(" and ")".
+ * Separators are not included in the returned index. If the characterIndex is a separator, the index of the previous word is returned.
+ */
+export function getStartIndexOfCurrentWord(text: string, characterIndex: number) {
+    let i = characterIndex - 1;
+    while (i >= 0 && !wordSeparators.includes(text[i])) {
         i--;
     }
     return i + 1;
 }
 
-export function getEndOfCurrentWord(text: string, caretPosition: number) {
+export function getEndIndexOfCurrentWord(text: string, characterIndex: number) {
     if (!text.includes(" ")) {
         return text.length;
     }
 
-    let i = caretPosition;
+    let i = characterIndex;
     while (i < text.length && text[i] != " ") {
         i++;
     }
     return i;
-}
-
-export function getSuggestions(word: string, functions: Function[]): Function[] {
-    if (functions.length == 0 || word == "") {
-        return [];
-    }
-
-    const returnable: Function[] = [];
-    for (const fn of functions) {
-        if (fn.name.startsWith(word)) {
-            returnable.push(fn);
-        } else {
-            for (const alias of fn.aliases) {
-                if (alias.startsWith(word) && !returnable.includes(fn)) {
-                    returnable.push(fn);
-                    break; // no need to check the rest of the aliases
-                }
-            }
-        }
-    }
-    return returnable;
 }

@@ -1,4 +1,4 @@
-import { getTextInCurrentParentheses, getStartOfCurrentWord, getEndOfCurrentWord, getSuggestions } from "./stringUtils";
+import { getTextInCurrentParentheses, getStartIndexOfCurrentWord, getEndIndexOfCurrentWord } from "./stringUtils";
 import { expect } from "@jest/globals";
 
 test("getTextInCurrentParentheses", () => {
@@ -16,4 +16,16 @@ test("getTextInCurrentParentheses", () => {
     );
     expect(getTextInCurrentParentheses("(mismatched parens", 0)).toBe("(mismatched parens");
     expect(getTextInCurrentParentheses("mismatched parens)", 0)).toBe("mismatched parens)");
+});
+
+test("getStartIndexOfCurrentWord", () => {
+    expect(getStartIndexOfCurrentWord("this is some text", 0)).toBe(0);
+    expect(getStartIndexOfCurrentWord("this is some text", 3)).toBe(0);
+    expect(getStartIndexOfCurrentWord("this is some text", 4)).toBe(0);
+    expect(getStartIndexOfCurrentWord("this is some text", 5)).toBe(5);
+    expect(getStartIndexOfCurrentWord("this is some text", 6)).toBe(5);
+    expect(getStartIndexOfCurrentWord("this is some text", 7)).toBe(5);
+    expect(getStartIndexOfCurrentWord("function_example(param1)", 16)).toBe(0);
+    expect(getStartIndexOfCurrentWord("function_example(param1)", 17)).toBe(17);
+    expect(getStartIndexOfCurrentWord("function_example(param1)", 23)).toBe(17);
 });
