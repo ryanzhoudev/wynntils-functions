@@ -9,21 +9,23 @@ export default function IdeTextarea(props: any) {
     const [suggestions, setSuggestions] = useState<Function[]>([]);
     const [selectedSuggestion, setSelectedSuggestion] = useState<Function | null>(null);
     const [currentFunction, setCurrentFunction] = useState<Function | null>(null);
+    const [currentFunctionParameter, setCurrentFunctionParameter] = useState<Parameter | null>(null);
 
     const onInput = (event: React.ChangeEvent<HTMLElement>) => {
         const text = event.target.textContent ?? "";
 
-        const caratPosition = window.getSelection()?.getRangeAt(0).startOffset ?? 0;
-        const startOfCurrentWord = getStartOfCurrentWord(text, caratPosition);
+        const caretPosition = window.getSelection()?.getRangeAt(0).startOffset ?? 0;
+        const startOfCurrentWord = getStartOfCurrentWord(text, caretPosition);
 
-        const currentTypedWord = text.substring(startOfCurrentWord, caratPosition);
+        const currentTypedWord = text.substring(startOfCurrentWord, caretPosition);
 
         const suggestions = getSuggestions(currentTypedWord, props.functions);
         setSuggestions(suggestions);
         setSelectedSuggestion(suggestions[0] ?? null);
 
-        const newCurrentFunction = getCurrentFunction(text, caratPosition);
+        const newCurrentFunction = getCurrentFunction(text, caretPosition);
         setCurrentFunction(newCurrentFunction);
+        setCurrentFunctionParameter(getCurrentParameter(text, caretPosition));
         if (
             newCurrentFunction != null &&
             suggestions.filter((suggestion) => suggestion.name != newCurrentFunction.name).length == 0
@@ -37,25 +39,7 @@ export default function IdeTextarea(props: any) {
     function insertSelectedSuggestion() {
         if (selectedSuggestion == null) return;
 
-        const textArea = document.getElementById(ideElementId) as HTMLElement;
-        const text: string = textArea.textContent ?? "";
-
-        const selection = window.getSelection();
-        const caratPosition = selection?.getRangeAt(0).startOffset ?? 0;
-
-        const startOfCurrentWord = getStartOfCurrentWord(text, caratPosition);
-        const endOfCurrentWord = getEndOfCurrentWord(text, caratPosition);
-
-        const preWordText = text.substring(0, startOfCurrentWord);
-        const postWordText = text.substring(endOfCurrentWord);
-        textArea.textContent = preWordText + selectedSuggestion.name + postWordText;
-
-        const newCaratPosition = preWordText.length + selectedSuggestion.name.length;
-        const range = document.createRange();
-        range.setStart(textArea.childNodes[0], newCaratPosition);
-        range.setEnd(textArea.childNodes[0], newCaratPosition);
-        selection?.removeAllRanges();
-        selection?.addRange(range);
+        insertText(selectedSuggestion.name + "()", -1, -1);
 
         setSuggestions([]);
         const returnable = selectedSuggestion;
@@ -63,15 +47,58 @@ export default function IdeTextarea(props: any) {
         return returnable;
     }
 
-    function getCurrentFunction(text: string, caratPosition: number) {
-        const startOfCurrentWord = getStartOfCurrentWord(text, caratPosition);
-        const endOfCurrentWord = getEndOfCurrentWord(text, caratPosition);
+    /**
+     * Inserts the specified text at the current caret position.
+     * Deletes deletePre characters to the left of the caret position before inserting.
+     * If deletePre is -1, deletes the entire current word.
+     * Sets the caret position to the end of the inserted text, plus the specified offset.
+     */
+    function insertText(insertable: string, deletePre: number, caretOffset: number) {
+        const textArea = document.getElementById(ideElementId) as HTMLElement;
+        const text: string = textArea.textContent ?? "";
 
-        const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord);
+        const selection = window.getSelection();
+        const caretPosition = selection?.getRangeAt(0).startOffset ?? 0;
+
+        if (deletePre == -1) {
+            deletePre = getEndOfCurrentWord(text, caretPosition) - getStartOfCurrentWord(text, caretPosition);
+        }
+
+        const preInsertText = text.substring(0, caretPosition - deletePre);
+        const postInsertText = text.substring(getEndOfCurrentWord(text, caretPosition));
+        textArea.textContent = preInsertText + insertable + postInsertText;
+
+        const newcaretPosition = preInsertText.length + insertable.length + caretOffset;
+        const range = document.createRange();
+        range.setStart(textArea.childNodes[0], newcaretPosition);
+        range.setEnd(textArea.childNodes[0], newcaretPosition);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+    }
+
+    function getCurrentFunction(text: string, caretPosition: number) {
+        const startOfCurrentWord = getStartOfCurrentWord(text, caretPosition);
+        const endOfCurrentWord = getEndOfCurrentWord(text, caretPosition);
+
+        const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
 
         return props.functions.find((func: Function) => {
             return func.name == currentWord || func.aliases.includes(currentWord);
         });
+    }
+
+    /**
+     * Requires currentFunction to be set and the caret to be inside the current function's parentheses.
+     */
+    function getCurrentParameter(text: string, caretPosition: number) {
+        const parameters: Parameter[] = props.parameters.filter(
+            (param: Parameter) => param.functionId == currentFunction?.id,
+        );
+        if (parameters.length == 0) return null;
+
+        // we can just get the number of semicolons to the left inside the parentheses to get the current parameter
+        const numberOfSemicolonsToLeft = getTextInCurrentParentheses(text, caretPosition).split(";").length - 1;
+        return parameters[numberOfSemicolonsToLeft];
     }
 
     const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
@@ -79,6 +106,9 @@ export default function IdeTextarea(props: any) {
             event.preventDefault();
             const justInserted = insertSelectedSuggestion() ?? null;
             setCurrentFunction(justInserted);
+            setCurrentFunctionParameter(
+                props.parameters.filter((param: Parameter) => param.functionId == justInserted?.id)[0],
+            );
         } else if (event.key == "ArrowUp") {
             event.preventDefault();
             setSelectedSuggestion(
@@ -131,10 +161,16 @@ export default function IdeTextarea(props: any) {
                                 return parameter.functionId == currentFunction.id;
                             })
                             .map((parameter: Parameter) => {
-                                return (
-                                    <span key={parameter.name}>
+                                return parameter.name == currentFunctionParameter?.name ? (
+                                    <span key={parameter.name} className="font-bold text-white">
                                         {parameter.name}
-                                        <span className="text-gray-400">({parameter.type})</span>
+                                        <span className="text-gray-600">({parameter.type})</span>
+                                        {"; "}
+                                    </span>
+                                ) : (
+                                    <span key={parameter.name} className="text-gray-300">
+                                        {parameter.name}
+                                        <span className="text-gray-600">({parameter.type})</span>
                                         {"; "}
                                     </span>
                                 );
@@ -145,6 +181,26 @@ export default function IdeTextarea(props: any) {
                     <code className="float-right">{currentFunction.aliases.map((alias) => alias).join(", ")}</code>
                     <br></br>
                     <code className="text-gray-400">{currentFunction.description}</code>
+                    <br></br>
+                    <br></br>
+                    {props.parameters.filter((param: Parameter) => param.functionId == currentFunction.id).length ==
+                    0 ? (
+                        <code className="text-gray-400">No parameters.</code>
+                    ) : (
+                        props.parameters
+                            .filter((param: Parameter) => param.functionId == currentFunction.id)
+                            .map((param: Parameter) => {
+                                return (
+                                    <div key={param.name}>
+                                        <code className="font-bold text-white">
+                                            {param.name}
+                                            {": "}
+                                        </code>
+                                        <code> {param.description ?? "No description."}</code>
+                                    </div>
+                                );
+                            })
+                    )}
                 </div>
             ) : (
                 <span></span>
@@ -164,24 +220,63 @@ export default function IdeTextarea(props: any) {
     );
 }
 
-function getStartOfCurrentWord(text: string, caratPosition: number) {
+/**
+ * Should be called when the caret is inside some parentheses.
+ */
+function getTextInCurrentParentheses(text: string, caretPosition: number) {
+    let start: number = 0;
+    let end: number = text.length - 1;
+
+    let i = caretPosition;
+    let openParentheses = 0;
+    while (i >= 0) {
+        if (text[i] == ")") {
+            openParentheses++;
+        } else if (text[i] == "(") {
+            openParentheses--;
+        }
+        if (openParentheses == 0) {
+            start = i;
+            break;
+        }
+        i--;
+    }
+
+    i = caretPosition;
+    openParentheses = 1;
+    while (i < text.length) {
+        if (text[i] == "(") {
+            openParentheses++;
+        } else if (text[i] == ")") {
+            openParentheses--;
+        }
+        if (openParentheses == 0) {
+            end = i;
+            break;
+        }
+        i++;
+    }
+    return text.substring(start, end + 1);
+}
+
+function getStartOfCurrentWord(text: string, caretPosition: number) {
     if (!text.includes(" ")) {
         return 0;
     }
 
-    let i = caratPosition - 1;
+    let i = caretPosition - 1;
     while (i >= 0 && text[i] != " ") {
         i--;
     }
     return i + 1;
 }
 
-function getEndOfCurrentWord(text: string, caratPosition: number) {
+function getEndOfCurrentWord(text: string, caretPosition: number) {
     if (!text.includes(" ")) {
         return text.length;
     }
 
-    let i = caratPosition;
+    let i = caretPosition;
     while (i < text.length && text[i] != " ") {
         i++;
     }
