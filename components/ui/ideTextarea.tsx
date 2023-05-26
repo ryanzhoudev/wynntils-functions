@@ -206,7 +206,7 @@ export default function IdeTextarea(props: any) {
                 <span></span>
             )}
             {suggestions.length > 0 ? (
-                <ul className="top-full mt-1 bg-zinc-700">
+                <ul className="top-full mt-1 bg-zinc-750">
                     {suggestions.map((suggestion) =>
                         suggestion.name == selectedSuggestion?.name
                             ? getListElement(suggestion, true)
