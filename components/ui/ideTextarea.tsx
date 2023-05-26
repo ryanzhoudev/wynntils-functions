@@ -152,7 +152,7 @@ export default function IdeTextarea(props: any) {
                 <br></br>
             </code>
             {currentFunction != null ? (
-                <div className="top-full mt-1 py-1 px-2 bg-zinc-700">
+                <div className="top-full mt-1 py-1 px-2 bg-zinc-750">
                     <code className="text-amber-300">{currentFunction.name}</code>
                     <code>
                         {"("}
@@ -164,13 +164,13 @@ export default function IdeTextarea(props: any) {
                                 return parameter.name == currentFunctionParameter?.name ? (
                                     <span key={parameter.name} className="font-bold text-white">
                                         {parameter.name}
-                                        <span className="text-gray-600">({parameter.type})</span>
+                                        <span className="text-gray-500">({parameter.type})</span>
                                         {"; "}
                                     </span>
                                 ) : (
-                                    <span key={parameter.name} className="text-gray-300">
+                                    <span key={parameter.name} className="text-gray-400">
                                         {parameter.name}
-                                        <span className="text-gray-600">({parameter.type})</span>
+                                        <span className="text-gray-500">({parameter.type})</span>
                                         {"; "}
                                     </span>
                                 );
@@ -196,7 +196,7 @@ export default function IdeTextarea(props: any) {
                                             {param.name}
                                             {": "}
                                         </code>
-                                        <code> {param.description ?? "No description."}</code>
+                                        <code className="text-gray-400"> {param.description ?? "No description."}</code>
                                     </div>
                                 );
                             })
