@@ -16,7 +16,7 @@ export default function IdeTextarea(props: any) {
         const text = event.target.textContent ?? "";
 
         const caretPosition = window.getSelection()?.getRangeAt(0).startOffset ?? 0;
-        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition);
+        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, true);
 
         const currentTypedWord = text.substring(startOfCurrentWord, caretPosition);
 
@@ -83,14 +83,21 @@ export default function IdeTextarea(props: any) {
         const text: string = textArea.textContent ?? "";
 
         const selection = window.getSelection();
-        const caretPosition = selection?.getRangeAt(0).startOffset ?? 0;
+        const caretPosition = selection?.getRangeAt(0).startOffset ?? 1;
+
+        let preInsertTextIndex;
+        let postInsertTextIndex;
 
         if (deletePre == -1) {
-            deletePre = getEndIndexOfCurrentWord(text, caretPosition) - getStartIndexOfCurrentWord(text, caretPosition);
+            preInsertTextIndex = getStartIndexOfCurrentWord(text, caretPosition, true);
+            postInsertTextIndex = getEndIndexOfCurrentWord(text, caretPosition, true);
+        } else {
+            preInsertTextIndex = caretPosition - deletePre;
+            postInsertTextIndex = caretPosition;
         }
 
-        const preInsertText = text.substring(0, caretPosition - deletePre);
-        const postInsertText = text.substring(getEndIndexOfCurrentWord(text, caretPosition));
+        const preInsertText = text.substring(0, preInsertTextIndex);
+        const postInsertText = text.substring(postInsertTextIndex + 1); // FIXME: not sure why this +1 is needed but i guess if any issues arise with inserting text, this is the first place to look
         textArea.textContent = preInsertText + insertable + postInsertText;
 
         const newcaretPosition = preInsertText.length + insertable.length + caretOffset;
@@ -102,8 +109,8 @@ export default function IdeTextarea(props: any) {
     }
 
     function getCurrentFunction(text: string, caretPosition: number) {
-        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition);
-        const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition);
+        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, true);
+        const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition, true);
 
         const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
 
