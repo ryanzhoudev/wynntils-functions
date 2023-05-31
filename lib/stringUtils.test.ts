@@ -1,4 +1,9 @@
-import { getTextInCurrentParentheses, getStartIndexOfCurrentWord, getEndIndexOfCurrentWord } from "./stringUtils";
+import {
+    getTextInCurrentParentheses,
+    getStartIndexOfCurrentWord,
+    getEndIndexOfCurrentWord,
+    Separators,
+} from "./stringUtils";
 import { expect } from "@jest/globals";
 
 test("getTextInCurrentParentheses", () => {
@@ -23,34 +28,34 @@ test("getTextInCurrentParentheses", () => {
 });
 
 test("getStartIndexOfCurrentWord", () => {
-    expect(getStartIndexOfCurrentWord("this is some text", 0, false)).toBe(0);
-    expect(getStartIndexOfCurrentWord("this is some text", 3, false)).toBe(0);
-    expect(getStartIndexOfCurrentWord("this is some text", 4, false)).toBe(0);
-    expect(getStartIndexOfCurrentWord("this is some text", 5, false)).toBe(5);
-    expect(getStartIndexOfCurrentWord("this is some text", 6, false)).toBe(5);
-    expect(getStartIndexOfCurrentWord("this is some text", 7, false)).toBe(5);
-    expect(getStartIndexOfCurrentWord("function_example(param1)", 16, true)).toBe(0);
-    expect(getStartIndexOfCurrentWord("function_example(param1)", 17, true)).toBe(17);
-    expect(getStartIndexOfCurrentWord("function_example(param1)", 23, true)).toBe(17);
-    expect(getStartIndexOfCurrentWord("function_example(param1)", 24, true)).toBe(24);
-    expect(getStartIndexOfCurrentWord(" starting with space", 0, false)).toBe(0);
-    expect(getStartIndexOfCurrentWord(" starting with space", 1, false)).toBe(1);
-    expect(getStartIndexOfCurrentWord("ending with space ", 17, false)).toBe(12);
-    expect(getStartIndexOfCurrentWord("ending with space ", 18, false)).toBe(18);
+    expect(getStartIndexOfCurrentWord("this is some text", 0, Separators.SPACES)).toBe(0);
+    expect(getStartIndexOfCurrentWord("this is some text", 3, Separators.SPACES)).toBe(0);
+    expect(getStartIndexOfCurrentWord("this is some text", 4, Separators.SPACES)).toBe(0);
+    expect(getStartIndexOfCurrentWord("this is some text", 5, Separators.SPACES)).toBe(5);
+    expect(getStartIndexOfCurrentWord("this is some text", 6, Separators.SPACES)).toBe(5);
+    expect(getStartIndexOfCurrentWord("this is some text", 7, Separators.SPACES)).toBe(5);
+    expect(getStartIndexOfCurrentWord("function_example(param1)", 16, Separators.PARENTHESES)).toBe(0);
+    expect(getStartIndexOfCurrentWord("function_example(param1)", 17, Separators.PARENTHESES)).toBe(17);
+    expect(getStartIndexOfCurrentWord("function_example(param1)", 23, Separators.PARENTHESES)).toBe(17);
+    expect(getStartIndexOfCurrentWord("function_example(param1)", 24, Separators.PARENTHESES)).toBe(24);
+    expect(getStartIndexOfCurrentWord(" starting with space", 0, Separators.SPACES)).toBe(0);
+    expect(getStartIndexOfCurrentWord(" starting with space", 1, Separators.SPACES)).toBe(1);
+    expect(getStartIndexOfCurrentWord("ending with space ", 17, Separators.SPACES)).toBe(12);
+    expect(getStartIndexOfCurrentWord("ending with space ", 18, Separators.SPACES)).toBe(18);
 });
 
 test("getEndIndexOfCurrentWord", () => {
-    expect(getEndIndexOfCurrentWord("this is some text", 0, false)).toBe(3);
-    expect(getEndIndexOfCurrentWord("this is some text", 3, false)).toBe(3);
-    expect(getEndIndexOfCurrentWord("this is some text", 4, false)).toBe(3);
-    expect(getEndIndexOfCurrentWord("this is some text", 5, false)).toBe(6);
-    expect(getEndIndexOfCurrentWord("this is some text", 6, false)).toBe(6);
-    expect(getEndIndexOfCurrentWord("this is some text", 7, false)).toBe(6);
-    expect(getEndIndexOfCurrentWord("function_example(param1)", 16, true)).toBe(15);
-    expect(getEndIndexOfCurrentWord("function_example(param1)", 17, true)).toBe(22);
-    expect(getEndIndexOfCurrentWord("function_example(param1)", 23, true)).toBe(22);
-    expect(getEndIndexOfCurrentWord(" starting with space", 0, false)).toBe(0);
-    expect(getEndIndexOfCurrentWord(" starting with space", 1, false)).toBe(8);
-    expect(getEndIndexOfCurrentWord("ending with space ", 17, false)).toBe(16);
-    expect(getEndIndexOfCurrentWord("ending with space ", 18, false)).toBe(18);
+    expect(getEndIndexOfCurrentWord("this is some text", 0, Separators.SPACES)).toBe(3);
+    expect(getEndIndexOfCurrentWord("this is some text", 3, Separators.SPACES)).toBe(3);
+    expect(getEndIndexOfCurrentWord("this is some text", 4, Separators.SPACES)).toBe(3);
+    expect(getEndIndexOfCurrentWord("this is some text", 5, Separators.SPACES)).toBe(6);
+    expect(getEndIndexOfCurrentWord("this is some text", 6, Separators.SPACES)).toBe(6);
+    expect(getEndIndexOfCurrentWord("this is some text", 7, Separators.SPACES)).toBe(6);
+    expect(getEndIndexOfCurrentWord("function_example(param1)", 16, Separators.PARENTHESES)).toBe(15);
+    expect(getEndIndexOfCurrentWord("function_example(param1)", 17, Separators.PARENTHESES)).toBe(22);
+    expect(getEndIndexOfCurrentWord("function_example(param1)", 23, Separators.PARENTHESES)).toBe(22);
+    expect(getEndIndexOfCurrentWord(" starting with space", 0, Separators.SPACES)).toBe(0);
+    expect(getEndIndexOfCurrentWord(" starting with space", 1, Separators.SPACES)).toBe(8);
+    expect(getEndIndexOfCurrentWord("ending with space ", 17, Separators.SPACES)).toBe(16);
+    expect(getEndIndexOfCurrentWord("ending with space ", 18, Separators.SPACES)).toBe(18);
 });

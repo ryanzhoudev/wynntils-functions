@@ -2,7 +2,12 @@
 
 import React, { useState } from "react";
 import { Function, Parameter } from ".prisma/client";
-import { getTextInCurrentParentheses, getStartIndexOfCurrentWord, getEndIndexOfCurrentWord } from "@/lib/stringUtils";
+import {
+    getTextInCurrentParentheses,
+    getStartIndexOfCurrentWord,
+    getEndIndexOfCurrentWord,
+    Separators,
+} from "@/lib/stringUtils";
 
 const ideElementId = "ide";
 
@@ -16,7 +21,10 @@ export default function IdeTextarea(props: any) {
         const text = event.target.textContent ?? "";
 
         const caretPosition = window.getSelection()?.getRangeAt(0).startOffset ?? 0;
-        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, true);
+        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, [
+            ...Separators.SPACES,
+            ...Separators.PARENTHESES,
+        ]);
 
         const currentTypedWord = text.substring(startOfCurrentWord, caretPosition);
 
@@ -89,8 +97,14 @@ export default function IdeTextarea(props: any) {
         let postInsertTextIndex;
 
         if (deletePre == -1) {
-            preInsertTextIndex = getStartIndexOfCurrentWord(text, caretPosition, true);
-            postInsertTextIndex = getEndIndexOfCurrentWord(text, caretPosition, true);
+            preInsertTextIndex = getStartIndexOfCurrentWord(text, caretPosition, [
+                ...Separators.SPACES,
+                ...Separators.PARENTHESES,
+            ]);
+            postInsertTextIndex = getEndIndexOfCurrentWord(text, caretPosition, [
+                ...Separators.SPACES,
+                ...Separators.PARENTHESES,
+            ]);
         } else {
             preInsertTextIndex = caretPosition - deletePre;
             postInsertTextIndex = caretPosition;
@@ -109,8 +123,8 @@ export default function IdeTextarea(props: any) {
     }
 
     function getCurrentFunction(text: string, caretPosition: number) {
-        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, false);
-        const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition, false);
+        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, Separators.SPACES);
+        const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition, Separators.SPACES);
 
         const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
 
