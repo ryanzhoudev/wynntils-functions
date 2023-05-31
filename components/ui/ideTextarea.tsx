@@ -100,10 +100,10 @@ export default function IdeTextarea(props: any) {
         const postInsertText = text.substring(postInsertTextIndex + 1); // FIXME: not sure why this +1 is needed but i guess if any issues arise with inserting text, this is the first place to look
         textArea.textContent = preInsertText + insertable + postInsertText;
 
-        const newcaretPosition = preInsertText.length + insertable.length + caretOffset;
+        const newCaretPosition = preInsertText.length + insertable.length + caretOffset;
         const range = document.createRange();
-        range.setStart(textArea.childNodes[0], newcaretPosition);
-        range.setEnd(textArea.childNodes[0], newcaretPosition);
+        range.setStart(textArea.childNodes[0], newCaretPosition);
+        range.setEnd(textArea.childNodes[0], newCaretPosition);
         selection?.removeAllRanges();
         selection?.addRange(range);
     }
