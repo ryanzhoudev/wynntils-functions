@@ -52,14 +52,16 @@ export function getTextInCurrentParentheses(text: string, characterIndex: number
     return text.substring(start, end + 1);
 }
 
-const wordSeparators = [" ", "(", ")"];
-
 /**
  * Returns the index of the first character of the word the caret is currently in.
- * Separators are not included in the returned index. If the given characterIndex is a separator, the start index of the previous word is returned.
+ * Caret positions are essentially 0-indexed. The leftmost position of the caret (where the caret is to the left of the first character) is 0.
+ * The rightmost position of the caret (where the caret is to the right of the last character) is text.length.
+ * Separators are not considered part of the word.
+ * @return The index of the first character of the word the caret is currently in. Characters are also 0-indexed, but, unlike caret positions, the first character is at index 0.
  */
-export function getStartIndexOfCurrentWord(text: string, characterIndex: number) {
-    let i = characterIndex - 1;
+export function getStartIndexOfCurrentWord(text: string, caretPosition: number, separateOnParentheses: boolean) {
+    const wordSeparators = separateOnParentheses ? [" ", "(", ")"] : [" "];
+    let i = caretPosition - 1;
     while (i >= 0) {
         if (wordSeparators.includes(text[i])) {
             return i + 1;
@@ -70,14 +72,19 @@ export function getStartIndexOfCurrentWord(text: string, characterIndex: number)
 }
 
 /**
- * Returns the index of the last character of the word the caret is currently in. Word separators are " ", "(" and ")".
- * Separators are not included in the returned index. If the given characterIndex is a separator, the end index of the previous word is returned.
+ * Returns the index of the last character of the word the caret is currently in.
+ * Caret positions are essentially 0-indexed. The leftmost position of the caret (where the caret is to the left of the first character) is 0.
+ * The rightmost position of the caret (where the caret is to the right of the last character) is text.length.
+ * Separators are not considered part of the word.
+ * @return The index of the last character of the word the caret is currently in. Characters are also 0-indexed, but, unlike caret positions, the first character is at index 0.
  */
-export function getEndIndexOfCurrentWord(text: string, characterIndex: number) {
-    let i = characterIndex;
+export function getEndIndexOfCurrentWord(text: string, caretPosition: number, separateOnParentheses: boolean) {
+    const wordSeparators = separateOnParentheses ? [" ", "(", ")"] : [" "];
+    let i = caretPosition;
     while (i < text.length) {
         if (wordSeparators.includes(text[i])) {
-            return i - 1;
+            return i - 1 < 0 ? 0 : i - 1; // dollar store Math.clamp because this terrible language does not have it
+            // returns i-1 unless i-1 is less than 0, in which case it returns 0
         }
         i++;
     }
