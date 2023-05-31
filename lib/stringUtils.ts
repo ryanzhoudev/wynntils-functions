@@ -54,16 +54,16 @@ export function getTextInCurrentParentheses(text: string, characterIndex: number
 
 /**
  * Returns the index of the first character of the word the caret is currently in.
- * Caret positions are essentially 0-indexed. The leftmost position of the caret (where the caret is to the left of the first character) is 0.
- * The rightmost position of the caret (where the caret is to the right of the last character) is text.length.
  * Separators are not considered part of the word.
- * @return The index of the first character of the word the caret is currently in. Characters are also 0-indexed, but, unlike caret positions, the first character is at index 0.
+ * @param text The text to search in.
+ * @param caretPosition The position of the caret. 0-indexed. The leftmost and rightmost positions are 0 and text.length, respectively.
+ * @param separators The characters that separate words.
+ * @return The index of the first character of the word the caret is currently in. Characters are 0-indexed, so the leftmost and rightmost characters are 0 and text.length - 1, respectively.
  */
-export function getStartIndexOfCurrentWord(text: string, caretPosition: number, separateOnParentheses: boolean) {
-    const wordSeparators = separateOnParentheses ? [" ", "(", ")"] : [" "];
+export function getStartIndexOfCurrentWord(text: string, caretPosition: number, separators: string[]) {
     let i = caretPosition - 1;
     while (i >= 0) {
-        if (wordSeparators.includes(text[i])) {
+        if (separators.includes(text[i])) {
             return i + 1;
         }
         i--;
@@ -73,16 +73,17 @@ export function getStartIndexOfCurrentWord(text: string, caretPosition: number, 
 
 /**
  * Returns the index of the last character of the word the caret is currently in.
- * Caret positions are essentially 0-indexed. The leftmost position of the caret (where the caret is to the left of the first character) is 0.
- * The rightmost position of the caret (where the caret is to the right of the last character) is text.length.
+ * Caret positions are essentially 0-indexed.
  * Separators are not considered part of the word.
- * @return The index of the last character of the word the caret is currently in. Characters are also 0-indexed, but, unlike caret positions, the first character is at index 0.
+ * @param text The text to search in.
+ * @param caretPosition The position of the caret. 0-indexed. The leftmost and rightmost positions are 0 and text.length, respectively.
+ * @param separators The characters that separate words.
+ * @return The index of the last character of the word the caret is currently in. Characters are 0-indexed, so the leftmost and rightmost characters are 0 and text.length - 1, respectively.
  */
-export function getEndIndexOfCurrentWord(text: string, caretPosition: number, separateOnParentheses: boolean) {
-    const wordSeparators = separateOnParentheses ? [" ", "(", ")"] : [" "];
+export function getEndIndexOfCurrentWord(text: string, caretPosition: number, separators: string[]) {
     let i = caretPosition;
     while (i < text.length) {
-        if (wordSeparators.includes(text[i])) {
+        if (separators.includes(text[i])) {
             return i - 1 < 0 ? 0 : i - 1; // dollar store Math.clamp because this terrible language does not have it
             // returns i-1 unless i-1 is less than 0, in which case it returns 0
         }
@@ -90,3 +91,9 @@ export function getEndIndexOfCurrentWord(text: string, caretPosition: number, se
     }
     return text.length;
 }
+
+export const Separators = Object.freeze({
+    SPACES: [" "],
+    PARENTHESES: ["(", ")"],
+    QUOTES: ['"'],
+});
