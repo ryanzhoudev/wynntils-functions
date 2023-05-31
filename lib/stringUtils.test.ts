@@ -32,6 +32,7 @@ test("getStartIndexOfCurrentWord", () => {
     expect(getStartIndexOfCurrentWord("function_example(param1)", 16)).toBe(0);
     expect(getStartIndexOfCurrentWord("function_example(param1)", 17)).toBe(17);
     expect(getStartIndexOfCurrentWord("function_example(param1)", 23)).toBe(17);
+    expect(getStartIndexOfCurrentWord(" starting with space", 0)).toBe(0);
 });
 
 test("getEndIndexOfCurrentWord", () => {
@@ -44,4 +45,5 @@ test("getEndIndexOfCurrentWord", () => {
     expect(getEndIndexOfCurrentWord("function_example(param1)", 16)).toBe(15);
     expect(getEndIndexOfCurrentWord("function_example(param1)", 17)).toBe(22);
     expect(getEndIndexOfCurrentWord("function_example(param1)", 23)).toBe(22);
+    expect(getEndIndexOfCurrentWord(" starting with space", 0)).toBe(8);
 });

@@ -55,7 +55,7 @@ export function getTextInCurrentParentheses(text: string, characterIndex: number
 const wordSeparators = [" ", "(", ")"];
 
 /**
- * Returns the index of the first character of the word the caret is currently in. Word separators are " ", "(" and ")".
+ * Returns the index of the first character of the word the caret is currently in.
  * Separators are not included in the returned index. If the given characterIndex is a separator, the start index of the previous word is returned.
  */
 export function getStartIndexOfCurrentWord(text: string, characterIndex: number) {
