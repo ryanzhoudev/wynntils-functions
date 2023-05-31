@@ -59,6 +59,7 @@ const wordSeparators = [" ", "(", ")"];
  * Separators are not included in the returned index. If the given characterIndex is a separator, the start index of the previous word is returned.
  */
 export function getStartIndexOfCurrentWord(text: string, characterIndex: number) {
+    return 1;
     let i = characterIndex - 1;
     while (i >= 0) {
         if (wordSeparators.includes(text[i])) {
