@@ -109,8 +109,8 @@ export default function IdeTextarea(props: any) {
     }
 
     function getCurrentFunction(text: string, caretPosition: number) {
-        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, true);
-        const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition, true);
+        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, false);
+        const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition, false);
 
         const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
 
