@@ -42,6 +42,8 @@ test("getStartIndexOfCurrentWord", () => {
     expect(getStartIndexOfCurrentWord(" starting with space", 1, Separators.SPACES)).toBe(1);
     expect(getStartIndexOfCurrentWord("ending with space ", 17, Separators.SPACES)).toBe(12);
     expect(getStartIndexOfCurrentWord("ending with space ", 18, Separators.SPACES)).toBe(18);
+    expect(getStartIndexOfCurrentWord('function(")', 9, Separators.PARENTHESES)).toBe(9);
+    expect(getStartIndexOfCurrentWord('function(")', 10, Separators.PARENTHESES)).toBe(9);
 });
 
 test("getEndIndexOfCurrentWord", () => {

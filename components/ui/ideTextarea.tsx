@@ -17,18 +17,16 @@ export default function IdeTextarea(props: any) {
     const [currentFunction, setCurrentFunction] = useState<Function | null>(null);
     const [currentFunctionParameter, setCurrentFunctionParameter] = useState<Parameter | null>(null);
 
-    const onInput = (event: React.ChangeEvent<HTMLElement>) => {
-        const text = event.target.textContent ?? "";
-
+    function processInput(text: string) {
         const caretPosition = window.getSelection()?.getRangeAt(0).startOffset ?? 0;
         const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, [
             ...Separators.SPACES,
             ...Separators.PARENTHESES,
         ]);
 
-        const currentTypedWord = text.substring(startOfCurrentWord, caretPosition);
+        const currentPartialWord = text.substring(startOfCurrentWord, caretPosition);
 
-        const suggestions = getSuggestions(currentTypedWord, props.functions);
+        const suggestions = getSuggestions(currentPartialWord, props.functions);
         setSuggestions(suggestions);
         setSelectedSuggestion(suggestions[0] ?? null);
 
@@ -43,18 +41,61 @@ export default function IdeTextarea(props: any) {
             setSuggestions([]);
             setSelectedSuggestion(null);
         }
-    };
+
+        // Parameter parsing
+        if (currentFunctionParameter == null) return;
+        const startOfCurrentParameter = getStartIndexOfCurrentWord(text, caretPosition, Separators.PARENTHESES);
+        const endOfCurrentParameter = getEndIndexOfCurrentWord(text, caretPosition, Separators.PARENTHESES) + 1;
+        console.log("start of current parameter: " + startOfCurrentParameter);
+        console.log("end of current parameter: " + endOfCurrentParameter);
+        const currentParameterInput = text.substring(startOfCurrentParameter, endOfCurrentParameter);
+        console.log("current parameter input: " + currentParameterInput);
+        let currentParameterTypeCorrect = false;
+
+        const parameterFunction: Function | null = props.functions.find((func: Function) => func.name == currentParameterInput);
+        if (parameterFunction != null) {
+            // Since we found a valid function name, we can assume that the user is trying to write a function call
+            // Check the return type of the function and make sure it matches the type of the current parameter
+            if (parameterFunction.returnType == currentFunctionParameter.type) {
+                currentParameterTypeCorrect = true;
+            }
+        } else {
+            // Since we didn't find a valid function name, we can assume that the user is trying to write a literal
+            switch (currentFunctionParameter.type) {
+                case "String":
+                    if (currentParameterInput.startsWith("\"") && currentParameterInput.endsWith("\"")) {
+                        currentParameterTypeCorrect = true;
+                    }
+                    break;
+                case "Number" || "Double":
+                    if (!isNaN(Number(currentParameterInput))) {
+                        currentParameterTypeCorrect = true;
+                    }
+                    break;
+                case "Integer":
+                    if (!isNaN(Number(currentParameterInput)) && Number(currentParameterInput) % 1 == 0) {
+                        currentParameterTypeCorrect = true;
+                    }
+                    break;
+                case "Boolean":
+                    if (currentParameterInput == "true" || currentParameterInput == "false") {
+                        currentParameterTypeCorrect = true;
+                    }
+                    break;
+            }
+        }
+        console.log("current parameter type matches: " + currentParameterTypeCorrect);
+    }
+
+    const onInput = (event: React.ChangeEvent<HTMLElement>) => {
+        processInput(event.target.textContent ?? "");
+    }
 
     const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
         if (event.key == "Tab" || event.key == "Enter") {
             event.preventDefault();
-            const justInserted = insertSelectedSuggestion() ?? null;
-            if (justInserted != null) {
-                setCurrentFunction(justInserted);
-                setCurrentFunctionParameter(
-                    props.parameters.filter((param: Parameter) => param.functionId == justInserted?.id)[0],
-                );
-            }
+            insertSelectedSuggestion()
+            processInput(document.getElementById(ideElementId)?.textContent ?? "");
         } else if (event.key == "ArrowUp") {
             event.preventDefault();
             setSelectedSuggestion(
