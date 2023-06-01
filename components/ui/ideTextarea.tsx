@@ -19,7 +19,9 @@ export default function IdeTextarea(props: any) {
 
     function processInput(text: string) {
         const caretPosition = window.getSelection()?.getRangeAt(0).startOffset ?? 0;
-        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, [
+        console.log("Caret position is " + caretPosition);
+        // FIXME: caret position is inconsistent when using arrow keys
+        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, 0, [
             ...Separators.SPACES,
             ...Separators.PARENTHESES,
         ]);
@@ -44,15 +46,14 @@ export default function IdeTextarea(props: any) {
 
         // Parameter parsing
         if (currentFunctionParameter == null) return;
-        const startOfCurrentParameter = getStartIndexOfCurrentWord(text, caretPosition, Separators.PARENTHESES);
-        const endOfCurrentParameter = getEndIndexOfCurrentWord(text, caretPosition, Separators.PARENTHESES) + 1;
-        console.log("start of current parameter: " + startOfCurrentParameter);
-        console.log("end of current parameter: " + endOfCurrentParameter);
+        const startOfCurrentParameter = getStartIndexOfCurrentWord(text, caretPosition, 0, Separators.PARENTHESES);
+        const endOfCurrentParameter = getEndIndexOfCurrentWord(text, caretPosition, 0, Separators.PARENTHESES) + 1;
+
         const currentParameterInput = text.substring(startOfCurrentParameter, endOfCurrentParameter);
-        console.log("current parameter input: " + currentParameterInput);
         let currentParameterTypeCorrect = false;
 
-        const parameterFunction: Function | null = props.functions.find((func: Function) => func.name == currentParameterInput);
+        const parameterFunction: Function | null = getFunction(true, currentParameterInput.replace("(", "").replace(")", ""));
+        console.log("Current function is " + currentFunction?.name);
         if (parameterFunction != null) {
             // Since we found a valid function name, we can assume that the user is trying to write a function call
             // Check the return type of the function and make sure it matches the type of the current parameter
@@ -84,7 +85,6 @@ export default function IdeTextarea(props: any) {
                     break;
             }
         }
-        console.log("current parameter type matches: " + currentParameterTypeCorrect);
     }
 
     const onInput = (event: React.ChangeEvent<HTMLElement>) => {
@@ -107,6 +107,9 @@ export default function IdeTextarea(props: any) {
                 suggestions[suggestions.indexOf(selectedSuggestion ?? suggestions[0]) + 1] ??
                     suggestions[suggestions.length - 1],
             );
+        } else if (event.key == "ArrowRight" || event.key == "ArrowLeft") {
+            // Handle arrow keys to move the caret
+            processInput(document.getElementById(ideElementId)?.textContent ?? "");
         }
     };
 
@@ -138,11 +141,11 @@ export default function IdeTextarea(props: any) {
         let postInsertTextIndex;
 
         if (deletePre == -1) {
-            preInsertTextIndex = getStartIndexOfCurrentWord(text, caretPosition, [
+            preInsertTextIndex = getStartIndexOfCurrentWord(text, caretPosition, 0, [
                 ...Separators.SPACES,
                 ...Separators.PARENTHESES,
             ]);
-            postInsertTextIndex = getEndIndexOfCurrentWord(text, caretPosition, [
+            postInsertTextIndex = getEndIndexOfCurrentWord(text, caretPosition, 0, [
                 ...Separators.SPACES,
                 ...Separators.PARENTHESES,
             ]);
@@ -164,8 +167,19 @@ export default function IdeTextarea(props: any) {
     }
 
     function getCurrentFunction(text: string, caretPosition: number) {
-        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, Separators.SPACES);
-        const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition, Separators.SPACES);
+        const parenthesesCount = text.split("(").length - 1;
+        console.log(parenthesesCount);
+        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, parenthesesCount/2, [
+            ... Separators.SPACES,
+            ... Separators.PARENTHESES,
+        ]);
+        const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition, parenthesesCount/2, [
+            ... Separators.SPACES,
+            ... Separators.PARENTHESES,
+        ]);
+        console.log("Start of current word is " + startOfCurrentWord + " and character is " + text[startOfCurrentWord]);
+        console.log("End of current word is " + endOfCurrentWord + " and character is " + text[endOfCurrentWord]);
+        console.log("Current word is " + text.substring(startOfCurrentWord, endOfCurrentWord));
 
         const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
 
@@ -187,6 +201,12 @@ export default function IdeTextarea(props: any) {
         // we can just get the number of semicolons to the left inside the parentheses to get the current parameter
         const numberOfSemicolonsToLeft = getTextInCurrentParentheses(text, caretPosition).split(";").length - 1;
         return parameters[numberOfSemicolonsToLeft];
+    }
+
+    function getFunction(includeAliases: boolean, name: string): Function | null {
+        return props.functions.find((func: Function) => {
+            return func.name == name || (includeAliases && func.aliases.includes(name));
+        }) ?? null;
     }
 
     function getListElement(suggestion: Function, selected: boolean) {
