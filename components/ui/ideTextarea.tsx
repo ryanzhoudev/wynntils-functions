@@ -18,9 +18,8 @@ export default function IdeTextarea(props: any) {
     const [currentFunctionParameter, setCurrentFunctionParameter] = useState<Parameter | null>(null);
 
     function processInput(text: string) {
-        const caretPosition = window.getSelection()?.getRangeAt(0).startOffset ?? 0;
+        const caretPosition = getCaretPosition();
         console.log("Caret position is " + caretPosition);
-        // FIXME: caret position is inconsistent when using arrow keys
         const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, 0, [
             ...Separators.SPACES,
             ...Separators.PARENTHESES,
@@ -52,8 +51,10 @@ export default function IdeTextarea(props: any) {
         const currentParameterInput = text.substring(startOfCurrentParameter, endOfCurrentParameter);
         let currentParameterTypeCorrect = false;
 
-        const parameterFunction: Function | null = getFunction(true, currentParameterInput.replace("(", "").replace(")", ""));
-        console.log("Current function is " + currentFunction?.name);
+        const parameterFunction: Function | null = getFunction(
+            true,
+            currentParameterInput.replace("(", "").replace(")", ""),
+        );
         if (parameterFunction != null) {
             // Since we found a valid function name, we can assume that the user is trying to write a function call
             // Check the return type of the function and make sure it matches the type of the current parameter
@@ -64,7 +65,7 @@ export default function IdeTextarea(props: any) {
             // Since we didn't find a valid function name, we can assume that the user is trying to write a literal
             switch (currentFunctionParameter.type) {
                 case "String":
-                    if (currentParameterInput.startsWith("\"") && currentParameterInput.endsWith("\"")) {
+                    if (currentParameterInput.startsWith('"') && currentParameterInput.endsWith('"')) {
                         currentParameterTypeCorrect = true;
                     }
                     break;
@@ -89,12 +90,12 @@ export default function IdeTextarea(props: any) {
 
     const onInput = (event: React.ChangeEvent<HTMLElement>) => {
         processInput(event.target.textContent ?? "");
-    }
+    };
 
     const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
         if (event.key == "Tab" || event.key == "Enter") {
             event.preventDefault();
-            insertSelectedSuggestion()
+            insertSelectedSuggestion();
             processInput(document.getElementById(ideElementId)?.textContent ?? "");
         } else if (event.key == "ArrowUp") {
             event.preventDefault();
@@ -124,62 +125,16 @@ export default function IdeTextarea(props: any) {
         return returnable;
     }
 
-    /**
-     * Inserts the specified text at the current caret position.
-     * Deletes deletePre characters to the left of the caret position before inserting.
-     * If deletePre is -1, deletes the entire current word.
-     * Sets the caret position to the end of the inserted text, plus the specified offset.
-     */
-    function insertText(insertable: string, deletePre: number, caretOffset: number) {
-        const textArea = document.getElementById(ideElementId) as HTMLElement;
-        const text: string = textArea.textContent ?? "";
-
-        const selection = window.getSelection();
-        const caretPosition = selection?.getRangeAt(0).startOffset ?? 1;
-
-        let preInsertTextIndex;
-        let postInsertTextIndex;
-
-        if (deletePre == -1) {
-            preInsertTextIndex = getStartIndexOfCurrentWord(text, caretPosition, 0, [
-                ...Separators.SPACES,
-                ...Separators.PARENTHESES,
-            ]);
-            postInsertTextIndex = getEndIndexOfCurrentWord(text, caretPosition, 0, [
-                ...Separators.SPACES,
-                ...Separators.PARENTHESES,
-            ]);
-        } else {
-            preInsertTextIndex = caretPosition - deletePre;
-            postInsertTextIndex = caretPosition;
-        }
-
-        const preInsertText = text.substring(0, preInsertTextIndex);
-        const postInsertText = text.substring(postInsertTextIndex + 1); // FIXME: not sure why this +1 is needed but i guess if any issues arise with inserting text, this is the first place to look
-        textArea.textContent = preInsertText + insertable + postInsertText;
-
-        const newCaretPosition = preInsertText.length + insertable.length + caretOffset;
-        const range = document.createRange();
-        range.setStart(textArea.childNodes[0], newCaretPosition);
-        range.setEnd(textArea.childNodes[0], newCaretPosition);
-        selection?.removeAllRanges();
-        selection?.addRange(range);
-    }
-
     function getCurrentFunction(text: string, caretPosition: number) {
         const parenthesesCount = text.split("(").length - 1;
-        console.log(parenthesesCount);
-        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, parenthesesCount/2, [
-            ... Separators.SPACES,
-            ... Separators.PARENTHESES,
+        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, parenthesesCount / 2, [
+            ...Separators.SPACES,
+            ...Separators.PARENTHESES,
         ]);
-        const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition, parenthesesCount/2, [
-            ... Separators.SPACES,
-            ... Separators.PARENTHESES,
+        const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition, parenthesesCount / 2, [
+            ...Separators.SPACES,
+            ...Separators.PARENTHESES,
         ]);
-        console.log("Start of current word is " + startOfCurrentWord + " and character is " + text[startOfCurrentWord]);
-        console.log("End of current word is " + endOfCurrentWord + " and character is " + text[endOfCurrentWord]);
-        console.log("Current word is " + text.substring(startOfCurrentWord, endOfCurrentWord));
 
         const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
 
@@ -203,10 +158,15 @@ export default function IdeTextarea(props: any) {
         return parameters[numberOfSemicolonsToLeft];
     }
 
+    /**
+     * Returns the first function that matches the name or alias if applicable.
+     */
     function getFunction(includeAliases: boolean, name: string): Function | null {
-        return props.functions.find((func: Function) => {
-            return func.name == name || (includeAliases && func.aliases.includes(name));
-        }) ?? null;
+        return (
+            props.functions.find((func: Function) => {
+                return func.name == name || (includeAliases && func.aliases.includes(name));
+            }) ?? null
+        );
     }
 
     function getListElement(suggestion: Function, selected: boolean) {
@@ -304,6 +264,64 @@ export default function IdeTextarea(props: any) {
             )}
         </div>
     );
+}
+
+function getCaretPosition() {
+    const ideElement = document.getElementById(ideElementId);
+    let caretPos = 0;
+    if (ideElement) {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const clonedRange = range.cloneRange();
+            clonedRange.selectNodeContents(ideElement);
+            clonedRange.setEnd(range.endContainer, range.endOffset);
+            caretPos = clonedRange.toString().length;
+        }
+    }
+    return caretPos;
+}
+
+/**
+ * Inserts the specified text at the current caret position.
+ * Deletes deletePre characters to the left of the caret position before inserting.
+ * If deletePre is -1, deletes the entire current word.
+ * Sets the caret position to the end of the inserted text, plus the specified offset.
+ */
+function insertText(insertable: string, deletePre: number, caretOffset: number) {
+    const textArea = document.getElementById(ideElementId) as HTMLElement;
+    const text: string = textArea.textContent ?? "";
+
+    const selection = window.getSelection();
+    const caretPosition = getCaretPosition();
+
+    let preInsertTextIndex;
+    let postInsertTextIndex;
+
+    if (deletePre == -1) {
+        preInsertTextIndex = getStartIndexOfCurrentWord(text, caretPosition, 0, [
+            ...Separators.SPACES,
+            ...Separators.PARENTHESES,
+        ]);
+        postInsertTextIndex = getEndIndexOfCurrentWord(text, caretPosition, 0, [
+            ...Separators.SPACES,
+            ...Separators.PARENTHESES,
+        ]);
+    } else {
+        preInsertTextIndex = caretPosition - deletePre;
+        postInsertTextIndex = caretPosition;
+    }
+
+    const preInsertText = text.substring(0, preInsertTextIndex);
+    const postInsertText = text.substring(postInsertTextIndex + 1); // FIXME: not sure why this +1 is needed but i guess if any issues arise with inserting text, this is the first place to look
+    textArea.textContent = preInsertText + insertable + postInsertText;
+
+    const newCaretPosition = preInsertText.length + insertable.length + caretOffset;
+    const range = document.createRange();
+    range.setStart(textArea.childNodes[0], newCaretPosition);
+    range.setEnd(textArea.childNodes[0], newCaretPosition);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
 }
 
 function getSuggestions(word: string, functions: Function[]): Function[] {
