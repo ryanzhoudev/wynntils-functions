@@ -53,7 +53,7 @@ export default function IdeTextarea(props: any) {
                 ...Separators.PARENTHESES,
                 ...Separators.SEMICOLONS,
             ]);
-            const currentParameterInput = text.substring(startOfCurrentParameter, endOfCurrentParameter);
+            const currentParameterInput = text.substring(startOfCurrentParameter, endOfCurrentParameter + 1);
 
             const parameterFunction: Function | null = getFunction(
                 true,
