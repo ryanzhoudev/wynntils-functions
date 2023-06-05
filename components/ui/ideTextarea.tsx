@@ -67,7 +67,11 @@ export default function IdeTextarea(props: any) {
             // Since we didn't find a valid function name, we can assume that the user is trying to write a literal
             switch (currentFunctionParameter.type) {
                 case "String":
-                    if (currentParameterInput.startsWith('"') && currentParameterInput.endsWith('"')) {
+                    if (
+                        currentParameterInput.startsWith('"') &&
+                        currentParameterInput.endsWith('"') &&
+                        currentParameterInput.length > 1
+                    ) {
                         console.log("is a valid string");
                         setCurrentFunctionParameterTypeCorrect(true);
                     } else {
