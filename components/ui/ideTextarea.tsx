@@ -3,9 +3,9 @@
 import React, { useState } from "react";
 import { Function, Parameter } from ".prisma/client";
 import {
-    getTextInCurrentParentheses,
-    getStartIndexOfCurrentWord,
     getEndIndexOfCurrentWord,
+    getStartIndexOfCurrentWord,
+    getTextInCurrentParentheses,
     Separators,
 } from "@/lib/stringUtils";
 
@@ -19,9 +19,7 @@ export default function IdeTextarea(props: any) {
     const [currentFunctionParameterTypeCorrect, setCurrentFunctionParameterTypeCorrect] = useState<boolean>(false);
 
     function processInput(text: string) {
-        console.log(text);
         const caretPosition = getCaretPosition();
-        console.log(caretPosition);
         const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, 0, [
             ...Separators.SPACES,
             ...Separators.PARENTHESES,
@@ -46,67 +44,68 @@ export default function IdeTextarea(props: any) {
         }
 
         // Parameter parsing
-        if (currentFunctionParameter == null) return;
-        const startOfCurrentParameter = getStartIndexOfCurrentWord(text, caretPosition, 0, Separators.PARENTHESES);
-        const endOfCurrentParameter = getEndIndexOfCurrentWord(text, caretPosition, 0, Separators.PARENTHESES) + 1;
+        if (currentFunctionParameter != null) {
+            const startOfCurrentParameter = getStartIndexOfCurrentWord(text, caretPosition, 0, [
+                ...Separators.PARENTHESES,
+                ...Separators.SEMICOLONS,
+            ]);
+            const endOfCurrentParameter = getEndIndexOfCurrentWord(text, caretPosition, 0, [
+                ...Separators.PARENTHESES,
+                ...Separators.SEMICOLONS,
+            ]);
+            const currentParameterInput = text.substring(startOfCurrentParameter, endOfCurrentParameter);
 
-        const currentParameterInput = text.substring(startOfCurrentParameter, endOfCurrentParameter);
-
-        const parameterFunction: Function | null = getFunction(
-            true,
-            currentParameterInput.replace("(", "").replace(")", ""),
-            props.functions,
-        );
-        if (parameterFunction != null) {
-            // Since we found a valid function name, we can assume that the user is trying to write a function call
-            // Check the return type of the function and make sure it matches the type of the current parameter
-            if (parameterFunction.returnType == currentFunctionParameter.type) {
-                setCurrentFunctionParameterTypeCorrect(true);
-            }
-        } else {
-            // Since we didn't find a valid function name, we can assume that the user is trying to write a literal
-            switch (currentFunctionParameter.type) {
-                case "String":
-                    if (
-                        currentParameterInput.startsWith('"') &&
-                        currentParameterInput.endsWith('"') &&
-                        currentParameterInput.length > 1
-                    ) {
-                        console.log("is a valid string");
-                        setCurrentFunctionParameterTypeCorrect(true);
-                    } else {
-                        console.log("is not a valid string");
-                        setCurrentFunctionParameterTypeCorrect(false);
-                    }
-                    break;
-                case "Number" || "Double":
-                    if (currentParameterInput != "" && !isNaN(Number(currentParameterInput))) {
-                        console.log(Number(currentParameterInput));
-                        console.log("is a valid number");
-                        setCurrentFunctionParameterTypeCorrect(true);
-                    } else {
-                        console.log("is not a valid number");
-                        setCurrentFunctionParameterTypeCorrect(false);
-                    }
-                    break;
-                case "Integer":
-                    if (!isNaN(Number(currentParameterInput)) && Number(currentParameterInput) % 1 == 0) {
-                        console.log("is a valid integer");
-                        setCurrentFunctionParameterTypeCorrect(true);
-                    } else {
-                        console.log("is not a valid integer");
-                        setCurrentFunctionParameterTypeCorrect(false);
-                    }
-                    break;
-                case "Boolean":
-                    if (currentParameterInput == "true" || currentParameterInput == "false") {
-                        console.log("is a valid boolean");
-                        setCurrentFunctionParameterTypeCorrect(true);
-                    } else {
-                        console.log("is not a valid boolean");
-                        setCurrentFunctionParameterTypeCorrect(false);
-                    }
-                    break;
+            const parameterFunction: Function | null = getFunction(
+                true,
+                currentParameterInput.replace("(", "").replace(")", ""),
+                props.functions,
+            );
+            if (parameterFunction != null) {
+                // Since we found a valid function name, we can assume that the user is trying to write a function call
+                // Check the return type of the function and make sure it matches the type of the current parameter
+                if (parameterFunction.returnType == currentFunctionParameter.type) {
+                    setCurrentFunctionParameterTypeCorrect(true);
+                }
+            } else {
+                // Since we didn't find a valid function name, we can assume that the user is trying to write a literal
+                switch (currentFunctionParameter.type) {
+                    case "String":
+                        if (
+                            currentParameterInput.startsWith('"') &&
+                            currentParameterInput.endsWith('"') &&
+                            currentParameterInput.length > 1
+                        ) {
+                            setCurrentFunctionParameterTypeCorrect(true);
+                        } else {
+                            setCurrentFunctionParameterTypeCorrect(false);
+                        }
+                        break;
+                    case "Number" || "Double":
+                        if (currentParameterInput != "" && !isNaN(Number(currentParameterInput))) {
+                            setCurrentFunctionParameterTypeCorrect(true);
+                        } else {
+                            setCurrentFunctionParameterTypeCorrect(false);
+                        }
+                        break;
+                    case "Integer":
+                        if (
+                            currentParameterInput != "" &&
+                            !isNaN(Number(currentParameterInput)) &&
+                            Number(currentParameterInput) % 1 == 0
+                        ) {
+                            setCurrentFunctionParameterTypeCorrect(true);
+                        } else {
+                            setCurrentFunctionParameterTypeCorrect(false);
+                        }
+                        break;
+                    case "Boolean":
+                        if (currentParameterInput == "true" || currentParameterInput == "false") {
+                            setCurrentFunctionParameterTypeCorrect(true);
+                        } else {
+                            setCurrentFunctionParameterTypeCorrect(false);
+                        }
+                        break;
+                }
             }
         }
     }
@@ -187,7 +186,7 @@ export default function IdeTextarea(props: any) {
                 {/*firefox doesn't like empty contentEditable elements, the <br> tags fix it*/}
                 <br></br>
             </code>
-            {currentFunction != null ? (
+            {currentFunction != null && (
                 <div className="top-full mt-1 py-1 px-2 bg-zinc-750">
                     <code className="text-amber-300">{currentFunction.name}</code>
                     <code>
@@ -197,21 +196,17 @@ export default function IdeTextarea(props: any) {
                                 return parameter.functionId == currentFunction.id;
                             })
                             .map((parameter: Parameter) => {
-                                return parameter.name == currentFunctionParameter?.name ? (
+                                return (
                                     <span
                                         key={parameter.name}
                                         className={
-                                            currentFunctionParameterTypeCorrect
-                                                ? "font-bold text-white"
-                                                : "font-bold text-red-500"
+                                            parameter.name == currentFunctionParameter?.name
+                                                ? currentFunctionParameterTypeCorrect
+                                                    ? "font-bold text-white"
+                                                    : "font-bold text-red-500"
+                                                : "text-gray-400"
                                         }
                                     >
-                                        {parameter.name}
-                                        <span className="text-gray-500">({parameter.type})</span>
-                                        {"; "}
-                                    </span>
-                                ) : (
-                                    <span key={parameter.name} className="text-gray-400">
                                         {parameter.name}
                                         <span className="text-gray-500">({parameter.type})</span>
                                         {"; "}
@@ -245,19 +240,13 @@ export default function IdeTextarea(props: any) {
                             })
                     )}
                 </div>
-            ) : (
-                <span></span>
             )}
-            {suggestions.length > 0 ? (
+            {suggestions.length > 0 && (
                 <ul className="top-full mt-1 bg-zinc-750">
                     {suggestions.map((suggestion) =>
-                        suggestion.name == selectedSuggestion?.name
-                            ? getListElement(suggestion, true)
-                            : getListElement(suggestion, false),
+                        getListElement(suggestion, suggestion.name == selectedSuggestion?.name),
                     )}
                 </ul>
-            ) : (
-                <span></span>
             )}
         </div>
     );

@@ -61,7 +61,12 @@ export function getTextInCurrentParentheses(text: string, characterIndex: number
  * @param separators The characters that separate words.
  * @return The index of the first character of the word the caret is currently in. Characters are 0-indexed, so the leftmost and rightmost characters are 0 and text.length - 1, respectively.
  */
-export function getStartIndexOfCurrentWord(text: string, caretPosition: number, skipSets: number, separators: string[]) {
+export function getStartIndexOfCurrentWord(
+    text: string,
+    caretPosition: number,
+    skipSets: number,
+    separators: string[],
+) {
     let i = caretPosition - 1;
     while (i >= 0) {
         if (separators.includes(text[i])) {
@@ -106,4 +111,5 @@ export const Separators = Object.freeze({
     SPACES: [" "],
     PARENTHESES: ["(", ")"],
     QUOTES: ['"'],
+    SEMICOLONS: [";"],
 });
