@@ -16,10 +16,12 @@ export default function IdeTextarea(props: any) {
     const [selectedSuggestion, setSelectedSuggestion] = useState<Function | null>(null);
     const [currentFunction, setCurrentFunction] = useState<Function | null>(null);
     const [currentFunctionParameter, setCurrentFunctionParameter] = useState<Parameter | null>(null);
+    const [currentFunctionParameterTypeCorrect, setCurrentFunctionParameterTypeCorrect] = useState<boolean>(false);
 
     function processInput(text: string) {
+        console.log(text);
         const caretPosition = getCaretPosition();
-        console.log("Caret position is " + caretPosition);
+        console.log(caretPosition);
         const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, 0, [
             ...Separators.SPACES,
             ...Separators.PARENTHESES,
@@ -31,7 +33,7 @@ export default function IdeTextarea(props: any) {
         setSuggestions(suggestions);
         setSelectedSuggestion(suggestions[0] ?? null);
 
-        const newCurrentFunction = getCurrentFunction(text, caretPosition);
+        const newCurrentFunction = getCurrentFunction(text, caretPosition, props.functions) ?? null;
         setCurrentFunction(newCurrentFunction);
         setCurrentFunctionParameter(getCurrentParameter(text, caretPosition));
         if (
@@ -49,54 +51,66 @@ export default function IdeTextarea(props: any) {
         const endOfCurrentParameter = getEndIndexOfCurrentWord(text, caretPosition, 0, Separators.PARENTHESES) + 1;
 
         const currentParameterInput = text.substring(startOfCurrentParameter, endOfCurrentParameter);
-        let currentParameterTypeCorrect = false;
 
         const parameterFunction: Function | null = getFunction(
             true,
             currentParameterInput.replace("(", "").replace(")", ""),
+            props.functions,
         );
         if (parameterFunction != null) {
             // Since we found a valid function name, we can assume that the user is trying to write a function call
             // Check the return type of the function and make sure it matches the type of the current parameter
             if (parameterFunction.returnType == currentFunctionParameter.type) {
-                currentParameterTypeCorrect = true;
+                setCurrentFunctionParameterTypeCorrect(true);
             }
         } else {
             // Since we didn't find a valid function name, we can assume that the user is trying to write a literal
             switch (currentFunctionParameter.type) {
                 case "String":
                     if (currentParameterInput.startsWith('"') && currentParameterInput.endsWith('"')) {
-                        currentParameterTypeCorrect = true;
+                        console.log("is a valid string");
+                        setCurrentFunctionParameterTypeCorrect(true);
+                    } else {
+                        console.log("is not a valid string");
+                        setCurrentFunctionParameterTypeCorrect(false);
                     }
                     break;
                 case "Number" || "Double":
-                    if (!isNaN(Number(currentParameterInput))) {
-                        currentParameterTypeCorrect = true;
+                    if (currentParameterInput != "" && !isNaN(Number(currentParameterInput))) {
+                        console.log(Number(currentParameterInput));
+                        console.log("is a valid number");
+                        setCurrentFunctionParameterTypeCorrect(true);
+                    } else {
+                        console.log("is not a valid number");
+                        setCurrentFunctionParameterTypeCorrect(false);
                     }
                     break;
                 case "Integer":
                     if (!isNaN(Number(currentParameterInput)) && Number(currentParameterInput) % 1 == 0) {
-                        currentParameterTypeCorrect = true;
+                        console.log("is a valid integer");
+                        setCurrentFunctionParameterTypeCorrect(true);
+                    } else {
+                        console.log("is not a valid integer");
+                        setCurrentFunctionParameterTypeCorrect(false);
                     }
                     break;
                 case "Boolean":
                     if (currentParameterInput == "true" || currentParameterInput == "false") {
-                        currentParameterTypeCorrect = true;
+                        console.log("is a valid boolean");
+                        setCurrentFunctionParameterTypeCorrect(true);
+                    } else {
+                        console.log("is not a valid boolean");
+                        setCurrentFunctionParameterTypeCorrect(false);
                     }
                     break;
             }
         }
     }
 
-    const onInput = (event: React.ChangeEvent<HTMLElement>) => {
-        processInput(event.target.textContent ?? "");
-    };
-
     const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
         if (event.key == "Tab" || event.key == "Enter") {
             event.preventDefault();
             insertSelectedSuggestion();
-            processInput(document.getElementById(ideElementId)?.textContent ?? "");
         } else if (event.key == "ArrowUp") {
             event.preventDefault();
             setSelectedSuggestion(
@@ -108,9 +122,6 @@ export default function IdeTextarea(props: any) {
                 suggestions[suggestions.indexOf(selectedSuggestion ?? suggestions[0]) + 1] ??
                     suggestions[suggestions.length - 1],
             );
-        } else if (event.key == "ArrowRight" || event.key == "ArrowLeft") {
-            // Handle arrow keys to move the caret
-            processInput(document.getElementById(ideElementId)?.textContent ?? "");
         }
     };
 
@@ -119,28 +130,10 @@ export default function IdeTextarea(props: any) {
 
         insertText(selectedSuggestion.name + "()", -1, -1);
 
-        setSuggestions([]);
         const returnable = selectedSuggestion;
+        setSuggestions([]);
         setSelectedSuggestion(null);
         return returnable;
-    }
-
-    function getCurrentFunction(text: string, caretPosition: number) {
-        const parenthesesCount = text.split("(").length - 1;
-        const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, parenthesesCount / 2, [
-            ...Separators.SPACES,
-            ...Separators.PARENTHESES,
-        ]);
-        const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition, parenthesesCount / 2, [
-            ...Separators.SPACES,
-            ...Separators.PARENTHESES,
-        ]);
-
-        const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
-
-        return props.functions.find((func: Function) => {
-            return func.name == currentWord || func.aliases.includes(currentWord);
-        });
     }
 
     /**
@@ -156,17 +149,6 @@ export default function IdeTextarea(props: any) {
         // we can just get the number of semicolons to the left inside the parentheses to get the current parameter
         const numberOfSemicolonsToLeft = getTextInCurrentParentheses(text, caretPosition).split(";").length - 1;
         return parameters[numberOfSemicolonsToLeft];
-    }
-
-    /**
-     * Returns the first function that matches the name or alias if applicable.
-     */
-    function getFunction(includeAliases: boolean, name: string): Function | null {
-        return (
-            props.functions.find((func: Function) => {
-                return func.name == name || (includeAliases && func.aliases.includes(name));
-            }) ?? null
-        );
     }
 
     function getListElement(suggestion: Function, selected: boolean) {
@@ -189,9 +171,12 @@ export default function IdeTextarea(props: any) {
                 id={ideElementId}
                 contentEditable={true}
                 suppressContentEditableWarning={true} // why do they care that's the entire point of contentEditable
-                onInput={onInput}
-                onKeyDown={onKeyDown}
                 spellCheck={false}
+                onKeyDown={onKeyDown}
+                onSelect={() => {
+                    // called whenever user "selects" text, including when they move the caret by typing or whatever
+                    processInput(document.getElementById(ideElementId)?.textContent ?? "");
+                }}
                 className="block bg-zinc-900 w-full text-white h-96 caret-white p-2 resize-none outline-none m-0 border-r-0"
             >
                 {/*firefox doesn't like empty contentEditable elements, the <br> tags fix it*/}
@@ -208,7 +193,14 @@ export default function IdeTextarea(props: any) {
                             })
                             .map((parameter: Parameter) => {
                                 return parameter.name == currentFunctionParameter?.name ? (
-                                    <span key={parameter.name} className="font-bold text-white">
+                                    <span
+                                        key={parameter.name}
+                                        className={
+                                            currentFunctionParameterTypeCorrect
+                                                ? "font-bold text-white"
+                                                : "font-bold text-red-500"
+                                        }
+                                    >
                                         {parameter.name}
                                         <span className="text-gray-500">({parameter.type})</span>
                                         {"; "}
@@ -270,7 +262,7 @@ function getCaretPosition() {
     const ideElement = document.getElementById(ideElementId);
     let caretPos = 0;
     if (ideElement) {
-        const selection = window.getSelection();
+        let selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
             const clonedRange = range.cloneRange();
@@ -343,4 +335,33 @@ function getSuggestions(word: string, functions: Function[]): Function[] {
         }
     }
     return returnable;
+}
+
+/**
+ * Returns the first function that matches the name or alias if applicable.
+ */
+function getFunction(includeAliases: boolean, name: string, functions: Function[]): Function | null {
+    return (
+        functions.find((func: Function) => {
+            return func.name == name || (includeAliases && func.aliases.includes(name));
+        }) ?? null
+    );
+}
+
+function getCurrentFunction(text: string, caretPosition: number, functions: Function[]) {
+    const parenthesesCount = text.split("(").length - 1;
+    const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, parenthesesCount / 2, [
+        ...Separators.SPACES,
+        ...Separators.PARENTHESES,
+    ]);
+    const endOfCurrentWord = getEndIndexOfCurrentWord(text, caretPosition, parenthesesCount / 2, [
+        ...Separators.SPACES,
+        ...Separators.PARENTHESES,
+    ]);
+
+    const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
+
+    return functions.find((func: Function) => {
+        return func.name == currentWord || func.aliases.includes(currentWord);
+    });
 }
