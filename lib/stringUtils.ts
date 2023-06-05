@@ -57,14 +57,24 @@ export function getTextInCurrentParentheses(text: string, characterIndex: number
  * Separators are not considered part of the word.
  * @param text The text to search in.
  * @param caretPosition The position of the caret. 0-indexed. The leftmost and rightmost positions are 0 and text.length, respectively.
+ * @param skipSets The number of sets of separators to skip. For example, if skipSets is 1 and separators is [" "], then this function will skip over one space and stop at the next space.
  * @param separators The characters that separate words.
  * @return The index of the first character of the word the caret is currently in. Characters are 0-indexed, so the leftmost and rightmost characters are 0 and text.length - 1, respectively.
  */
-export function getStartIndexOfCurrentWord(text: string, caretPosition: number, separators: string[]) {
+export function getStartIndexOfCurrentWord(
+    text: string,
+    caretPosition: number,
+    skipSets: number,
+    separators: string[],
+) {
     let i = caretPosition - 1;
     while (i >= 0) {
         if (separators.includes(text[i])) {
-            return i + 1;
+            if (skipSets > 0) {
+                skipSets--;
+            } else {
+                return i + 1;
+            }
         }
         i--;
     }
@@ -77,15 +87,20 @@ export function getStartIndexOfCurrentWord(text: string, caretPosition: number, 
  * Separators are not considered part of the word.
  * @param text The text to search in.
  * @param caretPosition The position of the caret. 0-indexed. The leftmost and rightmost positions are 0 and text.length, respectively.
+ * @param skipSets The number of sets of separators to skip. For example, if skipSets is 1 and separators is [" "], then this function will skip over one space and stop at the next space.
  * @param separators The characters that separate words.
  * @return The index of the last character of the word the caret is currently in. Characters are 0-indexed, so the leftmost and rightmost characters are 0 and text.length - 1, respectively.
  */
-export function getEndIndexOfCurrentWord(text: string, caretPosition: number, separators: string[]) {
+export function getEndIndexOfCurrentWord(text: string, caretPosition: number, skipSets: number, separators: string[]) {
     let i = caretPosition;
     while (i < text.length) {
         if (separators.includes(text[i])) {
-            return i - 1 < 0 ? 0 : i - 1; // dollar store Math.clamp because this terrible language does not have it
-            // returns i-1 unless i-1 is less than 0, in which case it returns 0
+            if (skipSets > 0) {
+                skipSets--;
+            } else {
+                return i - 1 < 0 ? 0 : i - 1; // dollar store Math.clamp because this terrible language does not have it
+                // returns i-1 unless i-1 is less than 0, in which case it returns 0
+            }
         }
         i++;
     }
@@ -96,4 +111,5 @@ export const Separators = Object.freeze({
     SPACES: [" "],
     PARENTHESES: ["(", ")"],
     QUOTES: ['"'],
+    SEMICOLONS: [";"],
 });
