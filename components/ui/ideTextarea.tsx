@@ -359,7 +359,5 @@ function getCurrentFunction(text: string, caretPosition: number, functions: Func
 
     const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
 
-    return functions.find((func: Function) => {
-        return func.name == currentWord || func.aliases.includes(currentWord);
-    });
+    return getFunction(true, currentWord, functions);
 }
