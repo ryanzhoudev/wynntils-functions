@@ -171,6 +171,9 @@ export default function IdeTextarea(props: any) {
 
     return (
         <div className="h-screen w-full p-8">
+            <div className={"absolute p-2"}>
+                <code className={"bg-green-900 bg-opacity-50"}>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code>
+            </div>
             <code
                 id={ideElementId}
                 contentEditable={true}
@@ -186,6 +189,7 @@ export default function IdeTextarea(props: any) {
                 {/*firefox doesn't like empty contentEditable elements, the <br> tags fix it*/}
                 <br></br>
             </code>
+
             {currentFunction != null && (
                 <div className="top-full mt-1 py-1 px-2 bg-zinc-750">
                     <code className="text-amber-300">{currentFunction.name}</code>
