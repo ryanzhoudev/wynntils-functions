@@ -17,6 +17,7 @@ export default function IdeTextarea(props: any) {
     const [currentFunction, setCurrentFunction] = useState<Function | null>(null);
     const [currentFunctionParameter, setCurrentFunctionParameter] = useState<Parameter | null>(null);
     const [currentFunctionParameterTypeCorrect, setCurrentFunctionParameterTypeCorrect] = useState<boolean>(false);
+    const [highlightedCharacters, setHighlightedCharacters] = useState<number[]>([]);
 
     function processInput(text: string) {
         const caretPosition = getCaretPosition();
@@ -171,9 +172,7 @@ export default function IdeTextarea(props: any) {
 
     return (
         <div className="h-screen w-full p-8">
-            <div className={"absolute p-2"}>
-                <code className={"bg-green-900 bg-opacity-50"}>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code>
-            </div>
+            {createHighlightElement(highlightedCharacters)}
             <code
                 id={ideElementId}
                 contentEditable={true}
@@ -254,6 +253,19 @@ export default function IdeTextarea(props: any) {
             )}
         </div>
     );
+}
+
+function createHighlightElement(highlightedCharacters: number[]) {
+    const maxHighlightIndex = Math.max(...highlightedCharacters);
+    const elements: any[] = [];
+    for (let i = 0; i <= maxHighlightIndex; i++) {
+        elements.push(
+            <code className={highlightedCharacters.includes(i) ? "bg-green-700 bg-opacity-50 pt-0.5" : "pt-0.5"}>
+                &nbsp;
+            </code>,
+        );
+    }
+    return <div className={"absolute p-2"}>{elements}</div>;
 }
 
 function getCaretPosition() {
