@@ -28,10 +28,13 @@ export default function IdeTextarea(props: any) {
 
         const currentPartialWord = text.substring(startOfCurrentWord, caretPosition);
 
+        // region Suggestion generation
         const suggestions = getSuggestions(currentPartialWord, props.functions);
         setSuggestions(suggestions);
         setSelectedSuggestion(suggestions[0] ?? null);
+        // endregion
 
+        // region Function parsing
         const newCurrentFunction = getCurrentFunction(text, caretPosition, props.functions);
         setCurrentFunction(newCurrentFunction);
         setCurrentFunctionParameter(getCurrentParameter(text, caretPosition));
@@ -43,8 +46,9 @@ export default function IdeTextarea(props: any) {
             setSuggestions([]);
             setSelectedSuggestion(null);
         }
+        // endregion
 
-        // Parameter parsing
+        // region Parameter parsing
         if (currentFunctionParameter != null) {
             const startOfCurrentParameter = getStartIndexOfCurrentWord(text, caretPosition, 0, [
                 ...Separators.PARENTHESES,
@@ -91,6 +95,12 @@ export default function IdeTextarea(props: any) {
                 });
             }
         }
+        // endregion
+
+        // region Highlighting
+        // we should highlight matching parentheses with more deeply nested parentheses having a higher priority
+
+        // endregion
     }
 
     const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
