@@ -98,7 +98,12 @@ export default function IdeTextarea(props: any) {
         // endregion
 
         // region Highlighting
-        // we should highlight matching parentheses with more deeply nested parentheses having a higher priority
+        // we should highlight matching parentheses with parentheses to the right having higher priority
+        const rightChar = text[caretPosition] ?? "";
+        const leftChar = text[caretPosition - 1] ?? "";
+        if (rightChar == "(" || rightChar == ")") {
+        } else if (leftChar == "(" || leftChar == ")") {
+        }
 
         // endregion
     }

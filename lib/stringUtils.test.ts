@@ -3,6 +3,7 @@ import {
     getStartIndexOfCurrentWord,
     getEndIndexOfCurrentWord,
     Separators,
+    getMatchingParenthesesIndex,
 } from "./stringUtils";
 import { expect } from "@jest/globals";
 
@@ -60,4 +61,20 @@ test("getEndIndexOfCurrentWord", () => {
     expect(getEndIndexOfCurrentWord(" starting with space", 1, 0, Separators.SPACES)).toBe(8);
     expect(getEndIndexOfCurrentWord("ending with space ", 17, 0, Separators.SPACES)).toBe(16);
     expect(getEndIndexOfCurrentWord("ending with space ", 18, 0, Separators.SPACES)).toBe(18);
+});
+
+test("getMatchingParenthesesIndex", () => {
+    expect(getMatchingParenthesesIndex("()", 0)).toBe(1);
+    expect(getMatchingParenthesesIndex("()", 1)).toBe(0);
+    expect(getMatchingParenthesesIndex("(())", 0)).toBe(3);
+    expect(getMatchingParenthesesIndex("(())", 1)).toBe(2);
+    expect(getMatchingParenthesesIndex("(())", 2)).toBe(1);
+    expect(getMatchingParenthesesIndex("(())", 3)).toBe(0);
+    expect(getMatchingParenthesesIndex("((((((((", 0)).toBe(-1);
+    expect(getMatchingParenthesesIndex("((((((((", 7)).toBe(-1);
+    expect(getMatchingParenthesesIndex("))))))))", 0)).toBe(-1);
+    expect(getMatchingParenthesesIndex("))))))))", 7)).toBe(-1);
+    expect(getMatchingParenthesesIndex("(this is some text)", 0)).toBe(18);
+    expect(getMatchingParenthesesIndex("(this is some text)", 3)).toBe(-1);
+    expect(getMatchingParenthesesIndex("(this is some text)", 18)).toBe(0);
 });
