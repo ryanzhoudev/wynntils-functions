@@ -32,7 +32,7 @@ export default function IdeTextarea(props: any) {
         setSuggestions(suggestions);
         setSelectedSuggestion(suggestions[0] ?? null);
 
-        const newCurrentFunction = getCurrentFunction(text, caretPosition, props.functions) ?? null;
+        const newCurrentFunction = getCurrentFunction(text, caretPosition, props.functions);
         setCurrentFunction(newCurrentFunction);
         setCurrentFunctionParameter(getCurrentParameter(text, caretPosition));
         if (
@@ -332,7 +332,7 @@ function getSuggestions(word: string, functions: Function[]): Function[] {
 /**
  * Returns the first function that matches the name or alias if applicable.
  */
-function getFunction(includeAliases: boolean, name: string, functions: Function[]): Function | null {
+function getFunction(includeAliases: boolean, name: string, functions: Function[]) {
     return (
         functions.find((func: Function) => {
             return func.name == name || (includeAliases && func.aliases.includes(name));
