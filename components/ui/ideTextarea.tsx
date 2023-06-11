@@ -64,37 +64,31 @@ export default function IdeTextarea(props: any) {
             if (parameterFunction != null) {
                 // Since we found a valid function name, we can assume that the user is trying to write a function call
                 // Check the return type of the function and make sure it matches the type of the current parameter
-                if (parameterFunction.returnType == currentFunctionParameter.type) {
-                    setCurrentFunctionParameterTypeCorrect(true);
-                }
+                setCurrentFunctionParameterTypeCorrect(parameterFunction.returnType == currentFunctionParameter.type);
             } else {
                 // Since we didn't find a valid function name, we can assume that the user is trying to write a literal
-                switch (currentFunctionParameter.type) {
-                    case "String":
-                        setCurrentFunctionParameterTypeCorrect(
-                            currentParameterInput.startsWith('"') &&
+                setCurrentFunctionParameterTypeCorrect(() => {
+                    switch (currentFunctionParameter.type) {
+                        case "String":
+                            return (
+                                currentParameterInput.startsWith('"') &&
                                 currentParameterInput.endsWith('"') &&
-                                currentParameterInput.length > 1,
-                        );
-                        break;
-                    case "Number" || "Double":
-                        setCurrentFunctionParameterTypeCorrect(
-                            currentParameterInput != "" && !isNaN(Number(currentParameterInput)),
-                        );
-                        break;
-                    case "Integer":
-                        setCurrentFunctionParameterTypeCorrect(
-                            currentParameterInput != "" &&
+                                currentParameterInput.length > 1
+                            );
+                        case "Number" || "Double":
+                            return currentParameterInput != "" && !isNaN(Number(currentParameterInput));
+                        case "Integer":
+                            return (
+                                currentParameterInput != "" &&
                                 !isNaN(Number(currentParameterInput)) &&
-                                Number(currentParameterInput) % 1 == 0,
-                        );
-                        break;
-                    case "Boolean":
-                        setCurrentFunctionParameterTypeCorrect(
-                            currentParameterInput == "true" || currentParameterInput == "false",
-                        );
-                        break;
-                }
+                                Number(currentParameterInput) % 1 == 0
+                            );
+                        case "Boolean":
+                            return currentParameterInput == "true" || currentParameterInput == "false";
+                        default:
+                            return false;
+                    }
+                });
             }
         }
     }
