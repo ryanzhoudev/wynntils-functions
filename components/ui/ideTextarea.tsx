@@ -156,6 +156,30 @@ export default function IdeTextarea(props: any) {
         return parameters[numberOfSemicolonsToLeft];
     }
 
+    function createHighlightElement(highlightedCharacters: number[]) {
+        const maxHighlightIndex = Math.max(...highlightedCharacters);
+        const elements: any[] = [];
+        for (let i = 0; i <= maxHighlightIndex; i++) {
+            elements.push(
+                <code
+                    onClick={() => {
+                        // this is a hacky way to move the caret to the clicked position
+                        // but who cares
+                        setCaretPosition(i);
+                        const ide = document.getElementById(ideElementId);
+                        ide?.focus();
+                        processInput(ide?.textContent ?? "");
+                    }}
+                    key={i}
+                    className={highlightedCharacters.includes(i) ? "bg-green-600 bg-opacity-20 pt-0.5" : "pt-0.5"}
+                >
+                    &nbsp;
+                </code>,
+            );
+        }
+        return <div className={"absolute p-2"}>{elements}</div>;
+    }
+
     function getListElement(suggestion: Function, selected: boolean) {
         return (
             <li
@@ -253,28 +277,6 @@ export default function IdeTextarea(props: any) {
             )}
         </div>
     );
-}
-
-function createHighlightElement(highlightedCharacters: number[]) {
-    const maxHighlightIndex = Math.max(...highlightedCharacters);
-    const elements: any[] = [];
-    for (let i = 0; i <= maxHighlightIndex; i++) {
-        elements.push(
-            <code
-                onClick={() => {
-                    // this is a hacky way to move the caret to the clicked position
-                    // but who cares
-                    setCaretPosition(i);
-                    document.getElementById(ideElementId)?.focus();
-                }}
-                key={i}
-                className={highlightedCharacters.includes(i) ? "bg-green-600 bg-opacity-20 pt-0.5" : "pt-0.5"}
-            >
-                &nbsp;
-            </code>,
-        );
-    }
-    return <div className={"absolute p-2"}>{elements}</div>;
 }
 
 function getCaretPosition() {
