@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Function, Parameter } from ".prisma/client";
 import {
     getEndIndexOfCurrentWord,
+    getMatchingParenthesesIndex,
     getStartIndexOfCurrentWord,
     getTextInCurrentParentheses,
     Separators,
@@ -102,7 +103,11 @@ export default function IdeTextarea(props: any) {
         const rightChar = text[caretPosition] ?? "";
         const leftChar = text[caretPosition - 1] ?? "";
         if (rightChar == "(" || rightChar == ")") {
+            setHighlightedCharacters([caretPosition, getMatchingParenthesesIndex(text, caretPosition)]);
         } else if (leftChar == "(" || leftChar == ")") {
+            setHighlightedCharacters([caretPosition - 1, getMatchingParenthesesIndex(text, caretPosition - 1)]);
+        } else {
+            setHighlightedCharacters([]);
         }
 
         // endregion
@@ -255,7 +260,10 @@ function createHighlightElement(highlightedCharacters: number[]) {
     const elements: any[] = [];
     for (let i = 0; i <= maxHighlightIndex; i++) {
         elements.push(
-            <code className={highlightedCharacters.includes(i) ? "bg-green-700 bg-opacity-50 pt-0.5" : "pt-0.5"}>
+            <code
+                key={i}
+                className={highlightedCharacters.includes(i) ? "bg-green-700 bg-opacity-50 pt-0.5" : "pt-0.5"}
+            >
                 &nbsp;
             </code>,
         );
