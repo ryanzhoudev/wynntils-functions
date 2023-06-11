@@ -262,7 +262,7 @@ function createHighlightElement(highlightedCharacters: number[]) {
         elements.push(
             <code
                 key={i}
-                className={highlightedCharacters.includes(i) ? "bg-green-700 bg-opacity-50 pt-0.5" : "pt-0.5"}
+                className={highlightedCharacters.includes(i) ? "bg-green-600 bg-opacity-20 pt-0.5" : "pt-0.5"}
             >
                 &nbsp;
             </code>,
