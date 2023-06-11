@@ -127,10 +127,8 @@ export default function IdeTextarea(props: any) {
         insertText(selectedSuggestion.name + "()", -1, -1);
         setCurrentFunction(selectedSuggestion);
 
-        const returnable = selectedSuggestion;
         setSuggestions([]);
         setSelectedSuggestion(null);
-        return returnable;
     }
 
     /**
