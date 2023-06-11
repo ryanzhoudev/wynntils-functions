@@ -261,6 +261,12 @@ function createHighlightElement(highlightedCharacters: number[]) {
     for (let i = 0; i <= maxHighlightIndex; i++) {
         elements.push(
             <code
+                onClick={() => {
+                    // this is a hacky way to move the caret to the clicked position
+                    // but who cares
+                    setCaretPosition(i);
+                    document.getElementById(ideElementId)?.focus();
+                }}
                 key={i}
                 className={highlightedCharacters.includes(i) ? "bg-green-600 bg-opacity-20 pt-0.5" : "pt-0.5"}
             >
@@ -287,6 +293,16 @@ function getCaretPosition() {
     return caretPos;
 }
 
+function setCaretPosition(newCaretPosition: number) {
+    const textArea = document.getElementById(ideElementId) as HTMLElement;
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.setStart(textArea.childNodes[0], newCaretPosition);
+    range.setEnd(textArea.childNodes[0], newCaretPosition);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+}
+
 /**
  * Inserts the specified text at the current caret position.
  * Deletes deletePre characters to the left of the caret position before inserting.
@@ -297,7 +313,6 @@ function insertText(insertable: string, deletePre: number, caretOffset: number) 
     const textArea = document.getElementById(ideElementId) as HTMLElement;
     const text: string = textArea.textContent ?? "";
 
-    const selection = window.getSelection();
     const caretPosition = getCaretPosition();
 
     let preInsertTextIndex;
@@ -322,11 +337,7 @@ function insertText(insertable: string, deletePre: number, caretOffset: number) 
     textArea.textContent = preInsertText + insertable + postInsertText;
 
     const newCaretPosition = preInsertText.length + insertable.length + caretOffset;
-    const range = document.createRange();
-    range.setStart(textArea.childNodes[0], newCaretPosition);
-    range.setEnd(textArea.childNodes[0], newCaretPosition);
-    selection?.removeAllRanges();
-    selection?.addRange(range);
+    setCaretPosition(newCaretPosition);
 }
 
 function getSuggestions(word: string, functions: Function[]): Function[] {
