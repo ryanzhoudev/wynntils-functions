@@ -113,3 +113,35 @@ export const Separators = Object.freeze({
     QUOTES: ['"'],
     SEMICOLONS: [";"],
 });
+
+/**
+ * Returns the index of the matching parentheses for the given caret position. Returns -1 if no matching parentheses is found.
+ */
+export function getMatchingParenthesesIndex(text: string, caretPosition: number) {
+    if (text[caretPosition] != "(" && text[caretPosition] != ")") {
+        return -1;
+    }
+    let openParentheses = 0;
+    let i = caretPosition;
+    while (true) {
+        if (text[i] == "(") {
+            openParentheses++;
+        } else if (text[i] == ")") {
+            openParentheses--;
+        }
+
+        if (openParentheses == 0) {
+            return i;
+        } else if (openParentheses < 0) {
+            // we need to move left
+            i--;
+        } else if (openParentheses > 0) {
+            // we need to move right
+            i++;
+        }
+
+        if (i >= text.length || i < 0) {
+            return -1;
+        }
+    }
+}

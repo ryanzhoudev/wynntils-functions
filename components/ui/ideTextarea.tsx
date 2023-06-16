@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Function, Parameter } from ".prisma/client";
 import {
     getEndIndexOfCurrentWord,
+    getMatchingParenthesesIndex,
     getStartIndexOfCurrentWord,
     getTextInCurrentParentheses,
     Separators,
@@ -17,6 +18,7 @@ export default function IdeTextarea(props: any) {
     const [currentFunction, setCurrentFunction] = useState<Function | null>(null);
     const [currentFunctionParameter, setCurrentFunctionParameter] = useState<Parameter | null>(null);
     const [currentFunctionParameterTypeCorrect, setCurrentFunctionParameterTypeCorrect] = useState<boolean>(false);
+    const [highlightedCharacters, setHighlightedCharacters] = useState<number[]>([]);
 
     function processInput(text: string) {
         const caretPosition = getCaretPosition();
@@ -27,11 +29,14 @@ export default function IdeTextarea(props: any) {
 
         const currentPartialWord = text.substring(startOfCurrentWord, caretPosition);
 
+        // region Suggestion generation
         const suggestions = getSuggestions(currentPartialWord, props.functions);
         setSuggestions(suggestions);
         setSelectedSuggestion(suggestions[0] ?? null);
+        // endregion
 
-        const newCurrentFunction = getCurrentFunction(text, caretPosition, props.functions) ?? null;
+        // region Function parsing
+        const newCurrentFunction = getCurrentFunction(text, caretPosition, props.functions);
         setCurrentFunction(newCurrentFunction);
         setCurrentFunctionParameter(getCurrentParameter(text, caretPosition));
         if (
@@ -42,8 +47,9 @@ export default function IdeTextarea(props: any) {
             setSuggestions([]);
             setSelectedSuggestion(null);
         }
+        // endregion
 
-        // Parameter parsing
+        // region Parameter parsing
         if (currentFunctionParameter != null) {
             const startOfCurrentParameter = getStartIndexOfCurrentWord(text, caretPosition, 0, [
                 ...Separators.PARENTHESES,
@@ -63,51 +69,48 @@ export default function IdeTextarea(props: any) {
             if (parameterFunction != null) {
                 // Since we found a valid function name, we can assume that the user is trying to write a function call
                 // Check the return type of the function and make sure it matches the type of the current parameter
-                if (parameterFunction.returnType == currentFunctionParameter.type) {
-                    setCurrentFunctionParameterTypeCorrect(true);
-                }
+                setCurrentFunctionParameterTypeCorrect(parameterFunction.returnType == currentFunctionParameter.type);
             } else {
                 // Since we didn't find a valid function name, we can assume that the user is trying to write a literal
-                switch (currentFunctionParameter.type) {
-                    case "String":
-                        if (
-                            currentParameterInput.startsWith('"') &&
-                            currentParameterInput.endsWith('"') &&
-                            currentParameterInput.length > 1
-                        ) {
-                            setCurrentFunctionParameterTypeCorrect(true);
-                        } else {
-                            setCurrentFunctionParameterTypeCorrect(false);
-                        }
-                        break;
-                    case "Number" || "Double":
-                        if (currentParameterInput != "" && !isNaN(Number(currentParameterInput))) {
-                            setCurrentFunctionParameterTypeCorrect(true);
-                        } else {
-                            setCurrentFunctionParameterTypeCorrect(false);
-                        }
-                        break;
-                    case "Integer":
-                        if (
-                            currentParameterInput != "" &&
-                            !isNaN(Number(currentParameterInput)) &&
-                            Number(currentParameterInput) % 1 == 0
-                        ) {
-                            setCurrentFunctionParameterTypeCorrect(true);
-                        } else {
-                            setCurrentFunctionParameterTypeCorrect(false);
-                        }
-                        break;
-                    case "Boolean":
-                        if (currentParameterInput == "true" || currentParameterInput == "false") {
-                            setCurrentFunctionParameterTypeCorrect(true);
-                        } else {
-                            setCurrentFunctionParameterTypeCorrect(false);
-                        }
-                        break;
-                }
+                setCurrentFunctionParameterTypeCorrect(() => {
+                    switch (currentFunctionParameter.type) {
+                        case "String":
+                            return (
+                                currentParameterInput.startsWith('"') &&
+                                currentParameterInput.endsWith('"') &&
+                                currentParameterInput.length > 1
+                            );
+                        case "Number" || "Double":
+                            return currentParameterInput != "" && !isNaN(Number(currentParameterInput));
+                        case "Integer":
+                            return (
+                                currentParameterInput != "" &&
+                                !isNaN(Number(currentParameterInput)) &&
+                                Number(currentParameterInput) % 1 == 0
+                            );
+                        case "Boolean":
+                            return currentParameterInput == "true" || currentParameterInput == "false";
+                        default:
+                            return false;
+                    }
+                });
             }
         }
+        // endregion
+
+        // region Highlighting
+        // we should highlight matching parentheses with parentheses to the right having higher priority
+        const rightChar = text[caretPosition] ?? "";
+        const leftChar = text[caretPosition - 1] ?? "";
+        if (rightChar == "(" || rightChar == ")") {
+            setHighlightedCharacters([caretPosition, getMatchingParenthesesIndex(text, caretPosition)]);
+        } else if (leftChar == "(" || leftChar == ")") {
+            setHighlightedCharacters([caretPosition - 1, getMatchingParenthesesIndex(text, caretPosition - 1)]);
+        } else {
+            setHighlightedCharacters([]);
+        }
+
+        // endregion
     }
 
     const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
@@ -134,10 +137,8 @@ export default function IdeTextarea(props: any) {
         insertText(selectedSuggestion.name + "()", -1, -1);
         setCurrentFunction(selectedSuggestion);
 
-        const returnable = selectedSuggestion;
         setSuggestions([]);
         setSelectedSuggestion(null);
-        return returnable;
     }
 
     /**
@@ -153,6 +154,30 @@ export default function IdeTextarea(props: any) {
         // we can just get the number of semicolons to the left inside the parentheses to get the current parameter
         const numberOfSemicolonsToLeft = getTextInCurrentParentheses(text, caretPosition).split(";").length - 1;
         return parameters[numberOfSemicolonsToLeft];
+    }
+
+    function createHighlightElement(highlightedCharacters: number[]) {
+        const maxHighlightIndex = Math.max(...highlightedCharacters);
+        const elements: any[] = [];
+        for (let i = 0; i <= maxHighlightIndex; i++) {
+            elements.push(
+                <code
+                    onClick={() => {
+                        // this is a hacky way to move the caret to the clicked position
+                        // but who cares
+                        setCaretPosition(i);
+                        const ide = document.getElementById(ideElementId);
+                        ide?.focus();
+                        processInput(ide?.textContent ?? "");
+                    }}
+                    key={i}
+                    className={highlightedCharacters.includes(i) ? "bg-green-600 bg-opacity-20 pt-0.5" : "pt-0.5"}
+                >
+                    &nbsp;
+                </code>,
+            );
+        }
+        return <div className={"absolute p-2"}>{elements}</div>;
     }
 
     function getListElement(suggestion: Function, selected: boolean) {
@@ -171,6 +196,7 @@ export default function IdeTextarea(props: any) {
 
     return (
         <div className="h-screen w-full p-8">
+            {createHighlightElement(highlightedCharacters)}
             <code
                 id={ideElementId}
                 contentEditable={true}
@@ -186,6 +212,7 @@ export default function IdeTextarea(props: any) {
                 {/*firefox doesn't like empty contentEditable elements, the <br> tags fix it*/}
                 <br></br>
             </code>
+
             {currentFunction != null && (
                 <div className="top-full mt-1 py-1 px-2 bg-zinc-750">
                     <code className="text-amber-300">{currentFunction.name}</code>
@@ -268,6 +295,16 @@ function getCaretPosition() {
     return caretPos;
 }
 
+function setCaretPosition(newCaretPosition: number) {
+    const textArea = document.getElementById(ideElementId) as HTMLElement;
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.setStart(textArea.childNodes[0], newCaretPosition);
+    range.setEnd(textArea.childNodes[0], newCaretPosition);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+}
+
 /**
  * Inserts the specified text at the current caret position.
  * Deletes deletePre characters to the left of the caret position before inserting.
@@ -278,7 +315,6 @@ function insertText(insertable: string, deletePre: number, caretOffset: number) 
     const textArea = document.getElementById(ideElementId) as HTMLElement;
     const text: string = textArea.textContent ?? "";
 
-    const selection = window.getSelection();
     const caretPosition = getCaretPosition();
 
     let preInsertTextIndex;
@@ -303,11 +339,7 @@ function insertText(insertable: string, deletePre: number, caretOffset: number) 
     textArea.textContent = preInsertText + insertable + postInsertText;
 
     const newCaretPosition = preInsertText.length + insertable.length + caretOffset;
-    const range = document.createRange();
-    range.setStart(textArea.childNodes[0], newCaretPosition);
-    range.setEnd(textArea.childNodes[0], newCaretPosition);
-    selection?.removeAllRanges();
-    selection?.addRange(range);
+    setCaretPosition(newCaretPosition);
 }
 
 function getSuggestions(word: string, functions: Function[]): Function[] {
@@ -334,7 +366,7 @@ function getSuggestions(word: string, functions: Function[]): Function[] {
 /**
  * Returns the first function that matches the name or alias if applicable.
  */
-function getFunction(includeAliases: boolean, name: string, functions: Function[]): Function | null {
+function getFunction(includeAliases: boolean, name: string, functions: Function[]) {
     return (
         functions.find((func: Function) => {
             return func.name == name || (includeAliases && func.aliases.includes(name));
@@ -355,7 +387,5 @@ function getCurrentFunction(text: string, caretPosition: number, functions: Func
 
     const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
 
-    return functions.find((func: Function) => {
-        return func.name == currentWord || func.aliases.includes(currentWord);
-    });
+    return getFunction(true, currentWord, functions);
 }
