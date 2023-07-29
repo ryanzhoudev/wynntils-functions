@@ -15,14 +15,14 @@ async function makeContentCards(functions: functions[], args: arguments[]) {
     for (const func of functions) {
         const filteredArgs = args.filter((arg) => arg.functionid == func.id);
 
-        // returns "" if no filteredArgs exist, otherwise returns (param1, param2, param3)
+        // returns "" if no filteredArgs exist, otherwise returns (arg1, arg2, arg3)
         const argumentSuffix =
             filteredArgs.length == 0
                 ? ""
                 : "(" +
                   filteredArgs
-                      .map((param) => {
-                          return param.required ? param.name : param.name + "?";
+                      .map((arg) => {
+                          return arg.required ? arg.name : arg.name + "?";
                       })
                       .join("; ") +
                   ")";
@@ -44,12 +44,12 @@ async function makeContentCards(functions: functions[], args: arguments[]) {
                     <p>{filteredArgs.length == 0 ? "No arguments" : "Arguments:"}</p>
                 </CardHeader>
                 <CardContent>
-                    {filteredArgs.map((param) => (
-                        <div key={param.name}>
-                            - <code>{param.name} </code> (<code>{param.type}</code>
+                    {filteredArgs.map((arg) => (
+                        <div key={arg.name}>
+                            - <code>{arg.name} </code> (<code>{arg.type}</code>
                             {", "}
-                            {param.required ? "required" : "optional"})
-                            {param.description == null ? "" : " -- " + param.description}
+                            {arg.required ? "required" : "optional, default: " + arg.defaultvalue})
+                            {arg.description == null ? "" : " -- " + arg.description}
                         </div>
                     ))}
                 </CardContent>

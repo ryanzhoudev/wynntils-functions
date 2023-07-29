@@ -9,13 +9,14 @@ datasource db {
 }
 
 model arguments {
-  id          Int        @id @default(autoincrement())
-  name        String     @db.VarChar(255)
-  description String
-  required    Boolean
-  functionid  Int?
-  type        type
-  functions   functions? @relation(fields: [functionid], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id           Int        @id @default(autoincrement())
+  name         String     @db.VarChar(255)
+  description  String
+  required     Boolean
+  functionid   Int?
+  type         type
+  defaultvalue String?    @db.VarChar(255)
+  functions    functions? @relation(fields: [functionid], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model functions {
