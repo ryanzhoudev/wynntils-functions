@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Function, Parameter } from ".prisma/client";
+import { functions, arguments } from ".prisma/client";
 import {
     getEndIndexOfCurrentWord,
     getMatchingParenthesesIndex,
@@ -13,11 +13,11 @@ import {
 const ideElementId = "ide";
 
 export default function IdeTextarea(props: any) {
-    const [suggestions, setSuggestions] = useState<Function[]>([]);
-    const [selectedSuggestion, setSelectedSuggestion] = useState<Function | null>(null);
-    const [currentFunction, setCurrentFunction] = useState<Function | null>(null);
-    const [currentFunctionParameter, setCurrentFunctionParameter] = useState<Parameter | null>(null);
-    const [currentFunctionParameterTypeCorrect, setCurrentFunctionParameterTypeCorrect] = useState<boolean>(false);
+    const [suggestions, setSuggestions] = useState<functions[]>([]);
+    const [selectedSuggestion, setSelectedSuggestion] = useState<functions | null>(null);
+    const [currentfunctions, setCurrentfunctions] = useState<functions | null>(null);
+    const [currentfunctionsarguments, setCurrentfunctionsarguments] = useState<arguments | null>(null);
+    const [currentfunctionsargumentsTypeCorrect, setCurrentfunctionsargumentsTypeCorrect] = useState<boolean>(false);
     const [highlightedCharacters, setHighlightedCharacters] = useState<number[]>([]);
 
     function processInput(text: string) {
@@ -35,13 +35,13 @@ export default function IdeTextarea(props: any) {
         setSelectedSuggestion(suggestions[0] ?? null);
         // endregion
 
-        // region Function parsing
-        const newCurrentFunction = getCurrentFunction(text, caretPosition, props.functions);
-        setCurrentFunction(newCurrentFunction);
-        setCurrentFunctionParameter(getCurrentParameter(text, caretPosition));
+        // region functions parsing
+        const newCurrentfunctions = getCurrentfunctions(text, caretPosition, props.functions);
+        setCurrentfunctions(newCurrentfunctions);
+        setCurrentfunctionsarguments(getCurrentarguments(text, caretPosition));
         if (
-            newCurrentFunction != null &&
-            suggestions.filter((suggestion) => suggestion.name != newCurrentFunction.name).length == 0
+            newCurrentfunctions != null &&
+            suggestions.filter((suggestion) => suggestion.name != newCurrentfunctions.name).length == 0
         ) {
             // just manually wrote a valid function, so clear suggestions unless there are other suggestions
             setSuggestions([]);
@@ -49,47 +49,47 @@ export default function IdeTextarea(props: any) {
         }
         // endregion
 
-        // region Parameter parsing
-        if (currentFunctionParameter != null) {
-            const startOfCurrentParameter = getStartIndexOfCurrentWord(text, caretPosition, 0, [
+        // region arguments parsing
+        if (currentfunctionsarguments != null) {
+            const startOfCurrentarguments = getStartIndexOfCurrentWord(text, caretPosition, 0, [
                 ...Separators.PARENTHESES,
                 ...Separators.SEMICOLONS,
             ]);
-            const endOfCurrentParameter = getEndIndexOfCurrentWord(text, caretPosition, 0, [
+            const endOfCurrentarguments = getEndIndexOfCurrentWord(text, caretPosition, 0, [
                 ...Separators.PARENTHESES,
                 ...Separators.SEMICOLONS,
             ]);
-            const currentParameterInput = text.substring(startOfCurrentParameter, endOfCurrentParameter + 1);
+            const currentargumentsInput = text.substring(startOfCurrentarguments, endOfCurrentarguments + 1);
 
-            const parameterFunction: Function | null = getFunction(
+            const argumentfunctions: functions | null = getfunctions(
                 true,
-                currentParameterInput.replace("(", "").replace(")", ""),
+                currentargumentsInput.replace("(", "").replace(")", ""),
                 props.functions,
             );
-            if (parameterFunction != null) {
+            if (argumentfunctions != null) {
                 // Since we found a valid function name, we can assume that the user is trying to write a function call
-                // Check the return type of the function and make sure it matches the type of the current parameter
-                setCurrentFunctionParameterTypeCorrect(parameterFunction.returnType == currentFunctionParameter.type);
+                // Check the return type of the function and make sure it matches the type of the current argument
+                setCurrentfunctionsargumentsTypeCorrect(argumentfunctions.returntype == currentfunctionsarguments.type);
             } else {
                 // Since we didn't find a valid function name, we can assume that the user is trying to write a literal
-                setCurrentFunctionParameterTypeCorrect(() => {
-                    switch (currentFunctionParameter.type) {
+                setCurrentfunctionsargumentsTypeCorrect(() => {
+                    switch (currentfunctionsarguments.type) {
                         case "String":
                             return (
-                                currentParameterInput.startsWith('"') &&
-                                currentParameterInput.endsWith('"') &&
-                                currentParameterInput.length > 1
+                                currentargumentsInput.startsWith('"') &&
+                                currentargumentsInput.endsWith('"') &&
+                                currentargumentsInput.length > 1
                             );
                         case "Number" || "Double":
-                            return currentParameterInput != "" && !isNaN(Number(currentParameterInput));
+                            return currentargumentsInput != "" && !isNaN(Number(currentargumentsInput));
                         case "Integer":
                             return (
-                                currentParameterInput != "" &&
-                                !isNaN(Number(currentParameterInput)) &&
-                                Number(currentParameterInput) % 1 == 0
+                                currentargumentsInput != "" &&
+                                !isNaN(Number(currentargumentsInput)) &&
+                                Number(currentargumentsInput) % 1 == 0
                             );
                         case "Boolean":
-                            return currentParameterInput == "true" || currentParameterInput == "false";
+                            return currentargumentsInput == "true" || currentargumentsInput == "false";
                         default:
                             return false;
                     }
@@ -135,25 +135,25 @@ export default function IdeTextarea(props: any) {
         if (selectedSuggestion == null) return;
 
         insertText(selectedSuggestion.name + "()", -1, -1);
-        setCurrentFunction(selectedSuggestion);
+        setCurrentfunctions(selectedSuggestion);
 
         setSuggestions([]);
         setSelectedSuggestion(null);
     }
 
     /**
-     * Requires currentFunction to be set and the caret to be inside the current function's parentheses.
-     * Returns the current parameter selected at the caret position, or null if there are no parameters.
+     * Requires currentfunctions to be set and the caret to be inside the current function's parentheses.
+     * Returns the current argument selected at the caret position, or null if there are no arguments.
      */
-    function getCurrentParameter(text: string, caretPosition: number) {
-        const parameters: Parameter[] = props.parameters.filter(
-            (param: Parameter) => param.functionId == currentFunction?.id,
+    function getCurrentarguments(text: string, caretPosition: number) {
+        const args: arguments[] = props.arguments.filter(
+            (param: arguments) => param.functionid == currentfunctions?.id,
         );
-        if (parameters.length == 0) return null;
+        if (args.length == 0) return null;
 
-        // we can just get the number of semicolons to the left inside the parentheses to get the current parameter
+        // we can just get the number of semicolons to the left inside the parentheses to get the current argument
         const numberOfSemicolonsToLeft = getTextInCurrentParentheses(text, caretPosition).split(";").length - 1;
-        return parameters[numberOfSemicolonsToLeft];
+        return args[numberOfSemicolonsToLeft];
     }
 
     function createHighlightElement(highlightedCharacters: number[]) {
@@ -180,7 +180,7 @@ export default function IdeTextarea(props: any) {
         return <div className={"absolute p-2"}>{elements}</div>;
     }
 
-    function getListElement(suggestion: Function, selected: boolean) {
+    function getListElement(suggestion: functions, selected: boolean) {
         return (
             <li
                 key={suggestion.name}
@@ -189,7 +189,7 @@ export default function IdeTextarea(props: any) {
                 onMouseEnter={() => setSelectedSuggestion(suggestion)}
             >
                 <code>{suggestion.name}</code>
-                <code className="float-right">{suggestion.aliases.map((alias) => alias).join(", ")}</code>
+                <code className="float-right">{suggestion.aliases.map((alias: string) => alias).join(", ")}</code>
             </li>
         );
     }
@@ -213,48 +213,50 @@ export default function IdeTextarea(props: any) {
                 <br></br>
             </code>
 
-            {currentFunction != null && (
+            {currentfunctions != null && (
                 <div className="top-full mt-1 py-1 px-2 bg-zinc-750">
-                    <code className="text-amber-300">{currentFunction.name}</code>
+                    <code className="text-amber-300">{currentfunctions.name}</code>
                     <code>
                         {"("}
-                        {props.parameters
-                            .filter((parameter: Parameter) => {
-                                return parameter.functionId == currentFunction.id;
+                        {props.arguments
+                            .filter((argument: arguments) => {
+                                return argument.functionid == currentfunctions.id;
                             })
-                            .map((parameter: Parameter) => {
+                            .map((argument: arguments) => {
                                 return (
                                     <span
-                                        key={parameter.name}
+                                        key={argument.name}
                                         className={
-                                            parameter.name == currentFunctionParameter?.name
-                                                ? currentFunctionParameterTypeCorrect
+                                            argument.name == currentfunctionsarguments?.name
+                                                ? currentfunctionsargumentsTypeCorrect
                                                     ? "font-bold text-white"
                                                     : "font-bold text-red-500"
                                                 : "text-gray-400"
                                         }
                                     >
-                                        {parameter.name}
-                                        <span className="text-gray-500">({parameter.type})</span>
+                                        {argument.name}
+                                        <span className="text-gray-500">({argument.type})</span>
                                         {"; "}
                                     </span>
                                 );
                             })}
                         {")"}
                     </code>
-                    <code className="text-amber-300">{" -> " + currentFunction.returnType}</code>
-                    <code className="float-right">{currentFunction.aliases.map((alias) => alias).join(", ")}</code>
+                    <code className="text-amber-300">{" -> " + currentfunctions.returntype}</code>
+                    <code className="float-right">
+                        {currentfunctions.aliases.map((alias: string) => alias).join(", ")}
+                    </code>
                     <br></br>
-                    <code className="text-gray-400">{currentFunction.description}</code>
+                    <code className="text-gray-400">{currentfunctions.description}</code>
                     <br></br>
                     <br></br>
-                    {props.parameters.filter((param: Parameter) => param.functionId == currentFunction.id).length ==
+                    {props.arguments.filter((param: arguments) => param.functionid == currentfunctions.id).length ==
                     0 ? (
-                        <code className="text-gray-400">No parameters.</code>
+                        <code className="text-gray-400">No arguments.</code>
                     ) : (
-                        props.parameters
-                            .filter((param: Parameter) => param.functionId == currentFunction.id)
-                            .map((param: Parameter) => {
+                        props.arguments
+                            .filter((param: arguments) => param.functionid == currentfunctions.id)
+                            .map((param: arguments) => {
                                 return (
                                     <div key={param.name}>
                                         <code className="font-bold text-white">
@@ -342,12 +344,12 @@ function insertText(insertable: string, deletePre: number, caretOffset: number) 
     setCaretPosition(newCaretPosition);
 }
 
-function getSuggestions(word: string, functions: Function[]): Function[] {
+function getSuggestions(word: string, functions: functions[]): functions[] {
     if (functions.length == 0 || word == "") {
         return [];
     }
 
-    const returnable: Function[] = [];
+    const returnable: functions[] = [];
     for (const fn of functions) {
         if (fn.name.startsWith(word)) {
             returnable.push(fn);
@@ -366,15 +368,15 @@ function getSuggestions(word: string, functions: Function[]): Function[] {
 /**
  * Returns the first function that matches the name or alias if applicable.
  */
-function getFunction(includeAliases: boolean, name: string, functions: Function[]) {
+function getfunctions(includeAliases: boolean, name: string, functions: functions[]) {
     return (
-        functions.find((func: Function) => {
+        functions.find((func: functions) => {
             return func.name == name || (includeAliases && func.aliases.includes(name));
         }) ?? null
     );
 }
 
-function getCurrentFunction(text: string, caretPosition: number, functions: Function[]) {
+function getCurrentfunctions(text: string, caretPosition: number, functions: functions[]) {
     const parenthesesCount = text.split("(").length - 1;
     const startOfCurrentWord = getStartIndexOfCurrentWord(text, caretPosition, parenthesesCount / 2, [
         ...Separators.SPACES,
@@ -387,5 +389,5 @@ function getCurrentFunction(text: string, caretPosition: number, functions: Func
 
     const currentWord = text.substring(startOfCurrentWord, endOfCurrentWord).split("(")[0];
 
-    return getFunction(true, currentWord, functions);
+    return getfunctions(true, currentWord, functions);
 }

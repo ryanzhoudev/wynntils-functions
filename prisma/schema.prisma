@@ -1,66 +1,38 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider     = "postgresql"
-    url          = env("DATABASE_URL")
-    directUrl    = env("DIRECT_URL")
-
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-model Function {
-    id          Int             @id @default(autoincrement())
-    category    Category
-    name        String
-    description String
-    aliases     String[]
-    parameters  Parameter[]
-    returnType  Type
+model arguments {
+  id          Int        @id @default(autoincrement())
+  name        String     @db.VarChar(255)
+  description String
+  required    Boolean
+  functionid  Int?
+  type        type
+  functions   functions? @relation(fields: [functionid], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
-model Parameter {
-    id          Int             @id @default(autoincrement())
-    name        String
-    description String?
-    type        Type
-    required    Boolean
-    default     String?
-    function    Function?       @relation(fields: [functionId], references: [id])
-    functionId  Int?
+model functions {
+  id          Int         @id @default(autoincrement())
+  name        String      @unique @db.VarChar(255)
+  description String
+  aliases     String[]    @db.VarChar(255)
+  returntype  type
+  arguments   arguments[]
 }
 
-enum Type {
-    String
-    Integer
-    Double
-    Number
-    Boolean
-    CappedValue
-    Location
-}
-
-enum Category {
-    GenericCapped
-    GenericConditional
-    GenericLocation
-    GenericLogic
-    GenericMath
-    GenericString
-    Character
-    Combat
-    CombatXp
-    Environment
-    Horse
-    Inventory
-    Lootrun
-    Minecraft
-    Profession
-    Social
-    Spell
-    War
-    World
+enum type {
+  Integer
+  CappedValue
+  Number
+  String
+  Boolean
+  Double
+  Location
 }

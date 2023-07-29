@@ -1,8 +1,8 @@
 import prisma from "../../lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Function } from ".prisma/client";
+import { functions } from ".prisma/client";
 
-export async function makeContentCards(functions: Function[]) {
+export async function makeContentCards(functions: functions[]) {
     if (functions == undefined) {
         return <div>Failed to load functions.</div>;
     }
@@ -13,9 +13,9 @@ export async function makeContentCards(functions: Function[]) {
 
     // iterate through functions and create a div for each one
     for (const func of functions) {
-        const parameters = await prisma.parameter.findMany({
+        const parameters = await prisma.arguments.findMany({
             where: {
-                functionId: func.id,
+                functionid: func.id,
             },
         });
 
@@ -32,13 +32,13 @@ export async function makeContentCards(functions: Function[]) {
                   ")";
 
         const entry = (
-            <Card className="bg-gray-800" id={func.category}>
+            <Card className="bg-gray-800">
                 <CardTitle>
                     <code className="ml-2 text-lg">
                         {func.name}
                         {parameterSuffix}
                     </code>
-                    <code className="float-right mr-2 text-lg">{func.returnType}</code>
+                    <code className="float-right mr-2 text-lg">{func.returntype}</code>
                 </CardTitle>
                 <CardDescription>
                     <p>{func.description}</p>
@@ -78,7 +78,7 @@ export async function makeContentCards(functions: Function[]) {
 }
 
 export default async function Docs() {
-    const functions = await prisma.function.findMany();
+    const functions = await prisma.functions.findMany();
 
     return await makeContentCards(functions);
 }
