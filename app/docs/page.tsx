@@ -1,10 +1,10 @@
 import prisma from "../../lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { functions } from ".prisma/client";
+import { arguments, functions } from ".prisma/client";
 
-async function makeContentCards(functions: functions[]) {
-    if (functions == undefined) {
-        return <div>Failed to load functions.</div>;
+async function makeContentCards(functions: functions[], args: arguments[]) {
+    if (functions == undefined || args == undefined) {
+        return <div>Failed to load functions or arguments.</div>;
     }
 
     functions.sort((a, b) => a.id - b.id);
@@ -13,18 +13,14 @@ async function makeContentCards(functions: functions[]) {
 
     // iterate through functions and create a div for each one
     for (const func of functions) {
-        const args = await prisma.arguments.findMany({
-            where: {
-                functionid: func.id,
-            },
-        });
+        const filteredArgs = args.filter((arg) => arg.functionid == func.id);
 
-        // returns "" if no args exist, otherwise returns (param1, param2, param3)
+        // returns "" if no filteredArgs exist, otherwise returns (param1, param2, param3)
         const argumentSuffix =
-            args.length == 0
+            filteredArgs.length == 0
                 ? ""
                 : "(" +
-                  args
+                  filteredArgs
                       .map((param) => {
                           return param.required ? param.name : param.name + "?";
                       })
@@ -45,10 +41,10 @@ async function makeContentCards(functions: functions[]) {
                 </CardDescription>
 
                 <CardHeader>
-                    <p>{args.length == 0 ? "No args" : "Arguments:"}</p>
+                    <p>{filteredArgs.length == 0 ? "No arguments" : "Arguments:"}</p>
                 </CardHeader>
                 <CardContent>
-                    {args.map((param) => (
+                    {filteredArgs.map((param) => (
                         <div key={param.name}>
                             - <code>{param.name} </code> (<code>{param.type}</code>
                             {", "}
@@ -79,6 +75,7 @@ async function makeContentCards(functions: functions[]) {
 
 export default async function Docs() {
     const functions = await prisma.functions.findMany();
+    const args = await prisma.arguments.findMany();
 
-    return await makeContentCards(functions);
+    return await makeContentCards(functions, args);
 }
