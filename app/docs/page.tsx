@@ -13,18 +13,18 @@ async function makeContentCards(functions: functions[]) {
 
     // iterate through functions and create a div for each one
     for (const func of functions) {
-        const parameters = await prisma.arguments.findMany({
+        const args = await prisma.arguments.findMany({
             where: {
                 functionid: func.id,
             },
         });
 
-        // returns "" if no parameters exist, otherwise returns (param1, param2, param3)
-        const parameterSuffix =
-            parameters.length == 0
+        // returns "" if no args exist, otherwise returns (param1, param2, param3)
+        const argumentSuffix =
+            args.length == 0
                 ? ""
                 : "(" +
-                  parameters
+                  args
                       .map((param) => {
                           return param.required ? param.name : param.name + "?";
                       })
@@ -36,7 +36,7 @@ async function makeContentCards(functions: functions[]) {
                 <CardTitle>
                     <code className="ml-2 text-lg">
                         {func.name}
-                        {parameterSuffix}
+                        {argumentSuffix}
                     </code>
                     <code className="float-right mr-2 text-lg">{func.returntype}</code>
                 </CardTitle>
@@ -45,10 +45,10 @@ async function makeContentCards(functions: functions[]) {
                 </CardDescription>
 
                 <CardHeader>
-                    <p>{parameters.length == 0 ? "No parameters" : "Parameters:"}</p>
+                    <p>{args.length == 0 ? "No args" : "Arguments:"}</p>
                 </CardHeader>
                 <CardContent>
-                    {parameters.map((param) => (
+                    {args.map((param) => (
                         <div key={param.name}>
                             - <code>{param.name} </code> (<code>{param.type}</code>
                             {", "}
