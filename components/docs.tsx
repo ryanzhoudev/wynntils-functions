@@ -155,10 +155,16 @@ function filterFunctions(functions: functions[], args: arguments[]) {
 }
 
 function makeContentCards(functions: functions[], args: arguments[]) {
-    if (functions == undefined || args == undefined) {
-        return <div>Failed to load functions or arguments.</div>;
+    if (functions == undefined) {
+        console.log("functions undefined in makeContentCards");
+        return <div>Failed to load functions.</div>;
+    }
+    if (args == undefined) {
+        console.log("args undefined in makeContentCards");
+        return <div>Failed to load arguments.</div>;
     }
 
+    // sort functions by id, which is alphabetical from when the mod exported them
     functions.sort((a, b) => a.id - b.id);
 
     const entries = [];
