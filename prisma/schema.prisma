@@ -36,4 +36,5 @@ enum type {
   Boolean
   Double
   Location
+  NamedValue
 }
