@@ -1,4 +1,4 @@
-# [Wynntils Functions](https://wynntils-functions.donkeyblaster.tk/)
+# [Wynntils Functions](https://wynntils-functions.ryanzhou.dev/)
 
 This is a small, automatically generated documentation site for the [Wynntils/Artemis](https://github.com/Wynntils/Artemis/) info box functions.
 Function and argument descriptions are automatically taken from the `en_us.json` translation in mod itself.
