@@ -37,4 +37,6 @@ enum type {
   Double
   Location
   NamedValue
+  Long
+  RangedValue
 }
