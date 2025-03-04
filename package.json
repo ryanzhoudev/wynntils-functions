@@ -1,14 +1,13 @@
 {
   "name": "wynntils-info-site",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate",
-    "test": "jest"
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -27,7 +26,6 @@
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
-    "prisma": "^5.22.0",
-    "ts-jest": "^29.2.6"
+    "prisma": "^5.22.0"
   }
 }

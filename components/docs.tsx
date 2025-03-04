@@ -1,8 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/card";
-import { arguments, functions } from ".prisma/client";
-import Link from "next/link";
+import { arguments, functions } from "@prisma/client";
 import React, { useState } from "react";
 
 export default function Docs(props: any) {
