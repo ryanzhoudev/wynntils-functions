@@ -8,20 +8,31 @@ export default async function handler(
             (): any;
             new (): any;
             json: {
-                (
-                    arg0: {
+                (arg0: {
+                    functions: {
                         id: number;
                         name: string;
                         description: string;
                         aliases: string[];
                         returntype: $Enums.type;
-                    }[],
-                ): void;
+                    }[];
+                    args: {
+                        id: number;
+                        name: string;
+                        description: string;
+                        required: boolean;
+                        functionid: number | null;
+                        type: $Enums.type;
+                        defaultvalue: string | null;
+                    }[];
+                }): void;
                 new (): any;
             };
         };
     },
 ) {
     const functions = await prisma.functions.findMany();
-    res.status(200).json(functions);
+    const args = await prisma.arguments.findMany();
+
+    res.status(200).json({ functions, args });
 }
