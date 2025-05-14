@@ -39,25 +39,48 @@ export default function FunctionIDE() {
                     endColumn: word.endColumn,
                 };
 
-                const suggestions = functions.map((fn) => {
-                    return {
-                        label: fn.name,
-                        kind: monaco.languages.CompletionItemKind.Function,
-                        insertText: `${fn.name}($0)`,
-                        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                        documentation: {
-                            value: `**Returns**: \`${fn.returntype}\`\n\n${fn.description}`,
-                        },
-                        range,
-                    };
+                const textUntilNow = model.getValueInRange({
+                    startLineNumber: 1,
+                    startColumn: 1,
+                    endLineNumber: position.lineNumber,
+                    endColumn: position.column,
                 });
+
+                const outerMatch = /([a-zA-Z_]\w*)\(([^)]*)$/.exec(textUntilNow);
+                let expectedReturnType: string | null = null;
+
+                if (outerMatch) {
+                    const outerFn = functions.find((f) => f.name === outerMatch[1]);
+                    if (outerFn) {
+                        const paramCount = outerMatch[2].split(";").length - 1;
+                        const paramArg = args.filter((a) => a.functionid === outerFn.id)[paramCount];
+                        expectedReturnType = paramArg?.type ?? null;
+                    }
+                }
+
+                let suggestions = functions.map((fn) => ({
+                    label: fn.name,
+                    kind: monaco.languages.CompletionItemKind.Function,
+                    insertText: `${fn.name}($0)`,
+                    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                    documentation: {
+                        value: `**Returns**: \`${fn.returntype}\`\n\n${fn.description}`,
+                    },
+                    range,
+                }));
+
+                if (expectedReturnType) {
+                    suggestions = suggestions.filter((s) =>
+                        s.documentation?.value.includes(`\`${expectedReturnType}\``),
+                    );
+                }
 
                 return { suggestions };
             },
         });
 
         monaco.languages.registerSignatureHelpProvider("wynntils", {
-            signatureHelpTriggerCharacters: ["("],
+            signatureHelpTriggerCharacters: ["(", ";", "Tab"],
             signatureHelpRetriggerCharacters: [";"],
             provideSignatureHelp: (model, position) => {
                 const textUntilNow = model.getValueInRange({
@@ -84,7 +107,6 @@ export default function FunctionIDE() {
                     })),
                 };
 
-                // rough estimation of current arg index based on ; count
                 const argText = textUntilNow.split(`${fnName}(`)[1] || "";
                 const activeParameter = argText.split(";").length - 1;
 
@@ -107,8 +129,6 @@ export default function FunctionIDE() {
             <Editor
                 onMount={(editor, monaco) => {
                     editor.onDidChangeModelContent(() => {
-                        editor.trigger("keyboard", "editor.action.triggerSuggest", {});
-
                         // only force open ONCE for new users
                         if (!docPaneHasBeenForced) {
                             setTimeout(() => {
@@ -122,6 +142,13 @@ export default function FunctionIDE() {
 
                                 docPaneHasBeenForced = true;
                             }, 10);
+                        }
+                    });
+
+                    editor.onKeyDown((e) => {
+                        const triggerKeys = ["(", ";", "Tab"];
+                        if (triggerKeys.includes(e.browserEvent.key)) {
+                            editor.trigger("keyboard", "editor.action.triggerParameterHints", {});
                         }
                     });
 
