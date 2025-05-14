@@ -5,3 +5,9 @@
 .min-h-24 {
   min-height: 6rem;
 }
+
+html, body, #__next {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
