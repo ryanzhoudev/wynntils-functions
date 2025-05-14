@@ -10,13 +10,14 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "@prisma/client": "^5.22.0",
     "@types/node": "20.2.3",
     "@types/react": "18.2.6",
     "@types/react-dom": "18.2.4",
     "autoprefixer": "10.4.14",
-    "eslint": "8.41.0",
-    "eslint-config-next": "13.4.3",
+    "eslint-config-next": "15.3.2",
+    "monaco-editor": "^0.52.2",
     "next": "15.3.2",
     "pnpm": "^10.11.0",
     "postcss": "8.4.31",
@@ -26,9 +27,10 @@
     "typescript": "5.0.4"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.14",
+    "eslint": "8.57.0",
     "prisma": "^5.22.0"
-  },"engines": {
+  },
+  "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=10.11.0"
   },
