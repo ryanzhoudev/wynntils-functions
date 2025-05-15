@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Docs } from "../../components/docs/page.tsx";
-import type { wynntilsfunction, wynntilsargument } from "@prisma/client";
-import Card from "../../components/docs/card.tsx";
 import { useEffect, useState } from "react";
+import { Docs } from "../../components/docs/page.tsx";
+import Card from "../../components/docs/card.tsx";
+import type { wynntilsargument, wynntilsfunction } from "@prisma/client";
 
 export const Route = createFileRoute("/functions/")({
     component: RouteComponent

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import type { wynntilsfunction, wynntilsargument } from "@prisma/client";
+import type { wynntilsargument, wynntilsfunction } from "@prisma/client";
 
 type FilterCheckbox = {
     id: string;

@@ -3,7 +3,7 @@ import { CardBackground } from "./card/CardBackground.tsx";
 import { CardTitle } from "./card/CardTitle.tsx";
 import { CardHeader } from "./card/CardHeader.tsx";
 import { CardContent } from "./card/CardContent.tsx";
-import type { wynntilsfunction, wynntilsargument } from "@prisma/client";
+import type { wynntilsargument, wynntilsfunction } from "@prisma/client";
 
 export default function Card(
     func: wynntilsfunction,
