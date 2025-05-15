@@ -1,52 +1,58 @@
-import React, { useEffect, useState } from 'react'
-import type { wynntilsfunction, wynntilsargument } from '@prisma/client'
+import React, { useEffect, useState } from "react";
+import type { wynntilsfunction, wynntilsargument } from "@prisma/client";
 
 type FilterCheckbox = {
-    id: string
-    label: string
-    apply: (fn: wynntilsfunction, args: wynntilsargument[], query: string) => boolean
-    defaultChecked?: boolean
-}
+    id: string;
+    label: string;
+    apply: (
+        fn: wynntilsfunction,
+        args: wynntilsargument[],
+        query: string
+    ) => boolean;
+    defaultChecked?: boolean;
+};
 
 type DocsProps = {
-    data: { functions: wynntilsfunction[]; arguments: wynntilsargument[] }
-    filters: FilterCheckbox[]
-    renderAction: (item: any) => React.ReactNode
-}
+    data: { functions: wynntilsfunction[]; arguments: wynntilsargument[] };
+    filters: FilterCheckbox[];
+    renderAction: (item: any) => React.ReactNode;
+};
 
 export function Docs({ data, filters, renderAction }: DocsProps) {
-    const [query, setQuery] = useState('')
+    const [query, setQuery] = useState("");
     const [checkboxes, setCheckboxes] = useState<Record<string, boolean>>(
-        Object.fromEntries(filters.map((f) => [f.id, f.defaultChecked ?? true])),
-    )
-    const [filtered, setFiltered] = useState<wynntilsfunction[]>(data.functions)
+        Object.fromEntries(filters.map((f) => [f.id, f.defaultChecked ?? true]))
+    );
+    const [filtered, setFiltered] = useState<wynntilsfunction[]>(
+        data.functions
+    );
 
     useEffect(() => {
-        setFiltered(applyFilters(data, checkboxes, filters, query))
-    }, [data, checkboxes, query, filters])
+        setFiltered(applyFilters(data, checkboxes, filters, query));
+    }, [data, checkboxes, query, filters]);
 
     const handleCheckboxChange = (id: string) => {
         setCheckboxes((prev) => ({
             ...prev,
-            [id]: !prev[id],
-        }))
-    }
+            [id]: !prev[id]
+        }));
+    };
 
     const applyFilters = (
         items: { functions: wynntilsfunction[]; arguments: wynntilsargument[] },
         active: Record<string, boolean>,
         filters: FilterCheckbox[],
-        query: string,
+        query: string
     ) => {
-        const trimmedQuery = query.trim().toLowerCase()
+        const trimmedQuery = query.trim().toLowerCase();
 
         return items.functions.filter((fn) => {
             return filters.some((filter) => {
-                if (!active[filter.id]) return false
-                return filter.apply(fn, items.arguments, trimmedQuery)
-            })
-        })
-    }
+                if (!active[filter.id]) return false;
+                return filter.apply(fn, items.arguments, trimmedQuery);
+            });
+        });
+    };
 
     return (
         <div className="bg-gray-800 min-h-screen">
@@ -57,7 +63,11 @@ export function Docs({ data, filters, renderAction }: DocsProps) {
                         contentEditable
                         suppressContentEditableWarning
                         spellCheck={false}
-                        onInput={(e) => setQuery((e.target as HTMLElement).textContent ?? '')}
+                        onInput={(e) =>
+                            setQuery(
+                                (e.target as HTMLElement).textContent ?? ""
+                            )
+                        }
                         className="block bg-zinc-900 w-full text-white p-1 min-h-24 caret-white outline-none m-0 border-r-0"
                     >
                         <br />
@@ -86,5 +96,5 @@ export function Docs({ data, filters, renderAction }: DocsProps) {
                 </div>
             </div>
         </div>
-    )
+    );
 }

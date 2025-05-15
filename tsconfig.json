@@ -9,7 +9,9 @@
     "allowImportingTsExtensions": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./app/*"],
+      "@/*": [
+        "./app/*"
+      ]
     }
   }
 }
