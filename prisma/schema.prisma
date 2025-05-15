@@ -1,5 +1,6 @@
 generator client {
     provider = "prisma-client-js"
+    output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -8,24 +9,24 @@ datasource db {
     directUrl = env("DIRECT_URL")
 }
 
-model arguments {
-    id           Int        @id @default(autoincrement())
-    name         String     @db.VarChar(255)
+model wynntilsargument {
+    id           Int               @id @default(autoincrement())
+    name         String            @db.VarChar(255)
     description  String
     required     Boolean
     functionid   Int?
     type         type
-    defaultvalue String?    @db.VarChar(255)
-    functions    functions? @relation(fields: [functionid], references: [id], onDelete: NoAction, onUpdate: NoAction)
+    defaultvalue String?           @db.VarChar(255)
+    functions    wynntilsfunction? @relation(fields: [functionid], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
-model functions {
-    id          Int         @id @default(autoincrement())
-    name        String      @unique @db.VarChar(255)
+model wynntilsfunction {
+    id          Int                @id @default(autoincrement())
+    name        String             @unique @db.VarChar(255)
     description String
-    aliases     String[]    @db.VarChar(255)
+    aliases     String[]           @db.VarChar(255)
     returntype  type
-    arguments   arguments[]
+    arguments   wynntilsargument[]
 }
 
 enum type {
