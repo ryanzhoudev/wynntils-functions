@@ -3,7 +3,7 @@ import type { wynntilsargument, wynntilsfunction } from "@prisma/client";
 import prisma from "@/lib/prisma";
 
 export const APIRoute = createAPIFileRoute("/api/data")({
-    GET: async ({}) => {
+    GET: async () => {
         const fns: wynntilsfunction[] =
             await prisma.wynntilsfunction.findMany();
         const args: wynntilsargument[] =
