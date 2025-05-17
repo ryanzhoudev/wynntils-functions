@@ -11,6 +11,9 @@ importers:
       '@codingame/monaco-vscode-api':
         specifier: ^17.1.0
         version: 17.1.0
+      '@codingame/monaco-vscode-editor-api':
+        specifier: ^17.1.0
+        version: 17.1.0
       '@prisma/client':
         specifier: ^6.8.1
         version: 6.8.1(prisma@6.8.1(typescript@5.8.3))(typescript@5.8.3)
@@ -50,6 +53,9 @@ importers:
       vscode-languageserver:
         specifier: ^9.0.1
         version: 9.0.1
+      vscode-languageserver-textdocument:
+        specifier: ^1.0.12
+        version: 1.0.12
     devDependencies:
       '@tanstack/eslint-config':
         specifier: ^0.1.0
@@ -381,6 +387,9 @@ packages:
   '@codingame/monaco-vscode-5452e2b7-9081-5f95-839b-4ab3544ce28f-common@16.1.1':
     resolution: {integrity: sha512-fd0ZNX29deKMuAtzpqRGwq4GdVMOn8ZoAWrgiKh1qJ+xi5HOaXvgwN7fZ8IFI/btbuWFNfCaVHrV97d2uCmE5Q==}
 
+  '@codingame/monaco-vscode-5452e2b7-9081-5f95-839b-4ab3544ce28f-common@17.1.0':
+    resolution: {integrity: sha512-KzCt5+I7GbjchSih8B6hDYZ8KRKGiwTMyhluLMR9wek0CLNptNEuyOEoFxEzsO7bwXiv9l3YNWy7IoCCzXnGBA==}
+
   '@codingame/monaco-vscode-5945a5e2-a66c-5a82-bd2c-1965724b29eb-common@17.1.0':
     resolution: {integrity: sha512-3EjlFD3MpGIRYwbdM/4yrRxpcn5KQSTiBaoI48xMgC9Sb78Gfc6GK17QVq0jNGoTgIJWPwuJa1HrUepXM6Bdzg==}
 
@@ -680,6 +689,9 @@ packages:
 
   '@codingame/monaco-vscode-editor-api@16.1.1':
     resolution: {integrity: sha512-w3IB7oe1NVi//bfuORHjxuSsK2CKkQatSUcByaKUGrdctFRatcfoRxpj/fuIKQ2nsIGdk+5Q/jaLgxx+foqK7Q==}
+
+  '@codingame/monaco-vscode-editor-api@17.1.0':
+    resolution: {integrity: sha512-HVgsdnz5eANsMqU+s8ZLFqLoUd2fy7E5R+nXffylXGgpTuGk1oZdU92M5uqFL32lSqaYU3o9qs5djxWNFkM6LQ==}
 
   '@codingame/monaco-vscode-editor-service-override@16.1.1':
     resolution: {integrity: sha512-tbTsAuT/s0PWinYBgVR/IAnuv3nStwMlo9I3hPSltflFTNbeoWyuDSbLdkXLRB8nqbpzXM+Y89AaWbsEJX/TMQ==}
@@ -5146,6 +5158,9 @@ packages:
   vscode-languageserver-protocol@3.17.5:
     resolution: {integrity: sha512-mb1bvRJN8SVznADSGWM9u/b07H7Ecg0I3OgXDuLdn307rl/J3A9YD6/eYOssqhecL27hK1IPZAsaqh00i/Jljg==}
 
+  vscode-languageserver-textdocument@1.0.12:
+    resolution: {integrity: sha512-cxWNPesCnQCcMPeenjKKsOCKQZ/L6Tv19DTRIGuLWe32lyzWhihGVJ/rcckZXJxfdKCFvRLS3fpBIsV/ZGX4zA==}
+
   vscode-languageserver-types@3.17.5:
     resolution: {integrity: sha512-Ld1VelNuX9pdF39h2Hgaeb5hEZM2Z3jUrrMgWQAu82jMtZp7p3vJT3BzToKtZI7NgQssZje5o0zryOrhQvzQAg==}
 
@@ -5751,6 +5766,11 @@ snapshots:
     dependencies:
       '@codingame/monaco-vscode-1cc4ea0a-c5b6-54ed-bb60-078a99119b55-common': 16.1.1
       '@codingame/monaco-vscode-api': 16.1.1
+
+  '@codingame/monaco-vscode-5452e2b7-9081-5f95-839b-4ab3544ce28f-common@17.1.0':
+    dependencies:
+      '@codingame/monaco-vscode-1cc4ea0a-c5b6-54ed-bb60-078a99119b55-common': 17.1.0
+      '@codingame/monaco-vscode-api': 17.1.0
 
   '@codingame/monaco-vscode-5945a5e2-a66c-5a82-bd2c-1965724b29eb-common@17.1.0':
     dependencies:
@@ -6429,6 +6449,11 @@ snapshots:
     dependencies:
       '@codingame/monaco-vscode-5452e2b7-9081-5f95-839b-4ab3544ce28f-common': 16.1.1
       '@codingame/monaco-vscode-api': 16.1.1
+
+  '@codingame/monaco-vscode-editor-api@17.1.0':
+    dependencies:
+      '@codingame/monaco-vscode-5452e2b7-9081-5f95-839b-4ab3544ce28f-common': 17.1.0
+      '@codingame/monaco-vscode-api': 17.1.0
 
   '@codingame/monaco-vscode-editor-service-override@16.1.1':
     dependencies:
@@ -11713,6 +11738,8 @@ snapshots:
     dependencies:
       vscode-jsonrpc: 8.2.0
       vscode-languageserver-types: 3.17.5
+
+  vscode-languageserver-textdocument@1.0.12: {}
 
   vscode-languageserver-types@3.17.5: {}
 
