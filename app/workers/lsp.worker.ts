@@ -19,7 +19,10 @@ const documents = new TextDocuments(TextDocument);
 connection.onInitialize(() => ({
     capabilities: {
         textDocumentSync: TextDocumentSyncKind.Incremental,
-        completionProvider: { resolveProvider: false },
+        completionProvider: {
+            resolveProvider: false,
+            triggerCharacters: [".", " "]
+        },
         hoverProvider: true
     }
 }));
@@ -30,11 +33,14 @@ documents.onDidChangeContent((change) => {
     connection.sendDiagnostics({ uri: change.document.uri, diagnostics });
 });
 
-connection.onCompletion((): CompletionItem[] => [
-    { label: "print", kind: CompletionItemKind.Function },
-    { label: "if", kind: CompletionItemKind.Keyword }
-    // …
-]);
+connection.onCompletion((): CompletionItem[] => {
+    console.log("onCompletion called");
+    return [
+        { label: "print", kind: CompletionItemKind.Function },
+        { label: "if", kind: CompletionItemKind.Keyword }
+        // …
+    ];
+});
 
 documents.listen(connection);
 connection.listen();
