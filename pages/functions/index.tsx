@@ -1,8 +1,8 @@
 import dynamic from "next/dynamic";
 import prisma from "@/lib/prisma";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/docs/card";
 
-const Docs = dynamic(() => import("@/components/docs"), { ssr: false });
+const Docs = dynamic(() => import("@/components/docs/docs"), { ssr: false });
 
 export async function getStaticProps() {
     const functions = await prisma.functions.findMany();
