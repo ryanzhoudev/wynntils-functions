@@ -3,6 +3,8 @@
 import Editor, { useMonaco } from "@monaco-editor/react";
 import { useEffect, useRef, useState } from "react";
 import { wynntilsfunction, wynntilsargument } from "@prisma/client";
+import { BrowserMessageReader, BrowserMessageWriter } from "vscode-languageserver/browser";
+import { LanguageClientConfig, LanguageClientWrapper } from "monaco-editor-wrapper";
 
 export default function FunctionIDE() {
     const monaco = useMonaco();
@@ -20,6 +22,12 @@ export default function FunctionIDE() {
 
     useEffect(() => {
         if (!monaco || functions.length === 0) return;
+
+        const worker = new Worker(new URL("@/lsp/lsp.worker.ts?worker", import.meta.url), {
+            type: "module",
+        });
+        const reader = new BrowserMessageReader(worker);
+        const writer = new BrowserMessageWriter(worker);
 
         monaco.languages.register({ id: "wynntils" });
 
@@ -120,6 +128,27 @@ export default function FunctionIDE() {
                 };
             },
         });
+
+        const languageClientConfig: LanguageClientConfig = {
+            clientOptions: {
+                documentSelector: ["wynntils"],
+            },
+            connection: {
+                options: {
+                    $type: "WorkerDirect",
+                    worker: worker,
+                },
+                messageTransports: {
+                    reader,
+                    writer,
+                },
+            },
+        };
+
+        // default api is not ready yet, import "vscode/localExtensionHost" and wait for services init
+        // new LanguageClientWrapper({
+        //     languageClientConfig,
+        // }).start();
     }, [monaco, functions, args]);
 
     let docPaneHasBeenForced = false;
