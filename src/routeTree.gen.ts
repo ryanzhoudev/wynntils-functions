@@ -10,158 +10,158 @@
 
 // Import Routes
 
-import { Route as rootRoute } from './routes/__root'
-import { Route as IndexImport } from './routes/index'
-import { Route as FunctionsIndexImport } from './routes/functions/index'
-import { Route as FunctionsIdeImport } from './routes/functions/ide'
-import { Route as DemoTanstackQueryImport } from './routes/demo.tanstack-query'
-import { Route as ApiDataImport } from './routes/api/data'
+import { Route as rootRoute } from "./routes/__root";
+import { Route as IndexImport } from "./routes/index";
+import { Route as FunctionsIndexImport } from "./routes/functions/index";
+import { Route as FunctionsIdeImport } from "./routes/functions/ide";
+import { Route as DemoTanstackQueryImport } from "./routes/demo.tanstack-query";
+import { Route as ApiDataImport } from "./routes/api/data";
 
 // Create/Update Routes
 
 const IndexRoute = IndexImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRoute,
-} as any)
+    id: "/",
+    path: "/",
+    getParentRoute: () => rootRoute
+} as any);
 
 const FunctionsIndexRoute = FunctionsIndexImport.update({
-  id: '/functions/',
-  path: '/functions/',
-  getParentRoute: () => rootRoute,
-} as any)
+    id: "/functions/",
+    path: "/functions/",
+    getParentRoute: () => rootRoute
+} as any);
 
 const FunctionsIdeRoute = FunctionsIdeImport.update({
-  id: '/functions/ide',
-  path: '/functions/ide',
-  getParentRoute: () => rootRoute,
-} as any)
+    id: "/functions/ide",
+    path: "/functions/ide",
+    getParentRoute: () => rootRoute
+} as any);
 
 const DemoTanstackQueryRoute = DemoTanstackQueryImport.update({
-  id: '/demo/tanstack-query',
-  path: '/demo/tanstack-query',
-  getParentRoute: () => rootRoute,
-} as any)
+    id: "/demo/tanstack-query",
+    path: "/demo/tanstack-query",
+    getParentRoute: () => rootRoute
+} as any);
 
 const ApiDataRoute = ApiDataImport.update({
-  id: '/api/data',
-  path: '/api/data',
-  getParentRoute: () => rootRoute,
-} as any)
+    id: "/api/data",
+    path: "/api/data",
+    getParentRoute: () => rootRoute
+} as any);
 
 // Populate the FileRoutesByPath interface
 
-declare module '@tanstack/react-router' {
-  interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexImport
-      parentRoute: typeof rootRoute
+declare module "@tanstack/react-router" {
+    interface FileRoutesByPath {
+        "/": {
+            id: "/";
+            path: "/";
+            fullPath: "/";
+            preLoaderRoute: typeof IndexImport;
+            parentRoute: typeof rootRoute;
+        };
+        "/api/data": {
+            id: "/api/data";
+            path: "/api/data";
+            fullPath: "/api/data";
+            preLoaderRoute: typeof ApiDataImport;
+            parentRoute: typeof rootRoute;
+        };
+        "/demo/tanstack-query": {
+            id: "/demo/tanstack-query";
+            path: "/demo/tanstack-query";
+            fullPath: "/demo/tanstack-query";
+            preLoaderRoute: typeof DemoTanstackQueryImport;
+            parentRoute: typeof rootRoute;
+        };
+        "/functions/ide": {
+            id: "/functions/ide";
+            path: "/functions/ide";
+            fullPath: "/functions/ide";
+            preLoaderRoute: typeof FunctionsIdeImport;
+            parentRoute: typeof rootRoute;
+        };
+        "/functions/": {
+            id: "/functions/";
+            path: "/functions";
+            fullPath: "/functions";
+            preLoaderRoute: typeof FunctionsIndexImport;
+            parentRoute: typeof rootRoute;
+        };
     }
-    '/api/data': {
-      id: '/api/data'
-      path: '/api/data'
-      fullPath: '/api/data'
-      preLoaderRoute: typeof ApiDataImport
-      parentRoute: typeof rootRoute
-    }
-    '/demo/tanstack-query': {
-      id: '/demo/tanstack-query'
-      path: '/demo/tanstack-query'
-      fullPath: '/demo/tanstack-query'
-      preLoaderRoute: typeof DemoTanstackQueryImport
-      parentRoute: typeof rootRoute
-    }
-    '/functions/ide': {
-      id: '/functions/ide'
-      path: '/functions/ide'
-      fullPath: '/functions/ide'
-      preLoaderRoute: typeof FunctionsIdeImport
-      parentRoute: typeof rootRoute
-    }
-    '/functions/': {
-      id: '/functions/'
-      path: '/functions'
-      fullPath: '/functions'
-      preLoaderRoute: typeof FunctionsIndexImport
-      parentRoute: typeof rootRoute
-    }
-  }
 }
 
 // Create and export the route tree
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/api/data': typeof ApiDataRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
-  '/functions/ide': typeof FunctionsIdeRoute
-  '/functions': typeof FunctionsIndexRoute
+    "/": typeof IndexRoute;
+    "/api/data": typeof ApiDataRoute;
+    "/demo/tanstack-query": typeof DemoTanstackQueryRoute;
+    "/functions/ide": typeof FunctionsIdeRoute;
+    "/functions": typeof FunctionsIndexRoute;
 }
 
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/api/data': typeof ApiDataRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
-  '/functions/ide': typeof FunctionsIdeRoute
-  '/functions': typeof FunctionsIndexRoute
+    "/": typeof IndexRoute;
+    "/api/data": typeof ApiDataRoute;
+    "/demo/tanstack-query": typeof DemoTanstackQueryRoute;
+    "/functions/ide": typeof FunctionsIdeRoute;
+    "/functions": typeof FunctionsIndexRoute;
 }
 
 export interface FileRoutesById {
-  __root__: typeof rootRoute
-  '/': typeof IndexRoute
-  '/api/data': typeof ApiDataRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
-  '/functions/ide': typeof FunctionsIdeRoute
-  '/functions/': typeof FunctionsIndexRoute
+    __root__: typeof rootRoute;
+    "/": typeof IndexRoute;
+    "/api/data": typeof ApiDataRoute;
+    "/demo/tanstack-query": typeof DemoTanstackQueryRoute;
+    "/functions/ide": typeof FunctionsIdeRoute;
+    "/functions/": typeof FunctionsIndexRoute;
 }
 
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/api/data'
-    | '/demo/tanstack-query'
-    | '/functions/ide'
-    | '/functions'
-  fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/api/data'
-    | '/demo/tanstack-query'
-    | '/functions/ide'
-    | '/functions'
-  id:
-    | '__root__'
-    | '/'
-    | '/api/data'
-    | '/demo/tanstack-query'
-    | '/functions/ide'
-    | '/functions/'
-  fileRoutesById: FileRoutesById
+    fileRoutesByFullPath: FileRoutesByFullPath;
+    fullPaths:
+        | "/"
+        | "/api/data"
+        | "/demo/tanstack-query"
+        | "/functions/ide"
+        | "/functions";
+    fileRoutesByTo: FileRoutesByTo;
+    to:
+        | "/"
+        | "/api/data"
+        | "/demo/tanstack-query"
+        | "/functions/ide"
+        | "/functions";
+    id:
+        | "__root__"
+        | "/"
+        | "/api/data"
+        | "/demo/tanstack-query"
+        | "/functions/ide"
+        | "/functions/";
+    fileRoutesById: FileRoutesById;
 }
 
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  ApiDataRoute: typeof ApiDataRoute
-  DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
-  FunctionsIdeRoute: typeof FunctionsIdeRoute
-  FunctionsIndexRoute: typeof FunctionsIndexRoute
+    IndexRoute: typeof IndexRoute;
+    ApiDataRoute: typeof ApiDataRoute;
+    DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute;
+    FunctionsIdeRoute: typeof FunctionsIdeRoute;
+    FunctionsIndexRoute: typeof FunctionsIndexRoute;
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  ApiDataRoute: ApiDataRoute,
-  DemoTanstackQueryRoute: DemoTanstackQueryRoute,
-  FunctionsIdeRoute: FunctionsIdeRoute,
-  FunctionsIndexRoute: FunctionsIndexRoute,
-}
+    IndexRoute: IndexRoute,
+    ApiDataRoute: ApiDataRoute,
+    DemoTanstackQueryRoute: DemoTanstackQueryRoute,
+    FunctionsIdeRoute: FunctionsIdeRoute,
+    FunctionsIndexRoute: FunctionsIndexRoute
+};
 
 export const routeTree = rootRoute
-  ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+    ._addFileChildren(rootRouteChildren)
+    ._addFileTypes<FileRouteTypes>();
 
 /* ROUTE_MANIFEST_START
 {

@@ -1,3 +1,4 @@
+import "@/workers/monacoWorkerLoader";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { runClient } from "@/components/MonacoEditor.ts";
