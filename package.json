@@ -38,6 +38,7 @@
     "@tailwindcss/nesting": "0.0.0-insiders.565cd3e",
     "@typescript-eslint/parser": "8.32.1",
     "eslint": "8.57.0",
+    "monaco-editor-webpack-plugin": "^7.1.0",
     "prettier": "^3.5.3",
     "prisma": "^5.22.0",
     "worker-loader": "^3.0.8"

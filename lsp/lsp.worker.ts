@@ -1,11 +1,10 @@
-// workers.worker.ts
 import {
     BrowserMessageReader,
     BrowserMessageWriter,
     CompletionItemKind,
     TextDocumentSyncKind,
     TextDocuments,
-    createConnection
+    createConnection,
 } from "vscode-languageserver/browser";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import type { CompletionItem, Diagnostic } from "vscode-languageserver/browser";
@@ -21,10 +20,10 @@ connection.onInitialize(() => ({
         textDocumentSync: TextDocumentSyncKind.Incremental,
         completionProvider: {
             resolveProvider: false,
-            triggerCharacters: [".", " "]
+            triggerCharacters: [".", " "],
         },
-        hoverProvider: true
-    }
+        hoverProvider: true,
+    },
 }));
 
 documents.onDidChangeContent((change) => {
@@ -37,7 +36,7 @@ connection.onCompletion((): CompletionItem[] => {
     console.log("onCompletion called");
     return [
         { label: "print", kind: CompletionItemKind.Function },
-        { label: "if", kind: CompletionItemKind.Keyword }
+        { label: "if", kind: CompletionItemKind.Keyword },
         // …
     ];
 });
