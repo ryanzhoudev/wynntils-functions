@@ -1,144 +1,213 @@
-import Editor, { Monaco, useMonaco } from "@monaco-editor/react";
-import { useEffect, useRef, useState } from "react";
-import type { editor as MonacoEditorTypes } from "monaco-editor";
+"use client";
 
-function ensureWynntilsLanguageRegistered(monacoInstance: Monaco | null) {
-    if (!monacoInstance) {
-        console.warn("IDE: Monaco instance not available for language registration.");
-        return;
-    }
-    try {
-        const languages = monacoInstance.languages.getLanguages();
-        if (!languages.find((lang) => lang.id === "wynntils")) {
-            monacoInstance.languages.register({ id: "wynntils" });
-            console.log("IDE: Registered 'wynntils' language with Monaco.");
-        }
-    } catch (e) {
-        console.error("IDE: Error during ensureWynntilsLanguageRegistered:", e);
-    }
-}
+import Editor, { useMonaco } from "@monaco-editor/react";
+import { useEffect, useRef, useState } from "react";
+import { wynntilsfunction, wynntilsargument } from "@prisma/client";
 
 export default function FunctionIDE() {
     const monaco = useMonaco();
-    const docPaneHasBeenForcedRef = useRef(false);
-    const [clientServicesReady, setClientServicesReady] = useState(false);
-    const [initializationError, setInitializationError] = useState<Error | null>(null);
-    const lspDisposerRef = useRef<{ dispose: () => void } | null>(null);
+    const [functions, setFunctions] = useState<wynntilsfunction[]>([]);
+    const [args, setArgs] = useState<wynntilsargument[]>([]);
 
     useEffect(() => {
-        // Configure Monaco's loader to know where to get worker files from if not already handled
-        // This is more about Monaco Editor's own workers (like editor.worker.js), not your LSP worker.
-        // Often, @monaco-editor/react handles this, but explicit configuration can be safer.
-        // loader.config({ paths: { vs: '/monaco-editor/min/vs' } }); // Example if serving from public
-        // Or if using a CDN:
-        // loader.config({ 'vs/nls': { availableLanguages: {'*': 'de'} }, paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.47.0/min/vs' } });
-
-        let isMounted = true;
-
-        if (monaco && typeof window !== "undefined") {
-            // Ensure monaco is loaded and we are on client
-            if (lspDisposerRef.current) {
-                // Prevent re-initialization
-                console.log("IDE: LSP setup already initiated or completed.");
-                return;
-            }
-            console.log("IDE: Monaco available. Attempting to initialize services and start LSP.");
-        }
-
-        return () => {
-            isMounted = false;
-            if (lspDisposerRef.current) {
-                console.log("IDE: useEffect cleanup - Disposing LSP Client and services.");
-                lspDisposerRef.current.dispose();
-                lspDisposerRef.current = null; // Clear the ref
-            }
-        };
-    }, [monaco]); // Dependency array includes monaco
-
-    const handleEditorMount = (
-        editorInstance: MonacoEditorTypes.IStandaloneCodeEditor, // Use correct type
-        monacoInstance: Monaco,
-    ) => {
-        console.log("IDE: Editor onMount triggered.");
-        try {
-            // It's good to ensure language is registered here too
-            ensureWynntilsLanguageRegistered(monacoInstance);
-
-            editorInstance.onDidChangeModelContent(() => {
-                try {
-                    if (!docPaneHasBeenForcedRef.current) {
-                        setTimeout(() => {
-                            const controller = editorInstance.getContribution(
-                                "editor.contrib.suggestController",
-                            ) as any;
-                            const widget = document.querySelector(".suggest-widget"); // More generic
-                            const alreadyOpen = widget?.classList.contains("shows-details");
-
-                            if (
-                                controller &&
-                                typeof controller.toggleSuggestionDetails === "function" &&
-                                !alreadyOpen
-                            ) {
-                                controller.toggleSuggestionDetails();
-                            } else if (widget && !alreadyOpen) {
-                                widget.classList.add("shows-details");
-                            }
-                            docPaneHasBeenForcedRef.current = true;
-                        }, 50);
-                    }
-                    editorInstance.trigger("keyboard", "editor.action.triggerSuggest", {});
-                } catch (e) {
-                    console.error("IDE: Error in onDidChangeModelContent (docPane/triggerSuggest):", e);
-                }
+        fetch("/api/functions")
+            .then((res) => res.json())
+            .then(({ functions, args }) => {
+                setFunctions(functions);
+                setArgs(args);
             });
+    }, []);
 
-            editorInstance.onKeyDown((e) => {
-                // Use correct type
-                try {
-                    const triggerKeys = ["(", ";", "Tab"];
-                    if (triggerKeys.includes(e.browserEvent.key)) {
-                        setTimeout(() => {
-                            // Delay for char to appear
-                            editorInstance.trigger("keyboard", "editor.action.triggerParameterHints", {});
-                        }, 10);
+    useEffect(() => {
+        if (!monaco || functions.length === 0) return;
+
+        monaco.languages.register({ id: "wynntils" });
+
+        monaco.languages.setMonarchTokensProvider("wynntils", {
+            tokenizer: {
+                root: [[/\d+/, "number"]],
+            },
+        });
+
+        monaco.languages.registerCompletionItemProvider("wynntils", {
+            provideCompletionItems: (model, position) => {
+                const word = model.getWordUntilPosition(position);
+                const range = {
+                    startLineNumber: position.lineNumber,
+                    endLineNumber: position.lineNumber,
+                    startColumn: word.startColumn,
+                    endColumn: word.endColumn,
+                };
+
+                const textUntilNow = model.getValueInRange({
+                    startLineNumber: 1,
+                    startColumn: 1,
+                    endLineNumber: position.lineNumber,
+                    endColumn: position.column,
+                });
+
+                const outerMatch = /([a-zA-Z_]\w*)\(([^)]*)$/.exec(textUntilNow);
+                let expectedReturnType: string | null = null;
+
+                if (outerMatch) {
+                    const outerFn = functions.find((f) => f.name === outerMatch[1]);
+                    if (outerFn) {
+                        const paramCount = outerMatch[2].split(";").length - 1;
+                        const paramArg = args.filter((a) => a.functionid === outerFn.id)[paramCount];
+                        expectedReturnType = paramArg?.type ?? null;
                     }
-                } catch (e) {
-                    console.error("IDE: Error in onKeyDown (triggerParameterHints):", e);
                 }
-            });
 
-            // Your forceDocPane logic and MutationObserver
-            // Keep this code if you still need it, but be aware of its fragility.
-            // const forceDocPane = () => { ... };
-            // const observer = new MutationObserver(forceDocPane);
-            // observer.observe(document.body, { childList: true, subtree: true });
-            // return () => observer.disconnect(); // Make sure to return this if observer is used
-        } catch (e) {
-            console.error("IDE: CRITICAL ERROR in editor onMount:", e);
-        }
-    };
+                let suggestions = functions.map((fn) => ({
+                    label: fn.name,
+                    kind: monaco.languages.CompletionItemKind.Function,
+                    insertText: `${fn.name}($0)`,
+                    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                    documentation: {
+                        value: `**Returns**: \`${fn.returntype}\`\n\n${fn.description}`,
+                    },
+                    range,
+                }));
 
-    if (initializationError) {
-        return (
-            <div style={{ color: "red", padding: "20px", fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
-                <h2>Error Initializing IDE Services:</h2>
-                <p>{initializationError.message}</p>
-                <p>Stack: {initializationError.stack}</p>
-            </div>
-        );
-    }
+                if (expectedReturnType) {
+                    suggestions = suggestions.filter((s) =>
+                        s.documentation?.value.includes(`\`${expectedReturnType}\``),
+                    );
+                }
 
-    if (!clientServicesReady) {
-        return <p style={{ padding: "20px" }}>Initializing Language Services...</p>;
-    }
+                return { suggestions };
+            },
+        });
+
+        monaco.languages.registerSignatureHelpProvider("wynntils", {
+            signatureHelpTriggerCharacters: ["(", ";", "Tab"],
+            signatureHelpRetriggerCharacters: [";"],
+            provideSignatureHelp: (model, position) => {
+                const textUntilNow = model.getValueInRange({
+                    startLineNumber: 1,
+                    startColumn: 1,
+                    endLineNumber: position.lineNumber,
+                    endColumn: position.column,
+                });
+
+                const match = /([a-zA-Z_]\w*)\s*\([^()]*/.exec(textUntilNow);
+                const fnName = match?.[1];
+                const fn = functions.find((f) => f.name === fnName);
+                if (!fn)
+                    return { value: { signatures: [], activeSignature: 0, activeParameter: 0 }, dispose: () => {} };
+
+                const fnArgs = args.filter((a) => a.functionid === fn.id);
+
+                const signature = {
+                    label: `${fn.name}(${fnArgs.map((a) => a.name).join("; ")})`,
+                    documentation: fn.description,
+                    parameters: fnArgs.map((arg) => ({
+                        label: arg.name,
+                        documentation: arg.description ?? "",
+                    })),
+                };
+
+                const argText = textUntilNow.split(`${fnName}(`)[1] || "";
+                const activeParameter = argText.split(";").length - 1;
+
+                return {
+                    value: {
+                        signatures: [signature],
+                        activeSignature: 0,
+                        activeParameter: Math.min(activeParameter, fnArgs.length - 1),
+                    },
+                    dispose: () => {},
+                };
+            },
+        });
+    }, [monaco, functions, args]);
+
+    let docPaneHasBeenForced = false;
 
     return (
         <div className="h-screen w-full bg-gray-800">
             <Editor
-                onMount={handleEditorMount}
+                onMount={(editor, monaco) => {
+                    editor.onDidChangeModelContent(() => {
+                        // only force open ONCE for new users
+                        if (!docPaneHasBeenForced) {
+                            setTimeout(() => {
+                                const controller = editor.getContribution("editor.contrib.suggestController") as any;
+                                const widget = document.querySelector(".suggest-widget.no-type");
+                                const alreadyOpen = widget?.classList.contains("shows-details");
+
+                                if (!alreadyOpen) {
+                                    controller?.toggleSuggestionDetails?.();
+                                }
+
+                                docPaneHasBeenForced = true;
+                            }, 10);
+                        }
+                    });
+
+                    editor.onKeyDown((e) => {
+                        const triggerKeys = ["(", ";", "Tab"];
+                        if (triggerKeys.includes(e.browserEvent.key)) {
+                            editor.trigger("keyboard", "editor.action.triggerParameterHints", {});
+                        }
+                    });
+
+                    const forceDocPane = () => {
+                        const details = document.querySelector(".suggest-details.no-type") as HTMLElement | null;
+                        if (details) {
+                            details.style.width = "auto";
+                            details.style.maxWidth = "600px";
+                            details.style.height = "auto";
+                            details.style.maxHeight = "none";
+                            details.style.fontSize = "14px";
+                            details.style.padding = "4px";
+                            details.style.overflow = "visible";
+                            details.style.boxSizing = "border-box";
+                            details.style.margin = "0";
+                        }
+
+                        const container = document.querySelector(".suggest-details-container") as HTMLElement | null;
+                        if (container) {
+                            container.style.display = "block";
+                            container.style.width = "600px";
+                            container.style.padding = "1px";
+                            container.style.overflow = "visible";
+                            container.style.alignItems = "flex-start";
+                        }
+
+                        const scrollable = details?.querySelector(".monaco-scrollable-element") as HTMLElement | null;
+                        if (scrollable) {
+                            scrollable.style.overflow = "visible";
+                            scrollable.style.maxHeight = "none";
+                            scrollable.style.boxShadow = "none";
+                        }
+
+                        const shadow = details?.querySelector(".scrollbar-shadow-top") as HTMLElement | null;
+                        if (shadow) {
+                            shadow.style.display = "none";
+                        }
+
+                        const widget = document.querySelector(".suggest-widget") as HTMLElement | null;
+                        if (widget && !widget.classList.contains("shows-details")) {
+                            widget.classList.add("shows-details");
+                        }
+                    };
+
+                    const observer = new MutationObserver(forceDocPane);
+                    observer.observe(document.body, {
+                        childList: true,
+                        subtree: true,
+                    });
+
+                    editor.onDidChangeModelContent(() => {
+                        editor.trigger("keyboard", "editor.action.triggerSuggest", {});
+                    });
+
+                    return () => observer.disconnect();
+                }}
                 height="100%"
                 defaultLanguage="wynntils"
-                defaultValue="// Wynntils IDE - Ready\n"
+                defaultValue=""
                 theme="vs-dark"
                 options={{
                     fontSize: 14,
@@ -147,8 +216,6 @@ export default function FunctionIDE() {
                         showInlineDetails: true,
                         showIcons: true,
                     },
-                    parameterHints: { enabled: true }, // Ensure parameter hints are on
-                    quickSuggestions: { other: true, comments: true, strings: true },
                 }}
             />
         </div>

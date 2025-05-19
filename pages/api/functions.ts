@@ -31,8 +31,8 @@ export default async function handler(
         };
     },
 ) {
-    const functions = await prisma.functions.findMany();
-    const args = await prisma.arguments.findMany();
+    const functions = await prisma.wynntilsfunction.findMany();
+    const args = await prisma.wynntilsargument.findMany();
 
     res.status(200).json({ functions, args });
 }
