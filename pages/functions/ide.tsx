@@ -1,7 +1,7 @@
 "use client";
 
 import Editor, { useMonaco } from "@monaco-editor/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { wynntilsfunction, wynntilsargument } from "@prisma/client";
 import completionItemProvider from "@/components/ide/completionItemProvider.ts";
 import signatureHelpProvider from "@/components/ide/signatureHelpProvider.ts";
@@ -11,7 +11,9 @@ import { restyleSuggestPanes } from "@/components/ide/styleHelpers.ts";
 import { CharStreams, CommonTokenStream } from "antlr4";
 import WynntilsLexer from "@/lib/antlr/WynntilsLexer.ts";
 import WynntilsParser from "@/lib/antlr/WynntilsParser.ts";
-import { FunctionValidatorVisitor, invalidFunctions } from "@/components/ide/FunctionValidatorVisitor.ts";
+import { FunctionValidatorVisitor, getInvalidFunctions } from "@/components/ide/FunctionValidatorVisitor.ts";
+import { editor } from "monaco-editor";
+import IMarkerData = editor.IMarkerData;
 
 const wynntils = "wynntils";
 const wynntilsTheme = "wynntilsTheme";
@@ -20,6 +22,7 @@ export default function FunctionIDE() {
     const monaco = useMonaco();
     const [functions, setFunctions] = useState<wynntilsfunction[]>([]);
     const [args, setArgs] = useState<wynntilsargument[]>([]);
+    const functionsRef = useRef<wynntilsfunction[]>(); // for the onMount validation
 
     monaco?.editor.defineTheme(wynntilsTheme, getThemeDefinition());
 
@@ -42,6 +45,8 @@ export default function FunctionIDE() {
         monaco.languages.registerCompletionItemProvider(wynntils, completionItemProvider(monaco, functions, args));
 
         monaco.languages.registerSignatureHelpProvider(wynntils, signatureHelpProvider(functions, args));
+
+        functionsRef.current = functions;
     }, [monaco, functions, args]);
 
     let docPaneHasBeenForced = false;
@@ -69,7 +74,10 @@ export default function FunctionIDE() {
 
                     editor.onDidChangeModelContent(() => {
                         editor.trigger("keyboard", "editor.action.triggerSuggest", {});
+                    });
 
+                    editor.onDidChangeModelContent(() => {
+                        if (!functionsRef.current) return;
                         const code = editor.getValue();
                         const inputStream = CharStreams.fromString(code);
                         const lexer = new WynntilsLexer(inputStream);
@@ -78,13 +86,13 @@ export default function FunctionIDE() {
 
                         const tree = parser.script();
 
-                        const visitor = new FunctionValidatorVisitor(functions);
+                        const visitor = new FunctionValidatorVisitor(functionsRef.current);
                         visitor.visit(tree);
 
                         const model = editor.getModel();
                         if (!model) return;
 
-                        const diagnostics = invalidFunctions.map(({ start, stop }) => {
+                        const diagnostics: IMarkerData[] = getInvalidFunctions().map(({ start, stop }) => {
                             const startPos = model.getPositionAt(start);
                             const endPos = model.getPositionAt(stop + 1);
 
