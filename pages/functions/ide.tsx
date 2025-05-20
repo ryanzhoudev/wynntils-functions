@@ -8,6 +8,10 @@ import signatureHelpProvider from "@/components/ide/signatureHelpProvider.ts";
 import tokensProvider from "@/components/ide/tokensProvider.ts";
 import getThemeDefinition from "@/components/ide/themeDefinition.ts";
 import { restyleSuggestPanes } from "@/components/ide/styleHelpers.ts";
+import { CharStreams, CommonTokenStream } from "antlr4";
+import WynntilsLexer from "@/lib/antlr/WynntilsLexer.ts";
+import WynntilsParser from "@/lib/antlr/WynntilsParser.ts";
+import { FunctionValidatorVisitor, invalidFunctions } from "@/components/ide/FunctionValidatorVisitor.ts";
 
 const wynntils = "wynntils";
 const wynntilsTheme = "wynntilsTheme";
@@ -65,6 +69,36 @@ export default function FunctionIDE() {
 
                     editor.onDidChangeModelContent(() => {
                         editor.trigger("keyboard", "editor.action.triggerSuggest", {});
+
+                        const code = editor.getValue();
+                        const inputStream = CharStreams.fromString(code);
+                        const lexer = new WynntilsLexer(inputStream);
+                        const tokenStream = new CommonTokenStream(lexer);
+                        const parser = new WynntilsParser(tokenStream);
+
+                        const tree = parser.script();
+
+                        const visitor = new FunctionValidatorVisitor(functions);
+                        visitor.visit(tree);
+
+                        const model = editor.getModel();
+                        if (!model) return;
+
+                        const diagnostics = invalidFunctions.map(({ start, stop }) => {
+                            const startPos = model.getPositionAt(start);
+                            const endPos = model.getPositionAt(stop + 1);
+
+                            return {
+                                severity: monaco.MarkerSeverity.Error,
+                                message: "Unknown function",
+                                startLineNumber: startPos.lineNumber,
+                                startColumn: startPos.column,
+                                endLineNumber: endPos.lineNumber,
+                                endColumn: endPos.column,
+                            };
+                        });
+
+                        monaco.editor.setModelMarkers(model, "wynntils-validator", diagnostics);
                     });
 
                     return restyleSuggestPanes();

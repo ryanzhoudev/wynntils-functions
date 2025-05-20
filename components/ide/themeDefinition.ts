@@ -25,6 +25,7 @@ export default function getThemeDefinition(): IStandaloneThemeData {
 }
 
 // trying to match darcula colors
+// https://github.com/doums/darcula/blob/master/colors/darcula.vim
 const colors = {
     normalText: "#A9B7C6",
     delimiter: "#A9B7C6",
