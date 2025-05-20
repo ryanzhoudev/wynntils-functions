@@ -10,7 +10,6 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@codingame/monaco-vscode-api": "^17.0.0",
     "@monaco-editor/react": "^4.7.0",
     "@prisma/client": "^5.22.0",
     "@types/node": "20.2.3",

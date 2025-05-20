@@ -1,12 +1,13 @@
 import dynamic from "next/dynamic";
 import prisma from "@/lib/prisma";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/docs/card";
+import Card from "@/components/docs/card";
+import { wynntilsargument, wynntilsfunction } from "@prisma/client";
 
 const Docs = dynamic(() => import("@/components/docs/docs"), { ssr: false });
 
 export async function getStaticProps() {
-    const functions = await prisma.functions.findMany();
-    const args = await prisma.arguments.findMany();
+    const functions: wynntilsfunction[] = await prisma.wynntilsfunction.findMany();
+    const args: wynntilsargument[] = await prisma.wynntilsargument.findMany();
 
     return {
         props: {
@@ -57,50 +58,14 @@ export default function FunctionsPage({ functions, args }: any) {
         },
     ];
 
-    const renderCard = (func: any) => {
-        const filteredArgs = args.filter((arg: any) => arg.functionid === func.id);
-        const argSuffix =
+    const renderCard = (func: wynntilsfunction) => {
+        const filteredArgs: wynntilsargument[] = args.filter((arg: any) => arg.functionid === func.id);
+        const argSuffix: string =
             filteredArgs.length === 0
                 ? ""
                 : "(" + filteredArgs.map((arg: any) => (arg.required ? arg.name : arg.name + "?")).join("; ") + ")";
 
-        return (
-            <Card key={func.id} className="bg-gray-800">
-                <CardTitle>
-                    <code className="ml-2 text-lg">
-                        {func.name}
-                        {argSuffix}
-                    </code>
-                    <code className="float-right mr-2 text-lg">{func.returntype}</code>
-                </CardTitle>
-                <CardDescription>
-                    <p>{func.description}</p>
-                </CardDescription>
-                <CardHeader>
-                    <p>{filteredArgs.length === 0 ? "No arguments" : "Arguments:"}</p>
-                </CardHeader>
-                <CardContent>
-                    {filteredArgs.map((arg: any) => (
-                        <div key={arg.name}>
-                            - <code>{arg.name}</code> (<code>{arg.type}</code>
-                            {", "}
-                            {arg.required ? "required" : "optional, default: " + arg.defaultvalue})
-                            {arg.description ? ` -- ${arg.description}` : ""}
-                        </div>
-                    ))}
-                </CardContent>
-                <CardHeader>
-                    <p>{func.aliases.length === 0 ? "No aliases" : "Aliases:"}</p>
-                </CardHeader>
-                <CardContent>
-                    {func.aliases.map((alias: string) => (
-                        <div key={alias}>
-                            - <code>{alias}</code>
-                        </div>
-                    ))}
-                </CardContent>
-            </Card>
-        );
+        return Card(func, filteredArgs, argSuffix);
     };
 
     return <Docs data={functions} filters={filters} renderAction={renderCard} />;
