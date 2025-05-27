@@ -38,11 +38,29 @@ export function restyleSuggestPanes() {
         if (widget && !widget.classList.contains("shows-details")) {
             widget.classList.add("shows-details");
         }
+
+        const paramHelpWrapper = document.querySelector(".parameter-hints-widget") as HTMLElement | null;
+        if (!paramHelpWrapper) return;
+
+        const isSuggestVisible = widget && getComputedStyle(widget).visibility === "visible";
+
+        if (isSuggestVisible) {
+            const rect = widget.getBoundingClientRect();
+            paramHelpWrapper.style.position = "absolute";
+            paramHelpWrapper.style.top = `${rect.bottom + 2}px`;
+            paramHelpWrapper.style.left = `${rect.left}px`;
+        } else {
+            paramHelpWrapper.style.removeProperty("position");
+            paramHelpWrapper.style.removeProperty("top");
+            paramHelpWrapper.style.removeProperty("left");
+        }
     };
     const observer = new MutationObserver(forceDocPane);
     observer.observe(document.body, {
         childList: true,
         subtree: true,
+        attributes: true,
+        attributeFilter: ["sytle"],
     });
 
     return () => observer.disconnect();

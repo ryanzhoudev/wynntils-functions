@@ -7,8 +7,8 @@ export default function signatureHelpProvider(
     args: wynntilsargument[],
 ): SignatureHelpProvider {
     return {
-        signatureHelpTriggerCharacters: ["(", ";", "Tab"],
-        signatureHelpRetriggerCharacters: [";"],
+        signatureHelpTriggerCharacters: ["(", ";", " "],
+        signatureHelpRetriggerCharacters: ["(", ";", " "],
         provideSignatureHelp: (model, position) => {
             const textUntilNow = model.getValueInRange({
                 startLineNumber: 1,

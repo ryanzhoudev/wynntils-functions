@@ -73,7 +73,10 @@ export default function FunctionIDE() {
                     });
 
                     editor.onDidChangeModelContent(() => {
-                        editor.trigger("keyboard", "editor.action.triggerSuggest", {});
+                        // editor.trigger("keyboard", "editor.action.triggerSuggest", {});
+                        // editor.trigger("keyboard", "editor.action.triggerParameterHints", {});
+                        const suggestCtrl = editor.getContribution("editor.contrib.suggestController") as any;
+                        suggestCtrl.triggerSuggest();
                     });
 
                     editor.onDidChangeModelContent(() => {
