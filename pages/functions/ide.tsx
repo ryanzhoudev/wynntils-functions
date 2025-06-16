@@ -2,7 +2,7 @@
 
 import Editor, { useMonaco } from "@monaco-editor/react";
 import { useEffect, useRef, useState } from "react";
-import { wynntilsfunction, wynntilsargument } from "@prisma/client";
+import { wynntilsargument, wynntilsfunction } from "@prisma/client";
 import completionItemProvider from "@/components/ide/completionItemProvider.ts";
 import signatureHelpProvider from "@/components/ide/signatureHelpProvider.ts";
 import tokensProvider from "@/components/ide/tokensProvider.ts";
@@ -22,7 +22,7 @@ export default function FunctionIDE() {
     const monaco = useMonaco();
     const [functions, setFunctions] = useState<wynntilsfunction[]>([]);
     const [args, setArgs] = useState<wynntilsargument[]>([]);
-    const functionsRef = useRef<wynntilsfunction[]>(); // for the onMount validation
+    const validatorRef = useRef<FunctionValidatorVisitor | null>(null);
 
     monaco?.editor.defineTheme(wynntilsTheme, getThemeDefinition());
 
@@ -46,7 +46,7 @@ export default function FunctionIDE() {
 
         monaco.languages.registerSignatureHelpProvider(wynntils, signatureHelpProvider(functions, args));
 
-        functionsRef.current = functions;
+        validatorRef.current = new FunctionValidatorVisitor(functions);
     }, [monaco, functions, args]);
 
     let docPaneHasBeenForced = false;
@@ -80,7 +80,6 @@ export default function FunctionIDE() {
                     });
 
                     editor.onDidChangeModelContent(() => {
-                        if (!functionsRef.current) return;
                         const code = editor.getValue();
                         const inputStream = CharStreams.fromString(code);
                         const lexer = new WynntilsLexer(inputStream);
@@ -89,8 +88,8 @@ export default function FunctionIDE() {
 
                         const tree = parser.script();
 
-                        const visitor = new FunctionValidatorVisitor(functionsRef.current);
-                        visitor.visit(tree);
+                        console.log("Parsing tree:");
+                        validatorRef.current?.visit(tree);
 
                         const model = editor.getModel();
                         if (!model) return;

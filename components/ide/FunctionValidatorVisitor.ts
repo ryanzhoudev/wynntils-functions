@@ -12,10 +12,12 @@ export class FunctionValidatorVisitor extends WynntilsVisitor<void> {
     }
 
     visitNoArgsFunction = (ctx: NoArgsFunctionContext): void => {
+        console.log("Visiting no-args function:", ctx.getText());
         visitFunction(ctx);
     };
 
     visitParenFunction = (ctx: ParenFunctionContext): void => {
+        console.log("Visiting paren function:", ctx.getText());
         visitFunction(ctx);
     };
 }
@@ -26,7 +28,8 @@ function visitFunction(ctx: ParenFunctionContext | NoArgsFunctionContext): void 
     const stop = id.symbol.stop;
     const name = id.getText();
 
-    const isValid = knownFunctionNames.includes(name);
+    console.log(`Validating function: ${name} at ${start}-${stop}`);
+    const isValid = knownFunctionNames.includes(name) || name.length === 0;
     const exists = invalidMap.has(start);
 
     if (!isValid) {
