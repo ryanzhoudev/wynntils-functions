@@ -27,7 +27,7 @@ Click `OK` to import the data, starting with the `functions` table.
 Once database updates are complete, check that the new functions have actually appeared on the site.
 If not, go to the [Vercel](https://vercel.com/dashboard) dashboard and redeploy the site.
 
------------------
+---
 
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 

@@ -3,5 +3,5 @@
 @tailwind utilities;
 
 .min-h-24 {
-  min-height: 6rem;
+    min-height: 6rem;
 }
