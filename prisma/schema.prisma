@@ -44,4 +44,5 @@ enum type {
     StyledText
     Time
     Float
+    List
 }
