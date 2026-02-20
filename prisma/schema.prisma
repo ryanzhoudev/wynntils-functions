@@ -40,4 +40,5 @@ enum type {
     Long
     RangedValue
     CustomColor
+    Object
 }
