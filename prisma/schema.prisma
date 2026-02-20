@@ -41,4 +41,6 @@ enum type {
     RangedValue
     CustomColor
     Object
+    StyledText
+    Time
 }
