@@ -522,7 +522,7 @@ export default function WynntilsIde() {
                             <Braces className="size-5" />
                             Wynntils IDE (Upstream LSP)
                         </h1>
-                        <p className="text-xs text-muted-foreground">Monaco + upstream LSP server over WebSocket + local file workspace</p>
+                        {/*<p className="text-xs text-muted-foreground">Monaco + upstream LSP server over WebSocket + local file workspace</p>*/}
                         <p className="text-xs text-muted-foreground">
                             Language tooling by{" "}
                             <a
@@ -596,7 +596,11 @@ export default function WynntilsIde() {
                                 Delete
                             </Button>
                             <Button onClick={() => void compileActiveFile()} disabled={isCompiling || !activeFile}>
-                                {isCompiling ? <LoaderCircle className="size-4 animate-spin" /> : <Hammer className="size-4" />}
+                                {isCompiling ? (
+                                    <LoaderCircle className="size-4 animate-spin" />
+                                ) : (
+                                    <Hammer className="size-4" />
+                                )}
                                 Compile
                             </Button>
 
@@ -615,8 +619,8 @@ export default function WynntilsIde() {
                             <Badge variant={lspStatus === "ready" ? "default" : "outline"}>LSP {lspStatus}</Badge>
                             <Badge variant="secondary">{workspace.files.length} files</Badge>
                             <Badge variant="secondary">{diagnosticMarkers.length} diagnostics</Badge>
-                            <span>Ctrl/⌘ + Enter compiles</span>
-                            <span className="font-mono">{lspEndpoint}</span>
+                            <span>Ctrl/⌘ + Enter compiles when not focused in IDE</span>
+                            <span className="ml-auto font-mono">{lspEndpoint}</span>
                             {lspError ? <span className="text-red-300">{lspError}</span> : null}
                         </CardDescription>
                     </CardHeader>
@@ -668,7 +672,8 @@ export default function WynntilsIde() {
                                 Diagnostics
                             </CardTitle>
                             <CardDescription>
-                                Showing {Math.min(diagnosticMarkers.length, 12)} of {diagnosticMarkers.length} diagnostics.
+                                Showing {Math.min(diagnosticMarkers.length, 12)} of {diagnosticMarkers.length}{" "}
+                                diagnostics.
                             </CardDescription>
                         </CardHeader>
 
@@ -696,10 +701,16 @@ export default function WynntilsIde() {
                 ) : null}
 
                 {compileStatus ? (
-                    <Card className={compileStatus.tone === "success" ? "border-emerald-500/50" : "border-amber-500/50"}>
+                    <Card
+                        className={compileStatus.tone === "success" ? "border-emerald-500/50" : "border-amber-500/50"}
+                    >
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                {compileStatus.tone === "success" ? <Check className="size-4" /> : <AlertTriangle className="size-4" />}
+                                {compileStatus.tone === "success" ? (
+                                    <Check className="size-4" />
+                                ) : (
+                                    <AlertTriangle className="size-4" />
+                                )}
                                 Compile status
                             </CardTitle>
                             <CardDescription
@@ -715,7 +726,9 @@ export default function WynntilsIde() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Compiled output</CardTitle>
-                            <CardDescription>This mirrors the upstream VSCode compile command behavior.</CardDescription>
+                            <CardDescription>
+                                This mirrors the upstream VSCode compile command behavior.
+                            </CardDescription>
                         </CardHeader>
 
                         <CardContent className="space-y-3">
@@ -727,7 +740,11 @@ export default function WynntilsIde() {
                             />
 
                             <div className="flex flex-wrap gap-2">
-                                <Button variant="outline" onClick={() => void copyCompiledOutput()} disabled={isCopyingCompiledOutput}>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => void copyCompiledOutput()}
+                                    disabled={isCopyingCompiledOutput}
+                                >
                                     {isCopyingCompiledOutput ? "Copied" : "Copy output"}
                                 </Button>
                                 <Button variant="secondary" onClick={createFileFromCompiledOutput}>
