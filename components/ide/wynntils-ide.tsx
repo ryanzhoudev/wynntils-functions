@@ -16,10 +16,10 @@ import {
     FilePlus2,
     FilePenLine,
     FileUp,
-    FolderOpenDot,
     Hammer,
     LoaderCircle,
     Save,
+    Copy,
     Trash2,
 } from "lucide-react";
 import type { IDisposable, editor as MonacoEditor } from "monaco-editor";
@@ -442,7 +442,7 @@ export default function WynntilsIde() {
             if (result.errors.length > 0) {
                 setCompileStatus({
                     tone: "warning",
-                    message: `Compiled with ${result.errors.length} issue(s). Check source diagnostics like VSCode compile command.`,
+                    message: `Compiled with ${result.errors.length} issue(s).`,
                 });
             } else {
                 setCompileStatus({ tone: "success", message: "Compiled successfully." });
@@ -533,7 +533,6 @@ export default function WynntilsIde() {
                             >
                                 DevChromium/wynntils-functions-tools
                             </a>
-                            .
                         </p>
                     </div>
 
@@ -575,26 +574,28 @@ export default function WynntilsIde() {
                                 Rename
                             </Button>
                             <Button variant="outline" onClick={duplicateActiveFile}>
-                                <Save className="size-4" />
+                                <Copy className="size-4" />
                                 Duplicate
                             </Button>
                             <Button variant="outline" onClick={exportActiveFile}>
-                                <FileUp className="size-4" />
+                                <Save className="size-4" />
                                 Export
                             </Button>
                             <Button variant="outline" onClick={() => fileImportRef.current?.click()}>
-                                <FolderOpenDot className="size-4" />
+                                <FileUp className="size-4" />
                                 Import
                             </Button>
-                            <Button
-                                variant="outline"
-                                onClick={deleteActiveFile}
-                                disabled={workspace.files.length <= 1}
-                                className="text-red-300"
-                            >
-                                <Trash2 className="size-4" />
-                                Delete
-                            </Button>
+                            <span title={workspace.files.length <= 1 ? "You can't delete the last file" : undefined}>
+                                <Button
+                                    variant="outline"
+                                    onClick={deleteActiveFile}
+                                    disabled={workspace.files.length <= 1}
+                                    className="text-red-300"
+                                >
+                                    <Trash2 className="size-4" />
+                                    Delete
+                                </Button>
+                            </span>
                             <Button onClick={() => void compileActiveFile()} disabled={isCompiling || !activeFile}>
                                 {isCompiling ? (
                                     <LoaderCircle className="size-4 animate-spin" />
