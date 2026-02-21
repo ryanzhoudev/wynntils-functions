@@ -86,7 +86,7 @@ export default function LegacyDocs() {
                 </p>
             </aside>
 
-            <main className="ml-96 p-4">
+            <main className="ml-96">
                 {isLoading ? <p>Loading...</p> : null}
                 {error ? <p className="text-red-300">Failed to load: {error}</p> : null}
 
