@@ -1,0 +1,81 @@
+{
+  "scopeName": "source.wynntils",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#vars" },
+    { "include": "#template" }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        { "name": "comment.line.double-slash", "match": "//.*$" }
+      ]
+    },
+    "vars": {
+      "begin": "^\\s*let\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=",
+      "beginCaptures": {
+        "0": { "name": "keyword.declaration.variable" },
+        "1": { "name": "variable.other.readwrite" }
+      },
+      "end": "(;)(?=\\s*(?://.*)?$)",
+      "endCaptures": {
+        "1": { "name": "punctuation.terminator.statement" }
+      },
+      "patterns": [
+        { "name": "keyword.declaration.variable", "match": "\\blet\\b" },
+        { "name": "keyword.operator.assignment", "match": "=" },
+        { "include": "#expression" }
+      ]
+    },
+    "template": {
+      "begin": "\\{",
+      "beginCaptures": {
+        "0": { "name": "punctuation.section.block.begin" }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end" }
+      },
+      "patterns": [
+        { "include": "#call" },
+        { "include": "#expression" },
+        { "name": "punctuation.separator.parameter", "match": ";" }
+      ]
+    },
+    "call": {
+      "name": "meta.function-call.wynntils",
+      "begin": "\\b([A-Za-z_][A-Za-z0-9_]*)\\b\\s*(\\()",
+      "beginCaptures": {
+        "1": { "name": "entity.name.function" },
+        "2": { "name": "punctuation.section.parens.begin" }
+      },
+      "end": "\\)",
+      "endCaptures": {
+        "0": { "name": "punctuation.section.parens.end" }
+      },
+      "patterns": [
+        { "name": "punctuation.separator.parameter", "match": ";" },
+        { "include": "#expression" }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        { "include": "#call" },
+        { "name": "constant.numeric", "match": "\\b-?\\d+(?:\\.\\d+)?\\b" },
+        { "name": "constant.language.boolean", "match": "\\b(?:true|false)\\b" },
+        { "name": "constant.other.color.hex", "match": "#[0-9a-fA-F]{6}\\b" },
+        { "name": "constant.language.option", "match": "\\b[A-Z_][A-Z0-9_]*\\b" },
+        { "include": "#string.double" },
+        { "name": "variable.other.placeholder", "match": "[@$]\\{[A-Za-z_][A-Za-z0-9_]*\\}" }
+      ]
+    },
+    "string.double": {
+      "name": "string.quoted.double",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "name": "constant.character.escape", "match": "\\\\." }
+      ]
+    }
+  }
+}

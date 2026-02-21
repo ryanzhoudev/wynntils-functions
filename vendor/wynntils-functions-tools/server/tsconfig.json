@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "rootDir": "src",
+    "outDir": "../out/server",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": false,
+    "incremental": true,
+    "tsBuildInfoFile": "../out/server.tsbuildinfo",
+    "strict": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts","src/**/*.json"]
+}

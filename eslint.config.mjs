@@ -9,6 +9,8 @@ export default defineConfig([
         ".next/**",
         "out/**",
         "build/**",
+        ".generated/**",
+        "vendor/wynntils-functions-tools/**",
         "next-env.d.ts",
     ]),
 ]);

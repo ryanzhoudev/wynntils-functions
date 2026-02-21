@@ -1,97 +1,347 @@
-import { CompileResult, FunctionMetadata, LspCompletionItem, LspDiagnostic, LspHover } from "@/lib/ide/types";
-import { WorkerRequest, WorkerResponse } from "@/lib/ide/lsp-worker-protocol";
+import {
+    LspCompletionItem,
+    LspCompletionList,
+    LspHover,
+    LspPosition,
+    LspPublishDiagnosticsParams,
+} from "@/lib/ide/types";
 
-type PendingResolver = {
-    resolve: (value: WorkerResponse) => void;
+type JsonRpcRequest = {
+    jsonrpc: "2.0";
+    id: number;
+    method: string;
+    params?: unknown;
+};
+
+type JsonRpcNotification = {
+    jsonrpc: "2.0";
+    method: string;
+    params?: unknown;
+};
+
+type JsonRpcResponse = {
+    jsonrpc: "2.0";
+    id: number;
+    result?: unknown;
+    error?: {
+        code: number;
+        message: string;
+        data?: unknown;
+    };
+};
+
+type PendingRequest = {
+    resolve: (value: unknown) => void;
     reject: (error: Error) => void;
 };
 
-function createMessageId() {
-    return crypto.randomUUID();
+type DiagnosticsHandler = (params: LspPublishDiagnosticsParams) => void;
+
+function isResponseMessage(message: unknown): message is JsonRpcResponse {
+    if (typeof message !== "object" || message === null) {
+        return false;
+    }
+
+    return "id" in message && ("result" in message || "error" in message);
 }
 
-function isWorkerErrorResponse(response: WorkerResponse): response is Extract<WorkerResponse, { ok: false }> {
-    return response.ok === false;
+function isNotificationMessage(message: unknown): message is JsonRpcNotification {
+    if (typeof message !== "object" || message === null) {
+        return false;
+    }
+
+    return "method" in message && !("id" in message);
+}
+
+function toErrorMessage(error: unknown) {
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    return "Unknown LSP error";
 }
 
 export class WynntilsLspClient {
-    private worker: Worker;
-    private pending = new Map<string, PendingResolver>();
+    private readonly endpoint: string;
 
-    constructor() {
-        this.worker = new Worker(new URL("./wynntils-lsp.worker.ts", import.meta.url), { type: "module" });
+    private websocket: WebSocket | null = null;
+    private requestId = 1;
+    private connectPromise: Promise<void> | null = null;
+    private isInitialized = false;
 
-        this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-            const response = event.data;
-            const resolver = this.pending.get(response.id);
+    private readonly pendingRequests = new Map<number, PendingRequest>();
+    private readonly diagnosticsHandlers = new Set<DiagnosticsHandler>();
 
-            if (!resolver) {
+    private readonly openedDocuments = new Map<string, number>();
+
+    constructor(endpoint: string) {
+        this.endpoint = endpoint;
+    }
+
+    private handleMessage(message: unknown) {
+        if (isResponseMessage(message)) {
+            const pending = this.pendingRequests.get(message.id);
+
+            if (!pending) {
                 return;
             }
 
-            this.pending.delete(response.id);
-            resolver.resolve(response);
-        };
+            this.pendingRequests.delete(message.id);
 
-        this.worker.onerror = (event) => {
-            this.pending.forEach((resolver) => {
-                resolver.reject(new Error(event.message));
-            });
-            this.pending.clear();
-        };
-    }
+            if (message.error) {
+                pending.reject(new Error(message.error.message));
+                return;
+            }
 
-    private async send<T extends WorkerRequest["type"]>(
-        type: T,
-        payload: Extract<WorkerRequest, { type: T }>["payload"],
-    ): Promise<Extract<WorkerResponse, { type: T }>> {
-        const id = createMessageId();
-
-        const request = {
-            id,
-            type,
-            payload,
-        } as Extract<WorkerRequest, { type: T }>;
-
-        const response = await new Promise<WorkerResponse>((resolve, reject) => {
-            this.pending.set(id, { resolve, reject });
-            this.worker.postMessage(request);
-        });
-
-        if (isWorkerErrorResponse(response)) {
-            throw new Error(response.error);
+            pending.resolve(message.result);
+            return;
         }
 
-        return response as Extract<WorkerResponse, { type: T }>;
+        if (!isNotificationMessage(message)) {
+            return;
+        }
+
+        if (message.method === "textDocument/publishDiagnostics") {
+            const params = message.params as LspPublishDiagnosticsParams;
+
+            this.diagnosticsHandlers.forEach((handler) => handler(params));
+        }
     }
 
-    async setCatalog(functions: FunctionMetadata[]) {
-        const response = await this.send("setCatalog", { functions });
-        return response.payload;
+    private send(message: JsonRpcRequest | JsonRpcNotification) {
+        if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+            throw new Error("LSP websocket is not connected");
+        }
+
+        this.websocket.send(JSON.stringify(message));
     }
 
-    async getDiagnostics(text: string): Promise<LspDiagnostic[]> {
-        const response = await this.send("diagnostics", { text });
-        return response.payload.diagnostics;
+    private sendRequestInternal(method: string, params?: unknown) {
+        const id = this.requestId++;
+
+        return new Promise<unknown>((resolve, reject) => {
+            this.pendingRequests.set(id, { resolve, reject });
+
+            try {
+                this.send({
+                    jsonrpc: "2.0",
+                    id,
+                    method,
+                    params,
+                });
+            } catch (error) {
+                this.pendingRequests.delete(id);
+                reject(error instanceof Error ? error : new Error(toErrorMessage(error)));
+            }
+        });
     }
 
-    async getCompletionItems(text: string): Promise<LspCompletionItem[]> {
-        const response = await this.send("completion", { text });
-        return response.payload.items;
+    private async request(method: string, params?: unknown) {
+        await this.connect();
+
+        return this.sendRequestInternal(method, params);
     }
 
-    async getHover(text: string, offset: number): Promise<LspHover | null> {
-        const response = await this.send("hover", { text, offset });
-        return response.payload.hover;
+    private notifyInternal(method: string, params?: unknown) {
+        this.send({
+            jsonrpc: "2.0",
+            method,
+            params,
+        });
     }
 
-    async compile(text: string): Promise<CompileResult> {
-        const response = await this.send("compile", { text });
-        return response.payload;
+    private async notify(method: string, params?: unknown) {
+        await this.connect();
+
+        this.notifyInternal(method, params);
+    }
+
+    async connect() {
+        if (this.connectPromise) {
+            return this.connectPromise;
+        }
+
+        this.connectPromise = new Promise<void>((resolve, reject) => {
+            const websocket = new WebSocket(this.endpoint);
+            this.websocket = websocket;
+
+            websocket.onopen = () => {
+                void this
+                    .sendRequestInternal("initialize", {
+                        processId: null,
+                        rootUri: null,
+                        capabilities: {
+                            textDocument: {
+                                completion: {
+                                    completionItem: {
+                                        snippetSupport: true,
+                                        documentationFormat: ["markdown", "plaintext"],
+                                    },
+                                },
+                                hover: {
+                                    contentFormat: ["markdown", "plaintext"],
+                                },
+                            },
+                        },
+                        clientInfo: {
+                            name: "wynntils-functions-web",
+                            version: "1.0.0",
+                        },
+                        trace: "off",
+                    })
+                    .then(() => this.notifyInternal("initialized", {}))
+                    .then(() => {
+                        this.isInitialized = true;
+                        resolve();
+                    })
+                    .catch((error) => {
+                        this.isInitialized = false;
+                        reject(error instanceof Error ? error : new Error(toErrorMessage(error)));
+                    });
+            };
+
+            websocket.onmessage = (event) => {
+                if (typeof event.data !== "string") {
+                    return;
+                }
+
+                try {
+                    const parsed = JSON.parse(event.data) as unknown;
+
+                    if (Array.isArray(parsed)) {
+                        parsed.forEach((entry) => this.handleMessage(entry));
+                        return;
+                    }
+
+                    this.handleMessage(parsed);
+                } catch {
+                    // Ignore malformed messages.
+                }
+            };
+
+            websocket.onerror = () => {
+                if (!this.isInitialized) {
+                    reject(new Error(`Failed to connect to LSP websocket: ${this.endpoint}`));
+                }
+            };
+
+            websocket.onclose = () => {
+                this.isInitialized = false;
+                this.websocket = null;
+                this.connectPromise = null;
+                this.openedDocuments.clear();
+
+                this.pendingRequests.forEach((pending) => pending.reject(new Error("LSP websocket closed")));
+                this.pendingRequests.clear();
+            };
+        });
+
+        return this.connectPromise;
+    }
+
+    async syncDocument(uri: string, text: string) {
+        await this.connect();
+
+        const currentVersion = this.openedDocuments.get(uri);
+
+        if (!currentVersion) {
+            this.openedDocuments.set(uri, 1);
+
+            await this.notify("textDocument/didOpen", {
+                textDocument: {
+                    uri,
+                    languageId: "wynntils",
+                    version: 1,
+                    text,
+                },
+            });
+            return;
+        }
+
+        const nextVersion = currentVersion + 1;
+        this.openedDocuments.set(uri, nextVersion);
+
+        await this.notify("textDocument/didChange", {
+            textDocument: {
+                uri,
+                version: nextVersion,
+            },
+            contentChanges: [
+                {
+                    text,
+                },
+            ],
+        });
+    }
+
+    async closeDocument(uri: string) {
+        if (!this.openedDocuments.has(uri)) {
+            return;
+        }
+
+        this.openedDocuments.delete(uri);
+
+        await this.notify("textDocument/didClose", {
+            textDocument: {
+                uri,
+            },
+        });
+    }
+
+    async requestCompletion(uri: string, position: LspPosition): Promise<LspCompletionItem[]> {
+        const completionResult = (await this.request("textDocument/completion", {
+            textDocument: {
+                uri,
+            },
+            position,
+            context: {
+                triggerKind: 1,
+            },
+        })) as LspCompletionItem[] | LspCompletionList | null;
+
+        if (!completionResult) {
+            return [];
+        }
+
+        if (Array.isArray(completionResult)) {
+            return completionResult;
+        }
+
+        return completionResult.items ?? [];
+    }
+
+    async requestHover(uri: string, position: LspPosition): Promise<LspHover | null> {
+        const hoverResult = (await this.request("textDocument/hover", {
+            textDocument: {
+                uri,
+            },
+            position,
+        })) as LspHover | null;
+
+        return hoverResult ?? null;
+    }
+
+    onDiagnostics(handler: DiagnosticsHandler) {
+        this.diagnosticsHandlers.add(handler);
+
+        return () => {
+            this.diagnosticsHandlers.delete(handler);
+        };
     }
 
     dispose() {
-        this.worker.terminate();
-        this.pending.clear();
+        this.pendingRequests.forEach((pending) => pending.reject(new Error("LSP client disposed")));
+        this.pendingRequests.clear();
+
+        this.openedDocuments.clear();
+        this.diagnosticsHandlers.clear();
+        this.isInitialized = false;
+
+        if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+            this.websocket.close();
+        }
+
+        this.websocket = null;
+        this.connectPromise = null;
     }
 }

@@ -1,4 +1,4 @@
-// Adapted from DevChromium/wynntils-functions-tools (MIT License).
+// Adapted from DevChromium/wynntils-functions-tools/src/compile.ts (MIT License).
 
 import { CompileResult } from "@/lib/ide/types";
 
@@ -144,7 +144,6 @@ function replacePlaceholders(
 function normalizeCompiledCode(compiledCode: string): string {
     const withoutCarriageReturns = compiledCode.replace(/\r/g, "");
     const withoutNewlines = withoutCarriageReturns.replace(/\n+/g, "");
-
     return withoutNewlines.trim();
 }
 
@@ -239,14 +238,10 @@ function removeVariableDeclarations(sourceText: string, declarations: VariableDe
     }
 
     result += sourceText.slice(lastIndex);
-
     return result;
 }
 
-function readExpressionUntilSemicolon(sourceText: string, startIndex: number): {
-    valueEnd: number;
-    rawValue: string;
-} {
+function readExpressionUntilSemicolon(sourceText: string, startIndex: number): { valueEnd: number; rawValue: string } {
     const length = sourceText.length;
     let index = startIndex;
     let depthParenthesis = 0;

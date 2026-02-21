@@ -1,0 +1,66 @@
+{
+  "name": "wynntils-function-tools",
+  "displayName": "Wynntils Functions Tools",
+  "description": "Wynntils Info boxes language support",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.50.0"
+  },
+  "author": {
+    "name": "Chromium"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "publisher": "TeamWynntils",
+  "repository": {
+    "url": "https://github.com/DevChromium/wynntils-functions-tools"
+  },
+  "activationEvents": [
+    "onLanguage:wynntils",
+    "onCommand:wynntils.compileToFunctions"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "wynntils.compileToFunctions",
+        "title": "Wynntils: Compile"
+      }
+    ],
+    "languages": [
+      {
+        "id": "wynntils",
+        "aliases": [
+          "Wynntils",
+          "wynntils"
+        ],
+        "extensions": [
+          ".wynntils"
+        ],
+        "configuration": "language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "wynntils",
+        "scopeName": "source.wynntils",
+        "path": "syntaxes/wynntils.tmLanguage.json"
+      }
+    ]
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "@types/vscode": "^1.50.0",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "watch": "tsc -b -w tsconfig.build.json"
+  }
+}

@@ -4,10 +4,13 @@
     "private": true,
     "scripts": {
         "dev": "next dev",
+        "dev:ide-upstream": "concurrently -k -n LSP,WEB -c cyan,magenta \"pnpm lsp:bridge\" \"pnpm dev\"",
         "build": "next build",
         "start": "next start",
         "lint": "eslint .",
         "typecheck": "tsc --noEmit",
+        "build:lsp": "node scripts/build-upstream-lsp.mjs",
+        "lsp:bridge": "pnpm build:lsp && node scripts/lsp-bridge.mjs",
         "postinstall": "prisma generate"
     },
     "dependencies": {
@@ -30,12 +33,17 @@
         "react": "19.2.4",
         "react-dom": "19.2.4",
         "tailwind-merge": "^3.5.0",
-        "tw-animate-css": "^1.4.0"
+        "tw-animate-css": "^1.4.0",
+        "vscode-languageserver": "^9.0.1",
+        "vscode-languageserver-textdocument": "^1.0.12",
+        "vscode-ws-jsonrpc": "^3.5.0",
+        "ws": "^8.19.0"
     },
     "devDependencies": {
         "@types/node": "25.3.0",
         "@types/react": "19.2.14",
         "@types/react-dom": "19.2.3",
+        "concurrently": "^9.2.1",
         "eslint": "9.39.1",
         "postcss": "8.5.6",
         "prettier": "^3.8.1",

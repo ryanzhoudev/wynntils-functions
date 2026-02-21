@@ -10,38 +10,59 @@ export type IdeWorkspace = {
     activeFileId: string;
 };
 
-export type FunctionMetadataArgument = {
-    name: string;
-    required: boolean;
-    type: string;
-    defaultValue?: string | null;
+export type LspPosition = {
+    line: number;
+    character: number;
 };
 
-export type FunctionMetadata = {
-    canonicalName: string;
-    description: string;
-    returnType: string;
-    aliases: string[];
-    arguments: FunctionMetadataArgument[];
+export type LspRange = {
+    start: LspPosition;
+    end: LspPosition;
 };
-
-export type LspDiagnosticSeverity = "error" | "warning" | "information" | "hint";
 
 export type LspDiagnostic = {
+    range: LspRange;
+    severity?: number;
+    code?: number | string;
+    source?: string;
     message: string;
-    severity: LspDiagnosticSeverity;
-    startOffset: number;
-    endOffset: number;
 };
+
+export type LspPublishDiagnosticsParams = {
+    uri: string;
+    diagnostics: LspDiagnostic[];
+};
+
+export type LspTextEdit = {
+    range: LspRange;
+    newText: string;
+};
+
+export type LspMarkupContent = {
+    kind: "plaintext" | "markdown";
+    value: string;
+};
+
+export type LspMarkedString = string | { language: string; value: string };
 
 export type LspCompletionItem = {
     label: string;
-    detail: string;
-    insertText: string;
+    kind?: number;
+    detail?: string;
+    documentation?: string | LspMarkupContent | LspMarkedString | LspMarkedString[];
+    insertText?: string;
+    insertTextFormat?: number;
+    textEdit?: LspTextEdit;
+};
+
+export type LspCompletionList = {
+    isIncomplete?: boolean;
+    items: LspCompletionItem[];
 };
 
 export type LspHover = {
-    markdown: string;
+    contents: string | LspMarkupContent | LspMarkedString | LspMarkedString[];
+    range?: LspRange;
 };
 
 export type CompileResult = {

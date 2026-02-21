@@ -2,26 +2,32 @@
 
 Live site: <https://wynntils-functions.ryanzhou.dev/>
 
-Documentation site for Wynntils/Artemis info-box functions.
+Docs + IDE for Wynntils/Artemis info-box functions.
 
-## What changed
+## Routes
 
-This project now runs as a **full-stack Next.js app** (App Router):
+- `/` – redesigned docs UI
+- `/old` – classic docs UI
+- `/ide` – Monaco IDE (this branch uses **upstream LSP server over WebSocket**)
+- `/api/functions` – dynamic function catalog API from Postgres/Prisma
 
-- `GET /api/functions` serves the function catalog from Postgres via Prisma.
-- Frontend fetches that JSON and caches it locally (`localStorage`) for fast repeat loads.
-- New redesigned UI uses shadcn-style components.
-- Legacy UI is preserved at `/old`.
+## This branch: upstream LSP bridge experiment
 
-## Tech stack
+Branch: `feat/ide-upstream-lsp-bridge`
 
-- Next.js 16 (App Router)
-- React 19
-- Prisma 7 + PostgreSQL
-- Tailwind 4
-- shadcn-style UI component setup (`components/ui/*`)
+Goal: test behavior parity with the real Wynntils extension server flow.
 
-## Development
+How it works:
+
+- Upstream repo is vendored in `vendor/wynntils-functions-tools`.
+- Upstream LSP server (`vendor/.../server/src`) is compiled to `.generated/upstream-lsp`.
+- A WebSocket bridge forwards Monaco JSON-RPC requests to the upstream Node LSP process.
+- IDE compile command uses logic adapted from upstream compile implementation.
+
+Upstream reference:
+<https://github.com/DevChromium/wynntils-functions-tools>
+
+## Local development
 
 ### Install
 
@@ -29,54 +35,57 @@ This project now runs as a **full-stack Next.js app** (App Router):
 pnpm install
 ```
 
-### Run dev server
+### Docs/web app only
 
 ```bash
 pnpm dev
 ```
 
+### IDE + upstream LSP bridge (recommended on this branch)
+
+```bash
+pnpm dev:ide-upstream
+```
+
+This starts:
+
+- Next app (default port 3000)
+- LSP bridge at `ws://127.0.0.1:3001/wynntils`
+
+You can override bridge settings with env vars:
+
+- `WYNNTILS_LSP_HOST`
+- `WYNNTILS_LSP_PORT`
+- `WYNNTILS_LSP_PATH`
+
+And point the frontend to a custom bridge URL via:
+
+- `NEXT_PUBLIC_WYNNTILS_LSP_WS_URL`
+
 ### Quality checks
 
 ```bash
 pnpm lint
-pnpm exec tsc --noEmit
-```
-
-### Production build
-
-```bash
+pnpm typecheck
 pnpm build
 ```
 
-## Environment variables
+## Hosting notes for upstream-LSP mode
 
-Create `.env` with at least:
+Because this mode needs a long-running WebSocket + child-process bridge, it is **not a pure Vercel-serverless fit**.
+
+Recommended deploy patterns:
+
+1. Keep Next app on Vercel, host LSP bridge on a small VPS/container, set `NEXT_PUBLIC_WYNNTILS_LSP_WS_URL`.
+2. Host both web app + bridge together on a Node-friendly platform (Railway/Fly/Render/VPS).
+
+## Database/env
+
+Required env:
 
 ```bash
 DATABASE_URL=postgres://...
 DIRECT_URL=postgres://...
 ```
 
-Notes:
-
-- Prisma CLI uses `DATABASE_URL` via `prisma.config.ts`.
-- Runtime Prisma client prefers `DIRECT_URL`, then falls back to `DATABASE_URL`.
-
-## Data update flow (from Artemis)
-
-Function/argument data is exported from Artemis to CSV and imported manually into Postgres.
-
-1. Run `/execute FunctionDump dumpFunctions` in game.
-2. Use the generated SQL in pgAdmin (psql tool) to reset/prepare tables.
-3. Import CSV into `functions`, then `arguments`.
-4. Refresh the website (or redeploy on Vercel if needed).
-
-Reference feature in Artemis: <https://github.com/Wynntils/Artemis/pull/1887>
-
-## Project structure
-
-- `app/api/functions/route.ts` – API endpoint for catalog JSON
-- `components/function-catalog.tsx` – redesigned main UI (`/`)
-- `components/legacy/docs.tsx` – preserved classic UI (`/old`)
-- `lib/use-function-catalog.ts` – frontend fetch + cache logic
-- `lib/prisma.ts` – Prisma client setup (Prisma 7 adapter)
+Prisma runtime currently prefers `DATABASE_URL`, then `DIRECT_URL`, and auto-adds `sslmode=require` when needed.
