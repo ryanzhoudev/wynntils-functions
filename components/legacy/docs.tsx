@@ -1,70 +1,34 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/legacy/card";
-import { FunctionEntry } from "@/lib/types";
+import {
+    DEFAULT_SEARCH_SCOPE,
+    SEARCH_SCOPE_OPTIONS,
+    SearchScope,
+    matchesQuery,
+    normalizeQueryTokens,
+} from "@/lib/search";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-
-type LegacyFilterState = {
-    functionNames: boolean;
-    functionDescriptions: boolean;
-    functionReturnTypes: boolean;
-    argumentNames: boolean;
-    argumentDescriptions: boolean;
-};
-
-const DEFAULT_FILTERS: LegacyFilterState = {
-    functionNames: true,
-    functionDescriptions: true,
-    functionReturnTypes: false,
-    argumentNames: false,
-    argumentDescriptions: false,
-};
-
-function getSearchText(entry: FunctionEntry, filters: LegacyFilterState) {
-    const searchText: string[] = [];
-
-    if (filters.functionNames) {
-        searchText.push(entry.name, ...entry.aliases);
-    }
-
-    if (filters.functionDescriptions) {
-        searchText.push(entry.description);
-    }
-
-    if (filters.functionReturnTypes) {
-        searchText.push(entry.returnType);
-    }
-
-    if (filters.argumentNames) {
-        searchText.push(...entry.arguments.map((argument) => argument.name));
-    }
-
-    if (filters.argumentDescriptions) {
-        searchText.push(...entry.arguments.map((argument) => argument.description ?? ""));
-    }
-
-    return searchText.join(" ").toLowerCase();
-}
 
 export default function LegacyDocs() {
     const { data, error, isLoading } = useFunctionCatalog();
 
     const [query, setQuery] = useState("");
-    const [filters, setFilters] = useState<LegacyFilterState>(DEFAULT_FILTERS);
+    const [filters, setFilters] = useState<SearchScope>(DEFAULT_SEARCH_SCOPE);
 
-    const normalizedQuery = query.trim().toLowerCase();
+    const queryTokens = useMemo(() => normalizeQueryTokens(query), [query]);
+
+    const activeFilterCount = useMemo(() => {
+        return Object.values(filters).filter(Boolean).length;
+    }, [filters]);
 
     const functions = useMemo(() => {
         const catalog = [...(data?.functions ?? [])].sort((a, b) => a.id - b.id);
 
-        if (!normalizedQuery) {
-            return catalog;
-        }
-
-        return catalog.filter((entry) => getSearchText(entry, filters).includes(normalizedQuery));
-    }, [data?.functions, filters, normalizedQuery]);
+        return catalog.filter((entry) => matchesQuery(entry, filters, queryTokens));
+    }, [data?.functions, filters, queryTokens]);
 
     return (
         <div className="min-h-screen bg-zinc-900 text-white">
@@ -91,29 +55,26 @@ export default function LegacyDocs() {
                 <div className="space-y-2 text-sm">
                     <p className="font-bold">Search includes:</p>
 
-                    {(
-                        [
-                            ["functionNames", "Function names & aliases"],
-                            ["functionDescriptions", "Function descriptions"],
-                            ["functionReturnTypes", "Function return types"],
-                            ["argumentNames", "Argument names"],
-                            ["argumentDescriptions", "Argument descriptions"],
-                        ] as const
-                    ).map(([key, label]) => (
-                        <label key={key} className="flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                checked={filters[key]}
-                                onChange={(event) =>
-                                    setFilters((previous) => ({
-                                        ...previous,
-                                        [key]: event.target.checked,
-                                    }))
-                                }
-                            />
-                            <span>{label}</span>
-                        </label>
-                    ))}
+                    {SEARCH_SCOPE_OPTIONS.map(({ key, label }) => {
+                        const isLastActiveFilter = activeFilterCount === 1 && filters[key];
+
+                        return (
+                            <label key={key} className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    checked={filters[key]}
+                                    disabled={isLastActiveFilter}
+                                    onChange={(event) =>
+                                        setFilters((previous) => ({
+                                            ...previous,
+                                            [key]: event.target.checked,
+                                        }))
+                                    }
+                                />
+                                <span>{label}</span>
+                            </label>
+                        );
+                    })}
                 </div>
 
                 <p className="mt-4 text-xs text-zinc-400">
@@ -153,8 +114,8 @@ export default function LegacyDocs() {
                                             - <code>{argument.name}</code> (<code>{argument.type}</code>,{" "}
                                             {argument.required
                                                 ? "required"
-                                                : `optional${argument.defaultValue ? `, default: ${argument.defaultValue}` : ""}`})
-                                            {argument.description ? ` -- ${argument.description}` : ""}
+                                                : `optional${argument.defaultValue ? `, default: ${argument.defaultValue}` : ""}`}
+                                            ){argument.description ? ` -- ${argument.description}` : ""}
                                         </div>
                                     ))}
                                 </CardContent>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FunctionCatalogResponse } from "@/lib/types";
+import { FunctionCatalogResponse, FunctionEntry } from "@/lib/types";
 
 const CACHE_KEY = "wynntils-function-catalog:v1";
 const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 12;
@@ -11,21 +11,60 @@ type CachedCatalog = {
     data: FunctionCatalogResponse;
 };
 
+type FetchCatalogOptions = {
+    force?: boolean;
+    signal?: AbortSignal;
+};
+
+function isFunctionEntry(value: unknown): value is FunctionEntry {
+    if (typeof value !== "object" || value === null) {
+        return false;
+    }
+
+    const candidate = value as Partial<FunctionEntry>;
+
+    return (
+        typeof candidate.id === "number" &&
+        typeof candidate.name === "string" &&
+        typeof candidate.description === "string" &&
+        Array.isArray(candidate.aliases) &&
+        candidate.aliases.every((alias) => typeof alias === "string") &&
+        typeof candidate.returnType === "string" &&
+        Array.isArray(candidate.arguments)
+    );
+}
+
+function isFunctionCatalogResponse(value: unknown): value is FunctionCatalogResponse {
+    if (typeof value !== "object" || value === null) {
+        return false;
+    }
+
+    const candidate = value as Partial<FunctionCatalogResponse>;
+
+    return (
+        Array.isArray(candidate.functions) &&
+        candidate.functions.every((entry) => isFunctionEntry(entry)) &&
+        typeof candidate.count === "number" &&
+        typeof candidate.generatedAt === "string"
+    );
+}
+
 function readCachedCatalog() {
     if (typeof window === "undefined") {
         return null;
     }
 
-    const cached = window.localStorage.getItem(CACHE_KEY);
-
-    if (!cached) {
-        return null;
-    }
-
     try {
+        const cached = window.localStorage.getItem(CACHE_KEY);
+
+        if (!cached) {
+            return null;
+        }
+
         const parsed = JSON.parse(cached) as CachedCatalog;
 
-        if (!parsed?.savedAt || !parsed?.data) {
+        if (!parsed?.savedAt || !isFunctionCatalogResponse(parsed?.data)) {
+            window.localStorage.removeItem(CACHE_KEY);
             return null;
         }
 
@@ -45,11 +84,23 @@ function writeCachedCatalog(data: FunctionCatalogResponse) {
         data,
     };
 
-    window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+    try {
+        window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+    } catch {
+        // Ignore storage quota / privacy mode failures.
+    }
 }
 
 function isCacheFresh(cached: CachedCatalog) {
     return Date.now() - cached.savedAt < CACHE_MAX_AGE_MS;
+}
+
+function toErrorMessage(error: unknown) {
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    return "Failed to load catalog";
 }
 
 export function useFunctionCatalog() {
@@ -58,14 +109,16 @@ export function useFunctionCatalog() {
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [cacheSavedAt, setCacheSavedAt] = useState<number | null>(null);
+    const [isUsingStaleData, setIsUsingStaleData] = useState(false);
 
-    const fetchCatalog = useCallback(async (force: boolean = false) => {
+    const fetchCatalog = useCallback(async ({ force = false, signal }: FetchCatalogOptions = {}) => {
         const cached = readCachedCatalog();
 
         if (!force && cached) {
             setData(cached.data);
             setCacheSavedAt(cached.savedAt);
             setIsLoading(false);
+            setIsUsingStaleData(!isCacheFresh(cached));
 
             if (isCacheFresh(cached)) {
                 return;
@@ -82,21 +135,34 @@ export function useFunctionCatalog() {
             const response = await fetch("/api/functions", {
                 method: "GET",
                 cache: "no-store",
+                signal,
             });
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch function catalog (${response.status})`);
             }
 
-            const payload = (await response.json()) as FunctionCatalogResponse;
+            const payload = (await response.json()) as unknown;
+
+            if (!isFunctionCatalogResponse(payload)) {
+                throw new Error("Invalid function catalog payload received from server");
+            }
 
             setData(payload);
             setError(null);
+            setIsUsingStaleData(false);
             writeCachedCatalog(payload);
             setCacheSavedAt(Date.now());
         } catch (fetchError) {
-            if (!cached) {
-                setError(fetchError instanceof Error ? fetchError.message : "Failed to load catalog");
+            if (signal?.aborted) {
+                return;
+            }
+
+            if (cached) {
+                setError(`Using cached data: ${toErrorMessage(fetchError)}`);
+                setIsUsingStaleData(true);
+            } else {
+                setError(toErrorMessage(fetchError));
             }
         } finally {
             setIsLoading(false);
@@ -105,7 +171,13 @@ export function useFunctionCatalog() {
     }, []);
 
     useEffect(() => {
-        void fetchCatalog();
+        const controller = new AbortController();
+
+        void fetchCatalog({ signal: controller.signal });
+
+        return () => {
+            controller.abort();
+        };
     }, [fetchCatalog]);
 
     return useMemo(
@@ -114,9 +186,10 @@ export function useFunctionCatalog() {
             error,
             isLoading,
             isRefreshing,
-            refresh: () => fetchCatalog(true),
+            isUsingStaleData,
+            refresh: async () => fetchCatalog({ force: true }),
             cacheSavedAt,
         }),
-        [cacheSavedAt, data, error, fetchCatalog, isLoading, isRefreshing],
+        [cacheSavedAt, data, error, fetchCatalog, isLoading, isRefreshing, isUsingStaleData],
     );
 }

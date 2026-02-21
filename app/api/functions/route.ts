@@ -2,8 +2,13 @@ import prisma from "@/lib/prisma";
 import { FunctionCatalogResponse } from "@/lib/types";
 import { NextResponse } from "next/server";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+function normalizeAliases(aliases: string[]) {
+    return Array.from(new Set(aliases.map((alias) => alias.trim()).filter((alias) => alias.length > 0)));
+}
 
 export async function GET() {
     try {
@@ -21,7 +26,7 @@ export async function GET() {
                 id: fn.id,
                 name: fn.name,
                 description: fn.description,
-                aliases: fn.aliases,
+                aliases: normalizeAliases(fn.aliases),
                 returnType: fn.returntype,
                 arguments: fn.arguments.map((arg) => ({
                     id: arg.id,
@@ -44,6 +49,12 @@ export async function GET() {
     } catch (error) {
         console.error("Failed to load function catalog", error);
 
-        return NextResponse.json({ error: "Failed to load function catalog" }, { status: 500 });
+        return NextResponse.json(
+            {
+                error: "Failed to load function catalog",
+                generatedAt: new Date().toISOString(),
+            },
+            { status: 500 },
+        );
     }
 }

@@ -8,53 +8,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+    DEFAULT_SEARCH_SCOPE,
+    SEARCH_SCOPE_OPTIONS,
+    SearchScope,
+    matchesQuery,
+    normalizeQueryTokens,
+} from "@/lib/search";
 import { FunctionArgument, FunctionEntry } from "@/lib/types";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
-import { ListRestart, RefreshCcw, Search } from "lucide-react";
+import { AlertTriangle, ListRestart, RefreshCcw, Search, X } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
-
-type SearchScope = {
-    functionNames: boolean;
-    functionDescriptions: boolean;
-    functionReturnTypes: boolean;
-    argumentNames: boolean;
-    argumentDescriptions: boolean;
-};
-
-const DEFAULT_SEARCH_SCOPE: SearchScope = {
-    functionNames: true,
-    functionDescriptions: true,
-    functionReturnTypes: false,
-    argumentNames: false,
-    argumentDescriptions: false,
-};
-
-function createSearchBlob(entry: FunctionEntry, scope: SearchScope) {
-    const parts: string[] = [];
-
-    if (scope.functionNames) {
-        parts.push(entry.name, ...entry.aliases);
-    }
-
-    if (scope.functionDescriptions) {
-        parts.push(entry.description);
-    }
-
-    if (scope.functionReturnTypes) {
-        parts.push(entry.returnType);
-    }
-
-    if (scope.argumentNames) {
-        parts.push(...entry.arguments.map((argument) => argument.name));
-    }
-
-    if (scope.argumentDescriptions) {
-        parts.push(...entry.arguments.map((argument) => argument.description ?? ""));
-    }
-
-    return parts.join(" ").toLowerCase();
-}
+import { useEffect, useMemo, useRef, useState } from "react";
 
 function FunctionArgumentCard({ argument }: { argument: FunctionArgument }) {
     return (
@@ -84,7 +49,10 @@ function FunctionCard({ entry }: { entry: FunctionEntry }) {
             <CardHeader className="gap-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <CardTitle className="font-mono text-xl">{entry.name}</CardTitle>
-                    <Badge>{entry.returnType}</Badge>
+                    <div className="flex gap-2">
+                        <Badge variant="secondary">{entry.arguments.length} args</Badge>
+                        <Badge>{entry.returnType}</Badge>
+                    </div>
                 </div>
                 <CardDescription className="text-sm leading-relaxed">{entry.description}</CardDescription>
             </CardHeader>
@@ -143,26 +111,52 @@ function LoadingState() {
 }
 
 export default function FunctionCatalog() {
-    const { data, error, isLoading, isRefreshing, refresh, cacheSavedAt } = useFunctionCatalog();
+    const { data, error, isLoading, isRefreshing, isUsingStaleData, refresh, cacheSavedAt } = useFunctionCatalog();
 
     const [query, setQuery] = useState("");
     const [searchScope, setSearchScope] = useState<SearchScope>(DEFAULT_SEARCH_SCOPE);
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
-    const normalizedQuery = query.trim().toLowerCase();
+    const queryTokens = useMemo(() => normalizeQueryTokens(query), [query]);
 
     const sortedFunctions = useMemo(() => {
         return [...(data?.functions ?? [])].sort((first, second) => first.name.localeCompare(second.name));
     }, [data]);
 
     const filteredFunctions = useMemo(() => {
-        if (!normalizedQuery) {
-            return sortedFunctions;
-        }
+        return sortedFunctions.filter((entry) => matchesQuery(entry, searchScope, queryTokens));
+    }, [queryTokens, searchScope, sortedFunctions]);
 
-        return sortedFunctions.filter((entry) => createSearchBlob(entry, searchScope).includes(normalizedQuery));
-    }, [normalizedQuery, searchScope, sortedFunctions]);
+    const activeFilterCount = useMemo(() => {
+        return Object.values(searchScope).filter(Boolean).length;
+    }, [searchScope]);
 
     const hasLoadedData = Boolean(data);
+
+    useEffect(() => {
+        function onWindowKeyDown(event: KeyboardEvent) {
+            if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) {
+                return;
+            }
+
+            const target = event.target as HTMLElement | null;
+            const tagName = target?.tagName.toLowerCase();
+            const isTypingTarget = target?.isContentEditable || tagName === "input" || tagName === "textarea";
+
+            if (isTypingTarget) {
+                return;
+            }
+
+            event.preventDefault();
+            searchInputRef.current?.focus();
+        }
+
+        window.addEventListener("keydown", onWindowKeyDown);
+
+        return () => {
+            window.removeEventListener("keydown", onWindowKeyDown);
+        };
+    }, []);
 
     return (
         <div className="min-h-screen bg-background text-foreground">
@@ -193,62 +187,105 @@ export default function FunctionCatalog() {
                 <Card className="h-fit lg:sticky lg:top-4">
                     <CardHeader>
                         <CardTitle>Search</CardTitle>
-                        <CardDescription>Choose which fields to search, then type to filter functions.</CardDescription>
+                        <CardDescription>
+                            Use multiple words to narrow results. Press / to focus search.
+                        </CardDescription>
                     </CardHeader>
 
                     <CardContent className="space-y-4">
                         <div className="relative">
                             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
+                                ref={searchInputRef}
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
                                 placeholder="Find function, alias, type..."
-                                className="pl-9"
+                                className="pl-9 pr-9"
                             />
+
+                            {query.length > 0 ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setQuery("")}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                                    aria-label="Clear search query"
+                                >
+                                    <X className="size-4" />
+                                </button>
+                            ) : null}
                         </div>
 
                         <Separator />
 
                         <div className="space-y-3">
-                            {(
-                                [
-                                    ["functionNames", "Function names & aliases"],
-                                    ["functionDescriptions", "Function descriptions"],
-                                    ["functionReturnTypes", "Return types"],
-                                    ["argumentNames", "Argument names"],
-                                    ["argumentDescriptions", "Argument descriptions"],
-                                ] as const
-                            ).map(([key, label]) => (
-                                <div key={key} className="flex items-center gap-2">
-                                    <Checkbox
-                                        id={key}
-                                        checked={searchScope[key]}
-                                        onCheckedChange={(checked) =>
-                                            setSearchScope((previous) => ({
-                                                ...previous,
-                                                [key]: checked === true,
-                                            }))
-                                        }
-                                    />
-                                    <Label htmlFor={key}>{label}</Label>
-                                </div>
-                            ))}
+                            {SEARCH_SCOPE_OPTIONS.map(({ key, label }) => {
+                                const isLastActiveFilter = activeFilterCount === 1 && searchScope[key];
+
+                                return (
+                                    <div key={key} className="flex items-center gap-2">
+                                        <Checkbox
+                                            id={key}
+                                            checked={searchScope[key]}
+                                            disabled={isLastActiveFilter}
+                                            onCheckedChange={(checked) =>
+                                                setSearchScope((previous) => ({
+                                                    ...previous,
+                                                    [key]: checked === true,
+                                                }))
+                                            }
+                                        />
+                                        <Label htmlFor={key}>{label}</Label>
+                                    </div>
+                                );
+                            })}
                         </div>
 
                         <Separator />
 
                         <div className="space-y-1 text-xs text-muted-foreground">
                             <p>
-                                Showing <span className="font-semibold text-foreground">{filteredFunctions.length}</span> of{" "}
+                                Showing{" "}
+                                <span className="font-semibold text-foreground">{filteredFunctions.length}</span> of{" "}
                                 <span className="font-semibold text-foreground">{data?.count ?? 0}</span> functions.
                             </p>
+                            <p>
+                                Active search fields:{" "}
+                                <span className="font-semibold text-foreground">{activeFilterCount}</span>
+                            </p>
                             {cacheSavedAt ? <p>Cached locally: {new Date(cacheSavedAt).toLocaleString()}</p> : null}
-                            {data?.generatedAt ? <p>Server payload: {new Date(data.generatedAt).toLocaleString()}</p> : null}
+                            {data?.generatedAt ? (
+                                <p>Server payload: {new Date(data.generatedAt).toLocaleString()}</p>
+                            ) : null}
                         </div>
                     </CardContent>
                 </Card>
 
                 <section className="space-y-4">
+                    {hasLoadedData && error ? (
+                        <Card className="border-amber-500/60 bg-amber-500/10">
+                            <CardHeader>
+                                <div className="flex items-start gap-2">
+                                    <AlertTriangle className="mt-0.5 size-4 text-amber-300" />
+                                    <div>
+                                        <CardTitle className="text-base">Catalog warning</CardTitle>
+                                        <CardDescription className="text-amber-100/90">{error}</CardDescription>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                        </Card>
+                    ) : null}
+
+                    {hasLoadedData && isUsingStaleData ? (
+                        <Card className="border-amber-500/60 bg-amber-500/10">
+                            <CardHeader>
+                                <CardTitle className="text-base">Using stale cached data</CardTitle>
+                                <CardDescription className="text-amber-100/90">
+                                    Refresh again after connectivity/database issues are resolved.
+                                </CardDescription>
+                            </CardHeader>
+                        </Card>
+                    ) : null}
+
                     {!hasLoadedData && isLoading ? <LoadingState /> : null}
 
                     {!hasLoadedData && !isLoading && error ? (
@@ -268,7 +305,9 @@ export default function FunctionCatalog() {
                             <Card>
                                 <CardHeader>
                                     <CardTitle>No matches found</CardTitle>
-                                    <CardDescription>Try broadening your search filters or clearing the query.</CardDescription>
+                                    <CardDescription>
+                                        Try broadening your search filters or clearing the query.
+                                    </CardDescription>
                                 </CardHeader>
                             </Card>
                         ) : (
