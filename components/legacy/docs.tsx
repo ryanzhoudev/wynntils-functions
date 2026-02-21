@@ -36,9 +36,14 @@ export default function LegacyDocs() {
                 <div className="mb-4">
                     <h1 className="text-xl font-bold">Classic Wynntils Docs</h1>
                     <p className="text-sm text-zinc-400">Preserved old-style experience.</p>
-                    <Link href="/" className="mt-2 inline-block text-sm text-sky-300 underline underline-offset-4">
-                        Back to redesigned UI
-                    </Link>
+                    <div className="mt-2 flex flex-col gap-1">
+                        <Link href="/" className="inline-block text-sm text-sky-300 underline underline-offset-4">
+                            Back to redesigned UI
+                        </Link>
+                        <Link href="/ide" className="inline-block text-sm text-sky-300 underline underline-offset-4">
+                            Open IDE
+                        </Link>
+                    </div>
                 </div>
 
                 <div className="mb-4">

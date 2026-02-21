@@ -178,6 +178,9 @@ export default function FunctionCatalog() {
                     <Button variant="outline" asChild>
                         <Link href="/old">Open classic UI</Link>
                     </Button>
+                    <Button variant="outline" asChild>
+                        <Link href="/ide">Open IDE</Link>
+                    </Button>
                     <Button variant="secondary" onClick={() => setSearchScope(DEFAULT_SEARCH_SCOPE)}>
                         <ListRestart className="size-4" />
                         Reset filters
