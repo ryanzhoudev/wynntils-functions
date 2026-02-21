@@ -35,7 +35,6 @@ export default function LegacyDocs() {
             <aside className="fixed inset-y-0 left-0 w-96 overflow-y-auto border-r border-zinc-700 bg-zinc-950 p-4">
                 <div className="mb-4">
                     <h1 className="text-xl font-bold">Classic Wynntils Docs</h1>
-                    <p className="text-sm text-zinc-400">Preserved old-style experience.</p>
                     <div className="mt-2 flex flex-col gap-1">
                         <Link href="/" className="inline-block text-sm text-sky-300 underline underline-offset-4">
                             Back to redesigned UI
@@ -91,7 +90,7 @@ export default function LegacyDocs() {
                 {isLoading ? <p>Loading...</p> : null}
                 {error ? <p className="text-red-300">Failed to load: {error}</p> : null}
 
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1">
                     {functions.map((func) => {
                         const argumentSuffix =
                             func.arguments.length === 0
