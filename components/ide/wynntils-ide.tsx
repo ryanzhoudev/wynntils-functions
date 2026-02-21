@@ -4,17 +4,16 @@ import Editor, { type Monaco as MonacoApi, OnMount } from "@monaco-editor/react"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { toFunctionMetadata } from "@/lib/ide/metadata";
 import { WYNNTILS_LANGUAGE, ensureWynntilsLanguage, registerWynntilsProviders } from "@/lib/ide/monaco";
 import { WynntilsLspClient } from "@/lib/ide/lsp-client";
 import { createDefaultWorkspace, loadWorkspaceFromStorage, saveWorkspaceToStorage } from "@/lib/ide/storage";
 import { CompileResult, IdeFile, IdeWorkspace, LspDiagnostic } from "@/lib/ide/types";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
-import { Braces, FilePlus2, FilePenLine, FileUp, FolderOpenDot, Hammer, LoaderCircle, Save, Trash2 } from "lucide-react";
+import { AlertTriangle, Braces, FilePlus2, FilePenLine, FileUp, FolderOpenDot, Hammer, LoaderCircle, Save, Trash2 } from "lucide-react";
 import type { IDisposable, editor as MonacoEditor } from "monaco-editor";
 import Link from "next/link";
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const MARKER_OWNER = "wynntils-lsp";
 const WORKSPACE_SAVE_DEBOUNCE_MS = 250;
@@ -57,6 +56,34 @@ function mapDiagnosticSeverity(monaco: MonacoApi, severity: LspDiagnostic["sever
     }
 }
 
+function markerSeverityLabel(severity: number) {
+    switch (severity) {
+        case 8:
+            return "Error";
+        case 4:
+            return "Warning";
+        case 2:
+            return "Info";
+        case 1:
+            return "Hint";
+        default:
+            return "Info";
+    }
+}
+
+function markerSeverityVariant(severity: number) {
+    switch (severity) {
+        case 8:
+            return "default" as const;
+        case 4:
+            return "secondary" as const;
+        case 2:
+        case 1:
+        default:
+            return "outline" as const;
+    }
+}
+
 export default function WynntilsIde() {
     const { data, isLoading: isCatalogLoading, error: catalogError, refresh: refreshCatalog } = useFunctionCatalog();
 
@@ -64,7 +91,9 @@ export default function WynntilsIde() {
     const [isWorkspaceReady, setIsWorkspaceReady] = useState(false);
     const [compileResult, setCompileResult] = useState<CompileResult | null>(null);
     const [isCompiling, setIsCompiling] = useState(false);
+    const [isCopyingCompiledOutput, setIsCopyingCompiledOutput] = useState(false);
     const [diagnosticCount, setDiagnosticCount] = useState(0);
+    const [diagnosticMarkers, setDiagnosticMarkers] = useState<MonacoEditor.IMarkerData[]>([]);
     const [isCatalogAttached, setIsCatalogAttached] = useState(false);
 
     const fileImportRef = useRef<HTMLInputElement>(null);
@@ -153,7 +182,8 @@ export default function WynntilsIde() {
             .catch(() => setIsCatalogAttached(false));
     }, [data?.functions]);
 
-    const runDiagnostics = async () => {
+
+    const runDiagnostics = useCallback(async () => {
         const editor = editorRef.current;
         const monaco = monacoRef.current;
         const lspClient = lspClientRef.current;
@@ -191,9 +221,10 @@ export default function WynntilsIde() {
 
         monaco.editor.setModelMarkers(model, MARKER_OWNER, markers);
         setDiagnosticCount(markers.length);
-    };
+        setDiagnosticMarkers(markers);
+    }, []);
 
-    const scheduleDiagnostics = () => {
+    const scheduleDiagnostics = useCallback(() => {
         if (diagnosticsDebounceRef.current) {
             window.clearTimeout(diagnosticsDebounceRef.current);
         }
@@ -201,7 +232,15 @@ export default function WynntilsIde() {
         diagnosticsDebounceRef.current = window.setTimeout(() => {
             void runDiagnostics();
         }, 120);
-    };
+    }, [runDiagnostics]);
+
+    useEffect(() => {
+        if (!isCatalogAttached) {
+            return;
+        }
+
+        scheduleDiagnostics();
+    }, [isCatalogAttached, scheduleDiagnostics]);
 
     const onEditorMount: OnMount = (editor, monaco) => {
         editorRef.current = editor;
@@ -210,6 +249,23 @@ export default function WynntilsIde() {
         ensureWynntilsLanguage(monaco);
         scheduleDiagnostics();
     };
+
+    useEffect(() => {
+        return () => {
+            if (diagnosticsDebounceRef.current) {
+                window.clearTimeout(diagnosticsDebounceRef.current);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!workspace.activeFileId) {
+            return;
+        }
+
+        setCompileResult(null);
+        scheduleDiagnostics();
+    }, [workspace.activeFileId, scheduleDiagnostics]);
 
     const updateWorkspace = (updater: (previous: IdeWorkspace) => IdeWorkspace) => {
         setWorkspace((previous) => updater(previous));
@@ -348,7 +404,7 @@ export default function WynntilsIde() {
         event.target.value = "";
     };
 
-    const compileActiveFile = async () => {
+    const compileActiveFile = useCallback(async () => {
         if (!activeFile || !lspClientRef.current) {
             return;
         }
@@ -360,7 +416,7 @@ export default function WynntilsIde() {
         } finally {
             setIsCompiling(false);
         }
-    };
+    }, [activeFile]);
 
     const createFileFromCompiledOutput = () => {
         if (!compileResult || compileResult.code.length === 0) {
@@ -375,13 +431,53 @@ export default function WynntilsIde() {
         }));
     };
 
-    const copyCompiledOutput = async () => {
+    const copyCompiledOutput = useCallback(async () => {
         if (!compileResult || compileResult.code.length === 0) {
             return;
         }
 
-        await navigator.clipboard.writeText(compileResult.code);
+        setIsCopyingCompiledOutput(true);
+
+        try {
+            await navigator.clipboard.writeText(compileResult.code);
+        } finally {
+            window.setTimeout(() => {
+                setIsCopyingCompiledOutput(false);
+            }, 1200);
+        }
+    }, [compileResult]);
+
+    const jumpToDiagnostic = (marker: MonacoEditor.IMarkerData) => {
+        const editor = editorRef.current;
+
+        if (!editor) {
+            return;
+        }
+
+        const position = {
+            lineNumber: marker.startLineNumber,
+            column: marker.startColumn,
+        };
+
+        editor.focus();
+        editor.setPosition(position);
+        editor.revealPositionInCenter(position);
     };
+
+    useEffect(() => {
+        const onWindowKeyDown = (event: KeyboardEvent) => {
+            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                event.preventDefault();
+                void compileActiveFile();
+            }
+        };
+
+        window.addEventListener("keydown", onWindowKeyDown);
+
+        return () => {
+            window.removeEventListener("keydown", onWindowKeyDown);
+        };
+    }, [compileActiveFile]);
 
     return (
         <div className="min-h-screen bg-background text-foreground">
@@ -393,6 +489,18 @@ export default function WynntilsIde() {
                             Wynntils IDE
                         </h1>
                         <p className="text-xs text-muted-foreground">Monaco + browser LSP worker + local file workspace</p>
+                        <p className="text-xs text-muted-foreground">
+                            Language tooling adapted from{" "}
+                            <a
+                                href="https://github.com/DevChromium/wynntils-functions-tools"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline underline-offset-4"
+                            >
+                                DevChromium/wynntils-functions-tools
+                            </a>
+                            .
+                        </p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
@@ -457,7 +565,7 @@ export default function WynntilsIde() {
                                 <Trash2 className="size-4" />
                                 Delete
                             </Button>
-                            <Button onClick={() => compileActiveFile()} disabled={isCompiling}>
+                            <Button onClick={() => void compileActiveFile()} disabled={isCompiling || !activeFile}>
                                 {isCompiling ? <LoaderCircle className="size-4 animate-spin" /> : <Hammer className="size-4" />}
                                 Compile
                             </Button>
@@ -479,6 +587,7 @@ export default function WynntilsIde() {
                             </Badge>
                             <Badge variant="secondary">{workspace.files.length} files</Badge>
                             <Badge variant="secondary">{diagnosticCount} diagnostics</Badge>
+                            <span>Shortcut: Ctrl/⌘ + Enter to compile</span>
                             {catalogError ? <span className="text-red-300">{catalogError}</span> : null}
                         </CardDescription>
                     </CardHeader>
@@ -511,6 +620,41 @@ export default function WynntilsIde() {
                     </CardContent>
                 </Card>
 
+                {diagnosticMarkers.length > 0 ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <AlertTriangle className="size-4" />
+                                Diagnostics
+                            </CardTitle>
+                            <CardDescription>
+                                Showing {Math.min(diagnosticMarkers.length, 12)} of {diagnosticMarkers.length} diagnostics.
+                            </CardDescription>
+                        </CardHeader>
+
+                        <CardContent className="space-y-2">
+                            {diagnosticMarkers.slice(0, 12).map((marker, index) => (
+                                <button
+                                    key={`${marker.startLineNumber}-${marker.startColumn}-${index}`}
+                                    type="button"
+                                    onClick={() => jumpToDiagnostic(marker)}
+                                    className="flex w-full items-start gap-3 rounded-md border border-border bg-card p-2 text-left hover:bg-accent"
+                                >
+                                    <Badge variant={markerSeverityVariant(marker.severity)}>
+                                        {markerSeverityLabel(marker.severity)}
+                                    </Badge>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-xs text-muted-foreground">
+                                            Line {marker.startLineNumber}, Col {marker.startColumn}
+                                        </p>
+                                        <p className="line-clamp-2 text-sm">{marker.message}</p>
+                                    </div>
+                                </button>
+                            ))}
+                        </CardContent>
+                    </Card>
+                ) : null}
+
                 {compileResult ? (
                     <Card>
                         <CardHeader>
@@ -533,11 +677,16 @@ export default function WynntilsIde() {
                                 </div>
                             ) : null}
 
-                            <Input value={compileResult.code} readOnly />
+                            <textarea
+                                value={compileResult.code}
+                                readOnly
+                                spellCheck={false}
+                                className="h-40 w-full resize-y rounded-md border border-input bg-background p-3 font-mono text-xs"
+                            />
 
                             <div className="flex flex-wrap gap-2">
-                                <Button variant="outline" onClick={() => void copyCompiledOutput()}>
-                                    Copy output
+                                <Button variant="outline" onClick={() => void copyCompiledOutput()} disabled={isCopyingCompiledOutput}>
+                                    {isCopyingCompiledOutput ? "Copied" : "Copy output"}
                                 </Button>
                                 <Button variant="secondary" onClick={createFileFromCompiledOutput}>
                                     Create file from output

@@ -2,16 +2,31 @@
 
 Live site: <https://wynntils-functions.ryanzhou.dev/>
 
-Documentation site for Wynntils/Artemis info-box functions.
+Documentation + IDE for Wynntils/Artemis info-box functions.
 
-## What changed
+## App overview
 
 This project now runs as a **full-stack Next.js app** (App Router):
 
-- `GET /api/functions` serves the function catalog from Postgres via Prisma.
-- Frontend fetches that JSON and caches it locally (`localStorage`) for fast repeat loads.
-- New redesigned UI uses shadcn-style components.
-- Legacy UI is preserved at `/old`.
+- `GET /api/functions` serves function metadata from Postgres via Prisma.
+- Frontend fetches JSON and caches it in localStorage for fast repeat loads.
+- Redesigned docs UI lives at `/`.
+- Classic UI is preserved at `/old`.
+- New Monaco-based IDE lives at `/ide`.
+
+## IDE (route: `/ide`)
+
+Current IDE features:
+
+- Monaco editor with Wynntils language tokenization
+- Browser-side LSP worker for completions, hover, and diagnostics
+- Superset compile action (`let` + `@{var}` support)
+- Local file workspace in localStorage:
+    - create, rename, duplicate, delete
+    - import/export individual files
+
+Language tooling in `lib/ide/lsp-core/*` is adapted from:
+<https://github.com/DevChromium/wynntils-functions-tools> (MIT).
 
 ## Tech stack
 
@@ -19,6 +34,7 @@ This project now runs as a **full-stack Next.js app** (App Router):
 - React 19
 - Prisma 7 + PostgreSQL
 - Tailwind 4
+- Monaco Editor
 - shadcn-style UI component setup (`components/ui/*`)
 
 ## Development
@@ -39,7 +55,7 @@ pnpm dev
 
 ```bash
 pnpm lint
-pnpm exec tsc --noEmit
+pnpm typecheck
 ```
 
 ### Production build
@@ -60,7 +76,8 @@ DIRECT_URL=postgres://...
 Notes:
 
 - Prisma CLI uses `DATABASE_URL` via `prisma.config.ts`.
-- Runtime Prisma client prefers `DIRECT_URL`, then falls back to `DATABASE_URL`.
+- Runtime Prisma client prefers `DATABASE_URL`, then falls back to `DIRECT_URL`.
+- Runtime Prisma client auto-adds `sslmode=require` if missing.
 
 ## Data update flow (from Artemis)
 
@@ -76,7 +93,10 @@ Reference feature in Artemis: <https://github.com/Wynntils/Artemis/pull/1887>
 ## Project structure
 
 - `app/api/functions/route.ts` – API endpoint for catalog JSON
-- `components/function-catalog.tsx` – redesigned main UI (`/`)
-- `components/legacy/docs.tsx` – preserved classic UI (`/old`)
+- `app/ide/page.tsx` – IDE page
+- `components/function-catalog.tsx` – redesigned docs UI (`/`)
+- `components/legacy/docs.tsx` – classic UI (`/old`)
+- `components/ide/wynntils-ide.tsx` – IDE UI shell
 - `lib/use-function-catalog.ts` – frontend fetch + cache logic
 - `lib/prisma.ts` – Prisma client setup (Prisma 7 adapter)
+- `lib/ide/*` – IDE workspace, Monaco wiring, and browser LSP worker
