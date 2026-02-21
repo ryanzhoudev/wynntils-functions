@@ -6,9 +6,19 @@ import { FunctionCatalogResponse, FunctionEntry } from "@/lib/types";
 const CACHE_KEY = "wynntils-function-catalog:v1";
 const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 12;
 
+const REFRESH_RATE_LIMIT_KEY = "wynntils-function-catalog:refresh-attempts:v1";
+const REFRESH_RATE_LIMIT_MAX_ATTEMPTS = 5;
+const REFRESH_RATE_LIMIT_WINDOW_MS = 1000 * 60 * 15;
+
 type CachedCatalog = {
     savedAt: number;
     data: FunctionCatalogResponse;
+};
+
+type RefreshRateLimitStatus = {
+    isLimited: boolean;
+    remaining: number;
+    nextAllowedAt: number | null;
 };
 
 type FetchCatalogOptions = {
@@ -91,6 +101,89 @@ function writeCachedCatalog(data: FunctionCatalogResponse) {
     }
 }
 
+function readRefreshAttempts() {
+    if (typeof window === "undefined") {
+        return [] as number[];
+    }
+
+    try {
+        const raw = window.localStorage.getItem(REFRESH_RATE_LIMIT_KEY);
+
+        if (!raw) {
+            return [];
+        }
+
+        const parsed = JSON.parse(raw) as unknown;
+
+        if (!Array.isArray(parsed)) {
+            window.localStorage.removeItem(REFRESH_RATE_LIMIT_KEY);
+            return [];
+        }
+
+        return parsed.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+    } catch {
+        return [];
+    }
+}
+
+function writeRefreshAttempts(attempts: number[]) {
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    try {
+        window.localStorage.setItem(REFRESH_RATE_LIMIT_KEY, JSON.stringify(attempts));
+    } catch {
+        // Ignore localStorage failures.
+    }
+}
+
+function pruneRefreshAttempts(attempts: number[], now = Date.now()) {
+    return attempts.filter((timestamp) => now - timestamp < REFRESH_RATE_LIMIT_WINDOW_MS);
+}
+
+function getRefreshRateLimitStatus(now = Date.now()): RefreshRateLimitStatus {
+    const attempts = pruneRefreshAttempts(readRefreshAttempts(), now);
+    writeRefreshAttempts(attempts);
+
+    if (attempts.length < REFRESH_RATE_LIMIT_MAX_ATTEMPTS) {
+        return {
+            isLimited: false,
+            remaining: REFRESH_RATE_LIMIT_MAX_ATTEMPTS - attempts.length,
+            nextAllowedAt: null,
+        };
+    }
+
+    const oldestAttempt = attempts[0];
+
+    return {
+        isLimited: true,
+        remaining: 0,
+        nextAllowedAt: oldestAttempt + REFRESH_RATE_LIMIT_WINDOW_MS,
+    };
+}
+
+function reserveRefreshAttempt(now = Date.now()): RefreshRateLimitStatus {
+    const attempts = pruneRefreshAttempts(readRefreshAttempts(), now);
+
+    if (attempts.length >= REFRESH_RATE_LIMIT_MAX_ATTEMPTS) {
+        return {
+            isLimited: true,
+            remaining: 0,
+            nextAllowedAt: attempts[0] + REFRESH_RATE_LIMIT_WINDOW_MS,
+        };
+    }
+
+    attempts.push(now);
+    writeRefreshAttempts(attempts);
+
+    return {
+        isLimited: false,
+        remaining: REFRESH_RATE_LIMIT_MAX_ATTEMPTS - attempts.length,
+        nextAllowedAt: null,
+    };
+}
+
 function isCacheFresh(cached: CachedCatalog) {
     return Date.now() - cached.savedAt < CACHE_MAX_AGE_MS;
 }
@@ -110,9 +203,23 @@ export function useFunctionCatalog() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [cacheSavedAt, setCacheSavedAt] = useState<number | null>(null);
     const [isUsingStaleData, setIsUsingStaleData] = useState(false);
+    const [refreshRateLimit, setRefreshRateLimit] = useState<RefreshRateLimitStatus>(() =>
+        getRefreshRateLimitStatus(),
+    );
 
     const fetchCatalog = useCallback(async ({ force = false, signal }: FetchCatalogOptions = {}) => {
         let didSucceed = false;
+
+        if (force) {
+            const rateLimitStatus = reserveRefreshAttempt();
+            setRefreshRateLimit(rateLimitStatus);
+
+            if (rateLimitStatus.isLimited) {
+                setError("Refresh rate limit reached (5 refreshes per 15 minutes).");
+                return false;
+            }
+        }
+
         const cached = readCachedCatalog();
 
         if (!force && cached) {
@@ -169,6 +276,7 @@ export function useFunctionCatalog() {
         } finally {
             setIsLoading(false);
             setIsRefreshing(false);
+            setRefreshRateLimit(getRefreshRateLimitStatus());
         }
 
         return didSucceed;
@@ -184,6 +292,29 @@ export function useFunctionCatalog() {
         };
     }, [fetchCatalog]);
 
+    useEffect(() => {
+        const syncRateLimitStatus = () => {
+            setRefreshRateLimit(getRefreshRateLimitStatus());
+        };
+
+        syncRateLimitStatus();
+
+        const intervalId = window.setInterval(syncRateLimitStatus, 10_000);
+
+        const onStorage = (event: StorageEvent) => {
+            if (event.key === REFRESH_RATE_LIMIT_KEY) {
+                syncRateLimitStatus();
+            }
+        };
+
+        window.addEventListener("storage", onStorage);
+
+        return () => {
+            window.clearInterval(intervalId);
+            window.removeEventListener("storage", onStorage);
+        };
+    }, []);
+
     return useMemo(
         () => ({
             data,
@@ -191,9 +322,10 @@ export function useFunctionCatalog() {
             isLoading,
             isRefreshing,
             isUsingStaleData,
+            refreshRateLimit,
             refresh: async () => fetchCatalog({ force: true }),
             cacheSavedAt,
         }),
-        [cacheSavedAt, data, error, fetchCatalog, isLoading, isRefreshing, isUsingStaleData],
+        [cacheSavedAt, data, error, fetchCatalog, isLoading, isRefreshing, isUsingStaleData, refreshRateLimit],
     );
 }

@@ -25,12 +25,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 function FunctionArgumentCard({ argument }: { argument: FunctionArgument }) {
     return (
         <div className="rounded-md border border-border bg-background p-3">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-start gap-2">
                 <code className="rounded bg-muted px-1.5 py-0.5 text-sm">{argument.name}</code>
-                <Badge variant="secondary">{argument.type}</Badge>
-                <Badge variant={argument.required ? "default" : "outline"}>
-                    {argument.required ? "required" : "optional"}
-                </Badge>
+                <div className="ml-auto flex items-center gap-2">
+                    <Badge variant="secondary">{argument.type}</Badge>
+                    <Badge variant={argument.required ? "default" : "outline"}>
+                        {argument.required ? "required" : "optional"}
+                    </Badge>
+                </div>
             </div>
 
             {argument.defaultValue ? (
@@ -58,7 +60,7 @@ function FunctionCard({ entry }: { entry: FunctionEntry }) {
                     </CardTitle>
                     <div className="flex gap-2">
                         <Badge variant="secondary">{entry.arguments.length} args</Badge>
-                        <Badge>{entry.returnType}</Badge>
+                        <Badge variant="secondary">{entry.returnType}</Badge>
                     </div>
                 </div>
                 <CardDescription className="text-sm leading-relaxed">{entry.description}</CardDescription>
@@ -118,7 +120,8 @@ function LoadingState() {
 }
 
 export default function FunctionCatalog() {
-    const { data, error, isLoading, isRefreshing, isUsingStaleData, refresh, cacheSavedAt } = useFunctionCatalog();
+    const { data, error, isLoading, isRefreshing, isUsingStaleData, refreshRateLimit, refresh, cacheSavedAt } =
+        useFunctionCatalog();
 
     const [query, setQuery] = useState("");
     const [searchScope, setSearchScope] = useState<SearchScope>(DEFAULT_SEARCH_SCOPE);
@@ -145,6 +148,8 @@ export default function FunctionCatalog() {
     }, [searchScope]);
 
     const hasLoadedData = Boolean(data);
+    const isRefreshRateLimited = refreshRateLimit.isLimited;
+    const isRefreshDisabled = isRefreshing || isRefreshRateLimited;
 
     async function handleRefresh() {
         setRefreshIndicator("idle");
@@ -215,15 +220,23 @@ export default function FunctionCatalog() {
                     <Button variant="outline" asChild>
                         <Link href="/ide">Open IDE</Link>
                     </Button>
-                    <Button onClick={() => void handleRefresh()} disabled={isRefreshing}>
+                    <Button onClick={() => void handleRefresh()} disabled={isRefreshDisabled}>
                         {isRefreshing ? (
                             <RefreshCcw className="size-4 animate-spin" />
+                        ) : isRefreshRateLimited ? (
+                            <AlertTriangle className="size-4" />
                         ) : refreshIndicator === "success" ? (
                             <CheckCircle2 className="size-4" />
                         ) : (
                             <RefreshCcw className="size-4" />
                         )}
-                        {isRefreshing ? "Refreshing..." : refreshIndicator === "success" ? "Refreshed" : "Refresh data"}
+                        {isRefreshing
+                            ? "Refreshing..."
+                            : isRefreshRateLimited
+                              ? "Rate limited"
+                              : refreshIndicator === "success"
+                                ? "Refreshed"
+                                : "Refresh data"}
                     </Button>
                 </div>
             </header>
@@ -312,6 +325,12 @@ export default function FunctionCatalog() {
                             {lastRefreshSucceededAt ? (
                                 <p>Last refresh: {formatDateTime(lastRefreshSucceededAt)}</p>
                             ) : null}
+                            <p>
+                                Refresh budget: <span className="font-semibold text-foreground">{refreshRateLimit.remaining}</span>/5 in 15m
+                            </p>
+                            {refreshRateLimit.nextAllowedAt ? (
+                                <p>Next refresh allowed: {formatDateTime(refreshRateLimit.nextAllowedAt)}</p>
+                            ) : null}
                         </div>
                     </CardContent>
                 </Card>
@@ -342,6 +361,21 @@ export default function FunctionCatalog() {
                         </Card>
                     ) : null}
 
+                    {refreshRateLimit.isLimited ? (
+                        <Card className="border-amber-500/60 bg-amber-500/10">
+                            <CardHeader>
+                                <CardTitle className="text-base">Refresh rate limit reached</CardTitle>
+                                <CardDescription className="text-amber-100/90">
+                                    You can refresh up to 5 times every 15 minutes. Next refresh window starts at{" "}
+                                    {refreshRateLimit.nextAllowedAt
+                                        ? formatDateTime(refreshRateLimit.nextAllowedAt)
+                                        : "a later time"}
+                                    .
+                                </CardDescription>
+                            </CardHeader>
+                        </Card>
+                    ) : null}
+
                     {!hasLoadedData && isLoading ? <LoadingState /> : null}
 
                     {!hasLoadedData && !isLoading && error ? (
@@ -351,15 +385,17 @@ export default function FunctionCatalog() {
                                 <CardDescription>{error}</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <Button onClick={() => void handleRefresh()} disabled={isRefreshing}>
+                                <Button onClick={() => void handleRefresh()} disabled={isRefreshDisabled}>
                                     {isRefreshing ? (
                                         <RefreshCcw className="size-4 animate-spin" />
+                                    ) : isRefreshRateLimited ? (
+                                        <AlertTriangle className="size-4" />
                                     ) : refreshIndicator === "success" ? (
                                         <CheckCircle2 className="size-4" />
                                     ) : (
                                         <RefreshCcw className="size-4" />
                                     )}
-                                    {isRefreshing ? "Retrying..." : "Retry"}
+                                    {isRefreshing ? "Retrying..." : isRefreshRateLimited ? "Rate limited" : "Retry"}
                                 </Button>
                             </CardContent>
                         </Card>
