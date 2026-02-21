@@ -16,6 +16,7 @@ import Link from "next/link";
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const MARKER_OWNER = "wynntils-lsp";
+const MONACO_ERROR_SEVERITY = 8;
 const WORKSPACE_SAVE_DEBOUNCE_MS = 250;
 
 function createFile(name: string, content: string): IdeFile {
@@ -92,6 +93,7 @@ export default function WynntilsIde() {
     const [compileResult, setCompileResult] = useState<CompileResult | null>(null);
     const [isCompiling, setIsCompiling] = useState(false);
     const [isCopyingCompiledOutput, setIsCopyingCompiledOutput] = useState(false);
+    const [compileStatus, setCompileStatus] = useState<{ tone: "success" | "error"; message: string } | null>(null);
     const [diagnosticCount, setDiagnosticCount] = useState(0);
     const [diagnosticMarkers, setDiagnosticMarkers] = useState<MonacoEditor.IMarkerData[]>([]);
     const [isCatalogAttached, setIsCatalogAttached] = useState(false);
@@ -189,20 +191,20 @@ export default function WynntilsIde() {
         const lspClient = lspClientRef.current;
 
         if (!editor || !monaco || !lspClient) {
-            return;
+            return [] as MonacoEditor.IMarkerData[];
         }
 
         const model = editor.getModel();
 
         if (!model) {
-            return;
+            return [] as MonacoEditor.IMarkerData[];
         }
 
         const version = model.getVersionId();
         const diagnostics = await lspClient.getDiagnostics(model.getValue());
 
         if (model.isDisposed() || model.getVersionId() !== version) {
-            return;
+            return [] as MonacoEditor.IMarkerData[];
         }
 
         const markers: MonacoEditor.IMarkerData[] = diagnostics.map((diagnostic) => {
@@ -212,6 +214,7 @@ export default function WynntilsIde() {
             return {
                 severity: mapDiagnosticSeverity(monaco, diagnostic.severity),
                 message: diagnostic.message,
+                source: "wynntils",
                 startLineNumber: start.lineNumber,
                 startColumn: start.column,
                 endLineNumber: end.lineNumber,
@@ -222,6 +225,8 @@ export default function WynntilsIde() {
         monaco.editor.setModelMarkers(model, MARKER_OWNER, markers);
         setDiagnosticCount(markers.length);
         setDiagnosticMarkers(markers);
+
+        return markers;
     }, []);
 
     const scheduleDiagnostics = useCallback(() => {
@@ -264,6 +269,7 @@ export default function WynntilsIde() {
         }
 
         setCompileResult(null);
+        setCompileStatus(null);
         scheduleDiagnostics();
     }, [workspace.activeFileId, scheduleDiagnostics]);
 
@@ -410,13 +416,64 @@ export default function WynntilsIde() {
         }
 
         setIsCompiling(true);
+        setCompileStatus(null);
+
         try {
+            const baseMarkers = await runDiagnostics();
+            const errorCount = baseMarkers.filter((marker) => marker.severity === MONACO_ERROR_SEVERITY).length;
+
+            if (errorCount > 0) {
+                setCompileResult(null);
+                setCompileStatus({
+                    tone: "error",
+                    message: `Compilation blocked: fix ${errorCount} error${errorCount === 1 ? "" : "s"} first.`,
+                });
+                return;
+            }
+
             const result = await lspClientRef.current.compile(activeFile.content);
+
+            if (result.errors.length > 0) {
+                const monaco = monacoRef.current;
+                const editor = editorRef.current;
+                const model = editor?.getModel();
+
+                if (monaco && model) {
+                    const compileMarkers: MonacoEditor.IMarkerData[] = result.errors.map((error) => {
+                        const start = model.getPositionAt(error.off);
+                        const end = model.getPositionAt(error.off + 1);
+
+                        return {
+                            severity: monaco.MarkerSeverity.Error,
+                            source: "compiler",
+                            message: error.msg,
+                            startLineNumber: start.lineNumber,
+                            startColumn: start.column,
+                            endLineNumber: end.lineNumber,
+                            endColumn: end.column,
+                        };
+                    });
+
+                    const mergedMarkers = [...baseMarkers, ...compileMarkers];
+                    monaco.editor.setModelMarkers(model, MARKER_OWNER, mergedMarkers);
+                    setDiagnosticCount(mergedMarkers.length);
+                    setDiagnosticMarkers(mergedMarkers);
+                }
+
+                setCompileResult(null);
+                setCompileStatus({
+                    tone: "error",
+                    message: `Compilation failed with ${result.errors.length} compiler error${result.errors.length === 1 ? "" : "s"}.`,
+                });
+                return;
+            }
+
             setCompileResult(result);
+            setCompileStatus({ tone: "success", message: "Compilation succeeded." });
         } finally {
             setIsCompiling(false);
         }
-    }, [activeFile]);
+    }, [activeFile, runDiagnostics]);
 
     const createFileFromCompiledOutput = () => {
         if (!compileResult || compileResult.code.length === 0) {
@@ -602,6 +659,7 @@ export default function WynntilsIde() {
                                 onMount={onEditorMount}
                                 onChange={(value) => {
                                     upsertActiveFileContent(value ?? "");
+                                    setCompileStatus(null);
                                     scheduleDiagnostics();
                                 }}
                                 options={{
@@ -612,6 +670,15 @@ export default function WynntilsIde() {
                                     wordWrap: "off",
                                     automaticLayout: true,
                                     bracketPairColorization: { enabled: true },
+                                    glyphMargin: true,
+                                    renderValidationDecorations: "on",
+                                    hover: { enabled: true, delay: 120 },
+                                    suggestOnTriggerCharacters: true,
+                                    quickSuggestions: {
+                                        strings: true,
+                                        comments: false,
+                                        other: true,
+                                    },
                                     scrollBeyondLastLine: false,
                                 }}
                                 theme="vs-dark"
@@ -655,27 +722,27 @@ export default function WynntilsIde() {
                     </Card>
                 ) : null}
 
+                {compileStatus ? (
+                    <Card className={compileStatus.tone === "error" ? "border-red-500/50" : "border-emerald-500/50"}>
+                        <CardHeader>
+                            <CardTitle className="text-base">Compile status</CardTitle>
+                            <CardDescription
+                                className={compileStatus.tone === "error" ? "text-red-300" : "text-emerald-300"}
+                            >
+                                {compileStatus.message}
+                            </CardDescription>
+                        </CardHeader>
+                    </Card>
+                ) : null}
+
                 {compileResult ? (
                     <Card>
                         <CardHeader>
                             <CardTitle>Compiled output</CardTitle>
-                            <CardDescription>
-                                {compileResult.errors.length > 0
-                                    ? `Compiled with ${compileResult.errors.length} issue(s).`
-                                    : "Compiled successfully."}
-                            </CardDescription>
+                            <CardDescription>Compiled successfully and normalized for inline use.</CardDescription>
                         </CardHeader>
 
                         <CardContent className="space-y-3">
-                            {compileResult.errors.length > 0 ? (
-                                <div className="space-y-1 text-sm text-amber-200">
-                                    {compileResult.errors.map((error, index) => (
-                                        <p key={`${error.off}-${index}`}>
-                                            • {error.msg} (offset {error.off})
-                                        </p>
-                                    ))}
-                                </div>
-                            ) : null}
 
                             <textarea
                                 value={compileResult.code}

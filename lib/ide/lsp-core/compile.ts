@@ -143,9 +143,58 @@ function replacePlaceholders(
 
 function normalizeCompiledCode(compiledCode: string): string {
     const withoutCarriageReturns = compiledCode.replace(/\r/g, "");
-    const withoutNewlines = withoutCarriageReturns.replace(/\n+/g, "");
+    const withoutNewlines = withoutCarriageReturns.replace(/\n+/g, " ");
 
-    return withoutNewlines.trim();
+    return collapseConsecutiveWhitespaceOutsideStrings(withoutNewlines).trim();
+}
+
+function collapseConsecutiveWhitespaceOutsideStrings(value: string) {
+    let result = "";
+    let inString = false;
+    let delimiter = "";
+    let previousWasWhitespace = false;
+
+    for (let index = 0; index < value.length; index++) {
+        const char = value[index];
+
+        if (inString) {
+            result += char;
+
+            if (char === "\\" && index + 1 < value.length) {
+                result += value[index + 1];
+                index++;
+                continue;
+            }
+
+            if (char === delimiter) {
+                inString = false;
+                delimiter = "";
+            }
+
+            continue;
+        }
+
+        if (char === '"' || char === "'") {
+            inString = true;
+            delimiter = char;
+            previousWasWhitespace = false;
+            result += char;
+            continue;
+        }
+
+        if (/\s/.test(char)) {
+            if (!previousWasWhitespace) {
+                result += " ";
+                previousWasWhitespace = true;
+            }
+            continue;
+        }
+
+        previousWasWhitespace = false;
+        result += char;
+    }
+
+    return result;
 }
 
 function extractVariableDeclarations(sourceText: string): VariableDeclaration[] {
