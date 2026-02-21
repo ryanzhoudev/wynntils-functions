@@ -44,11 +44,17 @@ function FunctionArgumentCard({ argument }: { argument: FunctionArgument }) {
 }
 
 function FunctionCard({ entry }: { entry: FunctionEntry }) {
+    const argumentSuffix =
+        entry.arguments.length === 0 ? "" : `(${entry.arguments.map((argument) => argument.name).join("; ")})`;
+
     return (
         <Card>
             <CardHeader className="gap-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                    <CardTitle className="font-mono text-xl">{entry.name}</CardTitle>
+                    <CardTitle className="font-mono text-xl">
+                        {entry.name}
+                        {argumentSuffix}
+                    </CardTitle>
                     <div className="flex gap-2">
                         <Badge variant="secondary">{entry.arguments.length} args</Badge>
                         <Badge>{entry.returnType}</Badge>
