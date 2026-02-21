@@ -206,7 +206,7 @@ export default function FunctionCatalog() {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <header className="mx-auto flex w-full max-w-[90vw] flex-col gap-4 px-4 py-6 md:flex-row md:items-center md:justify-between">
+            <header className="mx-auto flex w-full max-w-[82rem] flex-col gap-4 px-4 py-6 md:flex-row md:items-center md:justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Wynntils Functions</h1>
                     {/*<p className="mt-1 text-sm text-muted-foreground">*/}
@@ -241,7 +241,7 @@ export default function FunctionCatalog() {
                 </div>
             </header>
 
-            <main className="mx-auto grid w-full max-w-[90vw] gap-6 px-4 pb-12 lg:grid-cols-[300px_minmax(0,1fr)]">
+            <main className="mx-auto grid w-full max-w-[82rem] gap-6 px-4 pb-12 lg:grid-cols-[300px_minmax(0,1fr)]">
                 <Card className="h-fit lg:sticky lg:top-4">
                     <CardHeader>
                         <CardTitle>Search</CardTitle>
