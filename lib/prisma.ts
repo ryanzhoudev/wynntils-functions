@@ -1,10 +1,25 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
-const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+function normalizeConnectionString(connectionString: string) {
+    try {
+        const url = new URL(connectionString);
+        const isPostgresProtocol = url.protocol === "postgres:" || url.protocol === "postgresql:";
+
+        if (isPostgresProtocol && !url.searchParams.has("sslmode")) {
+            url.searchParams.set("sslmode", "require");
+        }
+
+        return url.toString();
+    } catch {
+        return connectionString;
+    }
+}
+
+const connectionString = process.env.DATABASE_URL ?? process.env.DIRECT_URL;
 
 if (!connectionString) {
-    throw new Error("Missing DIRECT_URL or DATABASE_URL for Prisma connection.");
+    throw new Error("Missing DATABASE_URL or DIRECT_URL for Prisma connection.");
 }
 
 declare global {
@@ -15,7 +30,7 @@ const prisma =
     global.prisma ??
     new PrismaClient({
         adapter: new PrismaPg({
-            connectionString,
+            connectionString: normalizeConnectionString(connectionString),
         }),
         log: process.env.NODE_ENV === "development" ? ["query", "warn", "error"] : ["error"],
     });
