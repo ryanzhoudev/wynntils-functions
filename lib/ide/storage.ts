@@ -3,7 +3,11 @@ import { IdeFile, IdeWorkspace } from "@/lib/ide/types";
 const IDE_STORAGE_KEY = "wynntils-ide-workspace:v1";
 
 const DEFAULT_FILE_NAME = "new-function.wynntils";
-const DEFAULT_FILE_CONTENT = '{to_background_text("Hello Wynntils!"; from_hex("#ffffff"); from_hex("#00ff00"); "PILL"; "PILL")}';
+const DEFAULT_FILE_CONTENT = `let textColor = from_hex("#ffffff");
+let bgColor = from_hex("#00ff00");
+let edge = "PILL";
+
+{to_background_text("Hello Wynntils!"; @{textColor}; @{bgColor}; @{edge}; @{edge})}`;
 
 function createDefaultFile(): IdeFile {
     return {
