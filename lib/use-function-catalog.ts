@@ -112,6 +112,7 @@ export function useFunctionCatalog() {
     const [isUsingStaleData, setIsUsingStaleData] = useState(false);
 
     const fetchCatalog = useCallback(async ({ force = false, signal }: FetchCatalogOptions = {}) => {
+        let didSucceed = false;
         const cached = readCachedCatalog();
 
         if (!force && cached) {
@@ -121,7 +122,7 @@ export function useFunctionCatalog() {
             setIsUsingStaleData(!isCacheFresh(cached));
 
             if (isCacheFresh(cached)) {
-                return;
+                return true;
             }
         }
 
@@ -153,9 +154,10 @@ export function useFunctionCatalog() {
             setIsUsingStaleData(false);
             writeCachedCatalog(payload);
             setCacheSavedAt(Date.now());
+            didSucceed = true;
         } catch (fetchError) {
             if (signal?.aborted) {
-                return;
+                return false;
             }
 
             if (cached) {
@@ -168,6 +170,8 @@ export function useFunctionCatalog() {
             setIsLoading(false);
             setIsRefreshing(false);
         }
+
+        return didSucceed;
     }, []);
 
     useEffect(() => {

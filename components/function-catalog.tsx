@@ -15,9 +15,10 @@ import {
     matchesQuery,
     normalizeQueryTokens,
 } from "@/lib/search";
+import { formatDateTime } from "@/lib/date-time";
 import { FunctionArgument, FunctionEntry } from "@/lib/types";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
-import { AlertTriangle, ListRestart, RefreshCcw, Search, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ListRestart, RefreshCcw, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -121,6 +122,8 @@ export default function FunctionCatalog() {
 
     const [query, setQuery] = useState("");
     const [searchScope, setSearchScope] = useState<SearchScope>(DEFAULT_SEARCH_SCOPE);
+    const [refreshIndicator, setRefreshIndicator] = useState<"idle" | "success" | "error">("idle");
+    const [lastRefreshSucceededAt, setLastRefreshSucceededAt] = useState<number | null>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     const queryTokens = useMemo(() => normalizeQueryTokens(query), [query]);
@@ -137,7 +140,25 @@ export default function FunctionCatalog() {
         return Object.values(searchScope).filter(Boolean).length;
     }, [searchScope]);
 
+    const isDefaultSearchScope = useMemo(() => {
+        return SEARCH_SCOPE_OPTIONS.every(({ key }) => searchScope[key] === DEFAULT_SEARCH_SCOPE[key]);
+    }, [searchScope]);
+
     const hasLoadedData = Boolean(data);
+
+    async function handleRefresh() {
+        setRefreshIndicator("idle");
+
+        const didSucceed = await refresh();
+
+        if (didSucceed) {
+            setRefreshIndicator("success");
+            setLastRefreshSucceededAt(Date.now());
+            return;
+        }
+
+        setRefreshIndicator("error");
+    }
 
     useEffect(() => {
         function onWindowKeyDown(event: KeyboardEvent) {
@@ -164,9 +185,23 @@ export default function FunctionCatalog() {
         };
     }, []);
 
+    useEffect(() => {
+        if (refreshIndicator === "idle") {
+            return;
+        }
+
+        const timeout = window.setTimeout(() => {
+            setRefreshIndicator("idle");
+        }, 2500);
+
+        return () => {
+            window.clearTimeout(timeout);
+        };
+    }, [refreshIndicator]);
+
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <header className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6 md:flex-row md:items-center md:justify-between">
+            <header className="mx-auto flex w-full max-w-[90vw] flex-col gap-4 px-4 py-6 md:flex-row md:items-center md:justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Wynntils Functions</h1>
                     {/*<p className="mt-1 text-sm text-muted-foreground">*/}
@@ -180,18 +215,20 @@ export default function FunctionCatalog() {
                     <Button variant="outline" asChild>
                         <Link href="/ide">Open IDE</Link>
                     </Button>
-                    <Button variant="secondary" onClick={() => setSearchScope(DEFAULT_SEARCH_SCOPE)}>
-                        <ListRestart className="size-4" />
-                        Reset filters
-                    </Button>
-                    <Button onClick={() => refresh()} disabled={isRefreshing}>
-                        <RefreshCcw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                        Refresh data
+                    <Button onClick={() => void handleRefresh()} disabled={isRefreshing}>
+                        {isRefreshing ? (
+                            <RefreshCcw className="size-4 animate-spin" />
+                        ) : refreshIndicator === "success" ? (
+                            <CheckCircle2 className="size-4" />
+                        ) : (
+                            <RefreshCcw className="size-4" />
+                        )}
+                        {isRefreshing ? "Refreshing..." : refreshIndicator === "success" ? "Refreshed" : "Refresh data"}
                     </Button>
                 </div>
             </header>
 
-            <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 pb-12 lg:grid-cols-[300px_minmax(0,1fr)]">
+            <main className="mx-auto grid w-full max-w-[90vw] gap-6 px-4 pb-12 lg:grid-cols-[300px_minmax(0,1fr)]">
                 <Card className="h-fit lg:sticky lg:top-4">
                     <CardHeader>
                         <CardTitle>Search</CardTitle>
@@ -248,6 +285,16 @@ export default function FunctionCatalog() {
                             })}
                         </div>
 
+                        <Button
+                            variant="secondary"
+                            onClick={() => setSearchScope(DEFAULT_SEARCH_SCOPE)}
+                            disabled={isDefaultSearchScope}
+                            className="w-full"
+                        >
+                            <ListRestart className="size-4" />
+                            Reset filters
+                        </Button>
+
                         <Separator />
 
                         <div className="space-y-1 text-xs text-muted-foreground">
@@ -260,9 +307,10 @@ export default function FunctionCatalog() {
                                 Active search fields:{" "}
                                 <span className="font-semibold text-foreground">{activeFilterCount}</span>
                             </p>
-                            {cacheSavedAt ? <p>Cached locally: {new Date(cacheSavedAt).toLocaleString()}</p> : null}
-                            {data?.generatedAt ? (
-                                <p>Server payload: {new Date(data.generatedAt).toLocaleString()}</p>
+                            {cacheSavedAt ? <p>Cached locally: {formatDateTime(cacheSavedAt)}</p> : null}
+                            {data?.generatedAt ? <p>Server payload: {formatDateTime(data.generatedAt)}</p> : null}
+                            {lastRefreshSucceededAt ? (
+                                <p>Last refresh: {formatDateTime(lastRefreshSucceededAt)}</p>
                             ) : null}
                         </div>
                     </CardContent>
@@ -303,7 +351,16 @@ export default function FunctionCatalog() {
                                 <CardDescription>{error}</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <Button onClick={() => refresh()}>Retry</Button>
+                                <Button onClick={() => void handleRefresh()} disabled={isRefreshing}>
+                                    {isRefreshing ? (
+                                        <RefreshCcw className="size-4 animate-spin" />
+                                    ) : refreshIndicator === "success" ? (
+                                        <CheckCircle2 className="size-4" />
+                                    ) : (
+                                        <RefreshCcw className="size-4" />
+                                    )}
+                                    {isRefreshing ? "Retrying..." : "Retry"}
+                                </Button>
                             </CardContent>
                         </Card>
                     ) : null}

@@ -516,7 +516,7 @@ export default function WynntilsIde() {
     return (
         <div className="min-h-screen bg-background text-foreground">
             <header className="border-b border-border px-4 py-3">
-                <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center justify-between gap-3">
+                <div className="mx-auto flex w-full max-w-[90vw] flex-wrap items-center justify-between gap-3">
                     <div>
                         <h1 className="flex items-center gap-2 text-xl font-semibold">
                             <Braces className="size-5" />
@@ -545,7 +545,7 @@ export default function WynntilsIde() {
                 </div>
             </header>
 
-            <main className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 p-4">
+            <main className="mx-auto flex w-full max-w-[90vw] flex-col gap-3 p-4">
                 <Card>
                     <CardHeader className="gap-3">
                         <div className="flex flex-wrap items-center gap-2">
