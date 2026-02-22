@@ -322,7 +322,10 @@ export default function FunctionCatalog() {
                                 <span className="font-semibold text-foreground">{activeFilterCount}</span>
                             </p>
                             {cacheSavedAt ? <p>Cached locally: {formatDateTime(cacheSavedAt)}</p> : null}
-                            {data?.generatedAt ? <p>Server payload: {formatDateTime(data.generatedAt)}</p> : null}
+                            <p>Data version: {data?.dataVersion ?? "Unknown"}</p>
+                            <p>
+                                Harvested at: {data?.harvestedAt != null ? `${formatDateTime(data.harvestedAt)} (local time)` : "Unknown"}
+                            </p>
                             {lastRefreshSucceededAt ? (
                                 <p>Last refresh: {formatDateTime(lastRefreshSucceededAt)}</p>
                             ) : null}

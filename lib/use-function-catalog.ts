@@ -55,7 +55,8 @@ function isFunctionCatalogResponse(value: unknown): value is FunctionCatalogResp
         Array.isArray(candidate.functions) &&
         candidate.functions.every((entry) => isFunctionEntry(entry)) &&
         typeof candidate.count === "number" &&
-        typeof candidate.generatedAt === "string"
+        (typeof candidate.dataVersion === "string" || candidate.dataVersion === null) &&
+        (typeof candidate.harvestedAt === "number" || candidate.harvestedAt === null)
     );
 }
 

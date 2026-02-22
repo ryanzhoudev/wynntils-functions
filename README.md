@@ -89,3 +89,16 @@ DIRECT_URL=postgres://...
 ```
 
 Prisma runtime currently prefers `DATABASE_URL`, then `DIRECT_URL`, and auto-adds `sslmode=require` when needed.
+
+## Function data import shape
+
+This app now reads the same table naming convention used by the mod dump tool:
+
+- `wynntilsFunction`
+- `wynntilsArgument`
+- `wynntilsDataVersion`
+
+The docs page uses `wynntilsDataVersion` for:
+
+- `Data version` (mod version string, e.g. `4.0.1-beta.2`)
+- `Harvested at` (epoch milliseconds, rendered as local time in the browser)

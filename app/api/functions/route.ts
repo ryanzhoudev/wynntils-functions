@@ -12,14 +12,19 @@ function normalizeAliases(aliases: string[]) {
 
 export async function GET() {
     try {
-        const functions = await prisma.functions.findMany({
-            include: {
-                arguments: {
-                    orderBy: [{ required: "desc" }, { id: "asc" }],
+        const [functions, dataVersion] = await Promise.all([
+            prisma.wynntilsFunction.findMany({
+                include: {
+                    arguments: {
+                        orderBy: [{ required: "desc" }, { id: "asc" }],
+                    },
                 },
-            },
-            orderBy: [{ name: "asc" }],
-        });
+                orderBy: [{ name: "asc" }],
+            }),
+            prisma.wynntilsDataVersion.findFirst({
+                orderBy: [{ id: "desc" }],
+            }),
+        ]);
 
         const payload: FunctionCatalogResponse = {
             functions: functions.map((fn) => ({
@@ -27,18 +32,19 @@ export async function GET() {
                 name: fn.name,
                 description: fn.description,
                 aliases: normalizeAliases(fn.aliases),
-                returnType: fn.returntype,
+                returnType: fn.returnType,
                 arguments: fn.arguments.map((arg) => ({
                     id: arg.id,
                     name: arg.name,
                     description: arg.description,
                     required: arg.required,
                     type: arg.type,
-                    defaultValue: arg.defaultvalue,
+                    defaultValue: arg.defaultValue,
                 })),
             })),
             count: functions.length,
-            generatedAt: new Date().toISOString(),
+            dataVersion: dataVersion?.modVersion ?? null,
+            harvestedAt: dataVersion ? Number(dataVersion.harvestedAt) : null,
         };
 
         return NextResponse.json(payload, {
@@ -52,7 +58,8 @@ export async function GET() {
         return NextResponse.json(
             {
                 error: "Failed to load function catalog",
-                generatedAt: new Date().toISOString(),
+                dataVersion: null,
+                harvestedAt: null,
             },
             { status: 500 },
         );

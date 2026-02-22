@@ -19,5 +19,6 @@ export type FunctionEntry = {
 export type FunctionCatalogResponse = {
     functions: FunctionEntry[];
     count: number;
-    generatedAt: string;
+    dataVersion: string | null;
+    harvestedAt: number | null;
 };
