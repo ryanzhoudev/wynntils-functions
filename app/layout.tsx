@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
     title: "Wynntils Functions",
-    description: "Function reference for Wynntils/Artemis expression helpers.",
+    description: "Unofficial functions reference and IDE for Wynntils",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

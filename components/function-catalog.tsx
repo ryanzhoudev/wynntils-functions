@@ -10,10 +10,10 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     DEFAULT_SEARCH_SCOPE,
-    SEARCH_SCOPE_OPTIONS,
-    SearchScope,
     matchesQuery,
     normalizeQueryTokens,
+    SEARCH_SCOPE_OPTIONS,
+    SearchScope,
 } from "@/lib/search";
 import { formatDateTime } from "@/lib/date-time";
 import { FunctionArgument, FunctionEntry } from "@/lib/types";
@@ -245,9 +245,7 @@ export default function FunctionCatalog() {
                 <Card className="h-fit lg:sticky lg:top-4">
                     <CardHeader>
                         <CardTitle>Search</CardTitle>
-                        <CardDescription>
-                            Use multiple words to narrow results. Press / to focus search.
-                        </CardDescription>
+                        <CardDescription>Press / to focus search from anywhere</CardDescription>
                     </CardHeader>
 
                     <CardContent className="space-y-4">
@@ -300,8 +298,11 @@ export default function FunctionCatalog() {
 
                         <Button
                             variant="secondary"
-                            onClick={() => setSearchScope(DEFAULT_SEARCH_SCOPE)}
-                            disabled={isDefaultSearchScope}
+                            onClick={() => {
+                                setSearchScope(DEFAULT_SEARCH_SCOPE);
+                                setQuery("");
+                            }}
+                            disabled={isDefaultSearchScope && query === ""}
                             className="w-full"
                         >
                             <ListRestart className="size-4" />
