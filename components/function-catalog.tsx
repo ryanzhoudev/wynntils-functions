@@ -321,11 +321,30 @@ export default function FunctionCatalog() {
                                 Active search fields:{" "}
                                 <span className="font-semibold text-foreground">{activeFilterCount}</span>
                             </p>
-                            {cacheSavedAt ? <p>Cached locally: {formatDateTime(cacheSavedAt)}</p> : null}
-                            <p>Data version: {data?.dataVersion ?? "Unknown"}</p>
+                        </div>
+
+                        <Separator />
+
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                            <p>Source mod version: {data?.dataVersion ?? "Unknown"}</p>
                             <p>
-                                Harvested at: {data?.harvestedAt != null ? `${formatDateTime(data.harvestedAt)} (local time)` : "Unknown"}
+                                Data generated:{" "}
+                                {data?.harvestedAt != null ? `${formatDateTime(data.harvestedAt)}` : "Unknown"}
                             </p>
+                        </div>
+
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                            {cacheSavedAt ? (
+                                <p
+                                    className={
+                                        data?.harvestedAt != null && data.harvestedAt > cacheSavedAt
+                                            ? "text-red-500"
+                                            : ""
+                                    }
+                                >
+                                    Cached locally: {formatDateTime(cacheSavedAt)}
+                                </p>
+                            ) : null}
                             {lastRefreshSucceededAt ? (
                                 <p>Last refresh: {formatDateTime(lastRefreshSucceededAt)}</p>
                             ) : null}
