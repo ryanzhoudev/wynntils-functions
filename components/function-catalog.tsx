@@ -20,7 +20,7 @@ import { FunctionArgument, FunctionEntry } from "@/lib/types";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
 import { AlertTriangle, CheckCircle2, ListRestart, RefreshCcw, Search, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 function FunctionArgumentCard({ argument }: { argument: FunctionArgument }) {
     return (
@@ -116,6 +116,22 @@ function LoadingState() {
                 </Card>
             ))}
         </div>
+    );
+}
+
+function WarningCard({ title, description }: { title: string; description: ReactNode }) {
+    return (
+        <Card className="border-amber-500/60 bg-amber-500/10">
+            <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-1">
+                        <CardTitle className="text-base">{title}</CardTitle>
+                        <CardDescription className="text-amber-100/90">{description}</CardDescription>
+                    </div>
+                    <AlertTriangle className="size-4 shrink-0 self-center text-amber-300" />
+                </div>
+            </CardHeader>
+        </Card>
     );
 }
 
@@ -356,44 +372,28 @@ export default function FunctionCatalog() {
                 </Card>
 
                 <section className="space-y-4">
-                    {hasLoadedData && error ? (
-                        <Card className="border-amber-500/60 bg-amber-500/10">
-                            <CardHeader>
-                                <div className="flex items-start gap-2">
-                                    <AlertTriangle className="mt-0.5 size-4 text-amber-300" />
-                                    <div>
-                                        <CardTitle className="text-base">Catalog warning</CardTitle>
-                                        <CardDescription className="text-amber-100/90">{error}</CardDescription>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                        </Card>
-                    ) : null}
+                    {hasLoadedData && error ? <WarningCard title="Catalog warning" description={error} /> : null}
 
                     {hasLoadedData && isUsingStaleData ? (
-                        <Card className="border-amber-500/60 bg-amber-500/10">
-                            <CardHeader>
-                                <CardTitle className="text-base">Using stale cached data</CardTitle>
-                                <CardDescription className="text-amber-100/90">
-                                    Refresh again after connectivity/database issues are resolved.
-                                </CardDescription>
-                            </CardHeader>
-                        </Card>
+                        <WarningCard
+                            title="Using stale cached data"
+                            description="Refresh again after connectivity/database issues are resolved."
+                        />
                     ) : null}
 
                     {refreshRateLimit.isLimited ? (
-                        <Card className="border-amber-500/60 bg-amber-500/10">
-                            <CardHeader>
-                                <CardTitle className="text-base">Refresh rate limit reached</CardTitle>
-                                <CardDescription className="text-amber-100/90">
+                        <WarningCard
+                            title="Refresh rate limit reached"
+                            description={
+                                <>
                                     You can refresh up to 5 times every 15 minutes. Next refresh window starts at{" "}
                                     {refreshRateLimit.nextAllowedAt
                                         ? formatDateTime(refreshRateLimit.nextAllowedAt)
                                         : "a later time"}
                                     .
-                                </CardDescription>
-                            </CardHeader>
-                        </Card>
+                                </>
+                            }
+                        />
                     ) : null}
 
                     {!hasLoadedData && isLoading ? <LoadingState /> : null}
