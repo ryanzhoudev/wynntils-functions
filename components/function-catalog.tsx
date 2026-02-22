@@ -25,7 +25,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 function FunctionArgumentCard({ argument }: { argument: FunctionArgument }) {
     return (
         <div className="rounded-md border border-border bg-background p-3">
-            <div className="flex flex-wrap items-start gap-2">
+            <div className="flex flex-wrap items-center gap-2">
                 <code className="rounded bg-muted px-1.5 py-0.5 text-sm">{argument.name}</code>
                 <div className="ml-auto flex items-center gap-2">
                     <Badge variant="secondary">{argument.type}</Badge>
@@ -35,12 +35,11 @@ function FunctionArgumentCard({ argument }: { argument: FunctionArgument }) {
                 </div>
             </div>
 
-            {argument.defaultValue ? (
+            {argument.defaultValue && argument.defaultValue !== "null" ? (
                 <p className="mt-2 text-xs text-muted-foreground">
                     Default: <code>{argument.defaultValue}</code>
                 </p>
             ) : null}
-
             {argument.description ? <p className="mt-2 text-sm text-muted-foreground">{argument.description}</p> : null}
         </div>
     );
@@ -53,13 +52,12 @@ function FunctionCard({ entry }: { entry: FunctionEntry }) {
     return (
         <Card>
             <CardHeader className="gap-2">
-                <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                     <CardTitle className="font-mono text-xl">
                         {entry.name}
                         {argumentSuffix}
                     </CardTitle>
                     <div className="flex gap-2">
-                        <Badge variant="secondary">{entry.arguments.length} args</Badge>
                         <Badge variant="secondary">{entry.returnType}</Badge>
                     </div>
                 </div>
@@ -68,7 +66,7 @@ function FunctionCard({ entry }: { entry: FunctionEntry }) {
 
             <CardContent className="space-y-4">
                 <div>
-                    <p className="mb-2 text-sm font-semibold">Arguments</p>
+                    <p className="mb-2 text-sm font-semibold">{"Arguments (" + entry.arguments.length + ")"}</p>
                     {entry.arguments.length === 0 ? (
                         <p className="text-sm text-muted-foreground">No arguments.</p>
                     ) : (
