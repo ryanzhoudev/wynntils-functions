@@ -126,7 +126,6 @@ export default function FunctionCatalog() {
     const [query, setQuery] = useState("");
     const [searchScope, setSearchScope] = useState<SearchScope>(DEFAULT_SEARCH_SCOPE);
     const [refreshIndicator, setRefreshIndicator] = useState<"idle" | "success" | "error">("idle");
-    const [lastRefreshSucceededAt, setLastRefreshSucceededAt] = useState<number | null>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     const queryTokens = useMemo(() => normalizeQueryTokens(query), [query]);
@@ -158,7 +157,6 @@ export default function FunctionCatalog() {
 
         if (didSucceed) {
             setRefreshIndicator("success");
-            setLastRefreshSucceededAt(Date.now());
             return;
         }
 
@@ -344,9 +342,6 @@ export default function FunctionCatalog() {
                                 >
                                     Cached locally: {formatDateTime(cacheSavedAt)}
                                 </p>
-                            ) : null}
-                            {lastRefreshSucceededAt ? (
-                                <p>Last refresh: {formatDateTime(lastRefreshSucceededAt)}</p>
                             ) : null}
                             <p>
                                 Refresh budget:{" "}
