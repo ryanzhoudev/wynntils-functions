@@ -5,6 +5,8 @@ export type FunctionCall = {
     arguments: ParsedArgument[];
     startOffset: number;
     endOffset: number;
+    hasArgumentList: boolean;
+    isBareExpression: boolean;
 };
 
 export type ParsedArgument = {
@@ -30,10 +32,9 @@ export function parse(sourceText: string): ParseResult {
     const functionCalls: FunctionCall[] = [];
     const parseErrors: ParseError[] = [];
     const openingBraces: Array<{ offset: number; length: number }> = [];
+    const expressionRanges: Array<{ startOffset: number; endOffset: number }> = [];
 
-    for (let tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
-        const token = tokens[tokenIndex];
-
+    for (const token of tokens) {
         switch (token.kind) {
             case TokenKind.LeftBrace:
                 openingBraces.push({ offset: token.offset, length: token.length });
@@ -43,10 +44,31 @@ export function parse(sourceText: string): ParseResult {
                 if (openingBraces.length === 0) {
                     parseErrors.push({ offset: token.offset, length: token.length, message: "Unmatched }" });
                 } else {
-                    openingBraces.pop();
+                    const openingBrace = openingBraces.pop()!;
+
+                    if (openingBraces.length === 0) {
+                        expressionRanges.push({
+                            startOffset: openingBrace.offset,
+                            endOffset: token.offset + token.length,
+                        });
+                    }
                 }
                 break;
 
+            default:
+                break;
+        }
+    }
+
+    while (openingBraces.length > 0) {
+        const unmatchedBrace = openingBraces.pop()!;
+        parseErrors.push({ offset: unmatchedBrace.offset, length: unmatchedBrace.length, message: "Unmatched {" });
+    }
+
+    for (let tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
+        const token = tokens[tokenIndex];
+
+        switch (token.kind) {
             case TokenKind.Identifier: {
                 if (!isValueToken(token)) {
                     break;
@@ -54,8 +76,20 @@ export function parse(sourceText: string): ParseResult {
 
                 const identifierToken: ValueToken = token;
                 const nextToken = tokens[tokenIndex + 1];
+                const expressionRange = findContainingExpressionRange(identifierToken, expressionRanges);
 
                 if (!nextToken || nextToken.kind !== TokenKind.LeftParenthesis) {
+                    if (expressionRange) {
+                        functionCalls.push({
+                            name: identifierToken.value,
+                            arguments: [],
+                            startOffset: identifierToken.offset,
+                            endOffset: identifierToken.offset + identifierToken.length,
+                            hasArgumentList: false,
+                            isBareExpression: true,
+                        });
+                    }
+
                     break;
                 }
 
@@ -102,9 +136,9 @@ export function parse(sourceText: string): ParseResult {
                     arguments: parsedArguments,
                     startOffset: callStartOffset,
                     endOffset: callEndOffset,
+                    hasArgumentList: true,
+                    isBareExpression: false,
                 });
-
-                tokenIndex = searchIndex;
                 break;
             }
 
@@ -113,12 +147,15 @@ export function parse(sourceText: string): ParseResult {
         }
     }
 
-    while (openingBraces.length > 0) {
-        const unmatchedBrace = openingBraces.pop()!;
-        parseErrors.push({ offset: unmatchedBrace.offset, length: unmatchedBrace.length, message: "Unmatched {" });
-    }
-
     return { calls: functionCalls, errors: parseErrors };
+}
+
+function findContainingExpressionRange(identifierToken: ValueToken, expressionRanges: Array<{ startOffset: number; endOffset: number }>) {
+    const tokenEndOffset = identifierToken.offset + identifierToken.length;
+
+    return expressionRanges.find((range) => {
+        return identifierToken.offset > range.startOffset && tokenEndOffset < range.endOffset;
+    });
 }
 
 function collectArgumentTokens(tokens: Token[], startIndex: number, endIndex: number) {

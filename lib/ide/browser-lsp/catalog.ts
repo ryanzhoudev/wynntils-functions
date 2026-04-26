@@ -24,10 +24,10 @@ export class FunctionsCatalog {
         this.metadataByName = new Map();
 
         for (const metadata of this.functions) {
-            this.metadataByName.set(metadata.canonicalName, metadata);
+            this.metadataByName.set(normalizeLookupName(metadata.canonicalName), metadata);
 
             for (const alias of metadata.aliases) {
-                this.metadataByName.set(alias, metadata);
+                this.metadataByName.set(normalizeLookupName(alias), metadata);
             }
         }
     }
@@ -37,7 +37,7 @@ export class FunctionsCatalog {
     }
 
     findByName(functionName: string) {
-        return this.metadataByName.get(functionName);
+        return this.metadataByName.get(normalizeLookupName(functionName));
     }
 }
 
@@ -104,4 +104,8 @@ function normalizeAliases(aliases: string[] | undefined) {
         .flatMap((alias) => alias.split(","))
         .map((alias) => alias.trim())
         .filter((alias) => alias.length > 0);
+}
+
+function normalizeLookupName(name: string) {
+    return name.toLowerCase();
 }
