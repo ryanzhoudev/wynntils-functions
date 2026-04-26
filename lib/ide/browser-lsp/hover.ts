@@ -1,4 +1,5 @@
 import { formatSignature, FunctionMetadata, FunctionsCatalog } from "@/lib/ide/browser-lsp/catalog";
+import { parse } from "@/lib/ide/browser-lsp/parser";
 import { BrowserTextDocument } from "@/lib/ide/browser-lsp/text-document";
 import { LspHover, LspPosition } from "@/lib/ide/types";
 
@@ -28,11 +29,12 @@ export function createHoverForPosition(
     const argumentsSection = formatArgumentsSection(metadata);
     const aliasSection =
         metadata.aliases.length > 0 ? `\n\n**Aliases:** ${metadata.aliases.join(", ")}` : "\n\n**Aliases:** none";
+    const formatSection = formatSuffixSection(documentText, offset);
 
     return {
         contents: {
             kind: "markdown",
-            value: `**${metadata.canonicalName}**${signature} -> \`${metadata.returnType}\`${descriptionSection}${argumentsSection}${aliasSection}`,
+            value: `**${metadata.canonicalName}**${signature} -> \`${metadata.returnType}\`${descriptionSection}${argumentsSection}${aliasSection}${formatSection}`,
         },
     };
 }
@@ -80,4 +82,20 @@ function formatArgumentsSection(metadata: FunctionMetadata) {
     });
 
     return `\n\n**Arguments:**\n${lines.join("\n")}`;
+}
+
+function formatSuffixSection(documentText: string, offset: number) {
+    const functionCall = parse(documentText).calls.find((call) => {
+        return call.formatSuffix && offset >= call.formatSuffix.startOffset && offset <= call.formatSuffix.endOffset;
+    });
+
+    if (!functionCall?.formatSuffix?.isValid) {
+        return "";
+    }
+
+    const suffix = functionCall.formatSuffix;
+    const formatLabel = suffix.formatted ? "formatted number output" : "plain number output";
+    const decimalsLabel = suffix.decimals === undefined ? "default decimals" : `${suffix.decimals} decimal places`;
+
+    return `\n\n**Format suffix:** \`${suffix.text}\` (${formatLabel}, ${decimalsLabel})`;
 }

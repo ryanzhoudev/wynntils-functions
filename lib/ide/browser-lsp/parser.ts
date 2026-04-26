@@ -7,6 +7,17 @@ export type FunctionCall = {
     endOffset: number;
     hasArgumentList: boolean;
     isBareExpression: boolean;
+    formatSuffix?: FormatSuffix;
+};
+
+export type FormatSuffix = {
+    text: string;
+    startOffset: number;
+    endOffset: number;
+    formatted: boolean;
+    decimals?: number;
+    isValid: boolean;
+    error?: string;
 };
 
 export type ParsedArgument = {
@@ -33,6 +44,7 @@ export function parse(sourceText: string): ParseResult {
     const parseErrors: ParseError[] = [];
     const openingBraces: Array<{ offset: number; length: number }> = [];
     const expressionRanges: Array<{ startOffset: number; endOffset: number }> = [];
+    const formatSuffixRanges: Array<{ startOffset: number; endOffset: number }> = [];
 
     for (const token of tokens) {
         switch (token.kind) {
@@ -75,19 +87,35 @@ export function parse(sourceText: string): ParseResult {
                 }
 
                 const identifierToken: ValueToken = token;
+
+                if (isInsideRange(identifierToken.offset, formatSuffixRanges)) {
+                    break;
+                }
+
                 const nextToken = tokens[tokenIndex + 1];
                 const expressionRange = findContainingExpressionRange(identifierToken, expressionRanges);
 
                 if (!nextToken || nextToken.kind !== TokenKind.LeftParenthesis) {
                     if (expressionRange) {
+                        const callEndOffset = identifierToken.offset + identifierToken.length;
+                        const formatSuffix = parseFormatSuffix(tokens, tokenIndex + 1, sourceText);
+
                         functionCalls.push({
                             name: identifierToken.value,
                             arguments: [],
                             startOffset: identifierToken.offset,
-                            endOffset: identifierToken.offset + identifierToken.length,
+                            endOffset: formatSuffix?.endOffset ?? callEndOffset,
                             hasArgumentList: false,
                             isBareExpression: true,
+                            formatSuffix,
                         });
+
+                        if (formatSuffix) {
+                            formatSuffixRanges.push({
+                                startOffset: formatSuffix.startOffset,
+                                endOffset: formatSuffix.endOffset,
+                            });
+                        }
                     }
 
                     break;
@@ -130,15 +158,24 @@ export function parse(sourceText: string): ParseResult {
                 const argumentTokens = collectArgumentTokens(tokens, tokenIndex + 2, closingParenthesisIndex);
                 const parsedArguments = buildParsedArguments(argumentTokens, sourceText);
                 const callEndOffset = closingParenthesisToken.offset + closingParenthesisToken.length;
+                const formatSuffix = parseFormatSuffix(tokens, closingParenthesisIndex + 1, sourceText);
 
                 functionCalls.push({
                     name: identifierToken.value,
                     arguments: parsedArguments,
                     startOffset: callStartOffset,
-                    endOffset: callEndOffset,
+                    endOffset: formatSuffix?.endOffset ?? callEndOffset,
                     hasArgumentList: true,
                     isBareExpression: false,
+                    formatSuffix,
                 });
+
+                if (formatSuffix) {
+                    formatSuffixRanges.push({
+                        startOffset: formatSuffix.startOffset,
+                        endOffset: formatSuffix.endOffset,
+                    });
+                }
                 break;
             }
 
@@ -148,6 +185,68 @@ export function parse(sourceText: string): ParseResult {
     }
 
     return { calls: functionCalls, errors: parseErrors };
+}
+
+function isInsideRange(offset: number, ranges: Array<{ startOffset: number; endOffset: number }>) {
+    return ranges.some((range) => offset >= range.startOffset && offset < range.endOffset);
+}
+
+function parseFormatSuffix(tokens: Token[], nextTokenIndex: number, sourceText: string): FormatSuffix | undefined {
+    const colonToken = tokens[nextTokenIndex];
+
+    if (!colonToken || colonToken.kind !== TokenKind.Colon) {
+        return undefined;
+    }
+
+    const suffixTokens: Token[] = [colonToken];
+    let cursor = nextTokenIndex + 1;
+
+    while (cursor < tokens.length && isFormatSuffixToken(tokens[cursor])) {
+        suffixTokens.push(tokens[cursor]);
+        cursor++;
+    }
+
+    const lastToken = suffixTokens[suffixTokens.length - 1];
+    const startOffset = colonToken.offset;
+    const endOffset = lastToken.offset + lastToken.length;
+    const text = sourceText.slice(startOffset, endOffset);
+    const match = /^:(F)?([0-9]+)?$/.exec(text);
+
+    if (!match || (!match[1] && !match[2])) {
+        return {
+            text,
+            startOffset,
+            endOffset,
+            formatted: false,
+            isValid: false,
+            error: "Invalid format suffix. Use :F, :2, or :F2.",
+        };
+    }
+
+    return {
+        text,
+        startOffset,
+        endOffset,
+        formatted: Boolean(match[1]),
+        decimals: match[2] ? Number.parseInt(match[2], 10) : undefined,
+        isValid: true,
+    };
+}
+
+function isFormatSuffixToken(token: Token) {
+    if (!isValueToken(token)) {
+        return false;
+    }
+
+    if (token.kind === TokenKind.Identifier) {
+        return /^[A-Za-z]+$/.test(token.value);
+    }
+
+    if (token.kind === TokenKind.Number) {
+        return /^[0-9]+$/.test(token.value);
+    }
+
+    return false;
 }
 
 function findContainingExpressionRange(identifierToken: ValueToken, expressionRanges: Array<{ startOffset: number; endOffset: number }>) {

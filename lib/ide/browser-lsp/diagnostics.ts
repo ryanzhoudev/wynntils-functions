@@ -120,6 +120,19 @@ function reportFunctionIssues(
     for (const functionCall of parseResult.calls) {
         const metadata = catalog.findByName(functionCall.name);
 
+        if (functionCall.formatSuffix && !functionCall.formatSuffix.isValid) {
+            diagnostics.push(
+                createDiagnostic(
+                    document,
+                    documentText,
+                    functionCall.formatSuffix.startOffset,
+                    functionCall.formatSuffix.endOffset - functionCall.formatSuffix.startOffset,
+                    DIAGNOSTIC_SEVERITY_ERROR,
+                    functionCall.formatSuffix.error ?? "Invalid format suffix",
+                ),
+            );
+        }
+
         if (!metadata) {
             diagnostics.push(
                 createDiagnostic(

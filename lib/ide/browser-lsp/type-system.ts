@@ -43,8 +43,19 @@ export function inferArgumentType(
                 return firstToken.value.includes(".") ? "Number" : "Integer";
             case TokenKind.HexLiteral:
                 return "HexColor";
-            case TokenKind.Identifier:
+            case TokenKind.Identifier: {
+                const possibleCall = callLookup.get(firstToken.offset);
+
+                if (possibleCall && possibleCall.isBareExpression) {
+                    const metadata = catalog.findByName(possibleCall.name);
+
+                    if (metadata) {
+                        return metadata.returnType;
+                    }
+                }
+
                 return "Identifier";
+            }
             case TokenKind.Placeholder:
                 return undefined;
             default:

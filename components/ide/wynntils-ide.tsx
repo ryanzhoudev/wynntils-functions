@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { WynntilsLspClient } from "@/lib/ide/lsp-client";
 import { WYNNTILS_LANGUAGE, ensureWynntilsLanguage, registerWynntilsProviders } from "@/lib/ide/monaco";
-import { createDefaultWorkspace, loadWorkspaceFromStorage, saveWorkspaceToStorage } from "@/lib/ide/storage";
+import { loadWorkspaceFromStorage, saveWorkspaceToStorage } from "@/lib/ide/storage";
 import { CompileResult, IdeFile, IdeWorkspace, LspDiagnostic } from "@/lib/ide/types";
 import { compileSupersetToWynntils } from "@/lib/ide/upstream-compile";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
@@ -115,8 +115,8 @@ function mapDiagnosticSeverity(monaco: MonacoApi, severity?: number) {
 export default function WynntilsIde() {
     const functionCatalog = useFunctionCatalog();
 
-    const [workspace, setWorkspace] = useState<IdeWorkspace>(() => createDefaultWorkspace());
-    const [isWorkspaceReady, setIsWorkspaceReady] = useState(false);
+    const [workspace, setWorkspace] = useState<IdeWorkspace>(() => loadWorkspaceFromStorage());
+    const [isWorkspaceReady] = useState(true);
 
     const [compileResult, setCompileResult] = useState<CompileResult | null>(null);
     const [compileStatus, setCompileStatus] = useState<{ tone: "success" | "warning"; message: string } | null>(null);
@@ -198,12 +198,6 @@ export default function WynntilsIde() {
     }, []);
 
     useEffect(() => {
-        const loadedWorkspace = loadWorkspaceFromStorage();
-        setWorkspace(loadedWorkspace);
-        setIsWorkspaceReady(true);
-    }, []);
-
-    useEffect(() => {
         if (!isWorkspaceReady) {
             return;
         }
@@ -225,8 +219,10 @@ export default function WynntilsIde() {
 
     useEffect(() => {
         if (!functionCatalog.data) {
-            setLspStatus("connecting");
-            setLspError(functionCatalog.error);
+            window.queueMicrotask(() => {
+                setLspStatus("connecting");
+                setLspError(functionCatalog.error);
+            });
             return;
         }
 
@@ -238,8 +234,10 @@ export default function WynntilsIde() {
             applyDiagnosticsForUri(params.uri);
         });
 
-        setLspStatus("connecting");
-        setLspError(null);
+        window.queueMicrotask(() => {
+            setLspStatus("connecting");
+            setLspError(null);
+        });
 
         void lspClient
             .connect()
