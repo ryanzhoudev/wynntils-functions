@@ -1,6 +1,7 @@
 import type { Monaco as MonacoApi } from "@monaco-editor/react";
 import { WynntilsLspClient } from "@/lib/ide/lsp-client";
 import { LspCompletionItem, LspHover, LspMarkupContent, LspMarkedString, LspRange, LspTextEdit } from "@/lib/ide/types";
+import type { editor as MonacoEditor, languages as MonacoLanguages, Position as MonacoPosition } from "monaco-editor";
 
 const WYNNTILS_LANGUAGE_ID = "wynntils";
 let languageRegistered = false;
@@ -219,7 +220,11 @@ export function ensureWynntilsLanguage(monaco: MonacoApi) {
 export function registerWynntilsProviders(monaco: MonacoApi, lspClient: WynntilsLspClient) {
     const completionProvider = monaco.languages.registerCompletionItemProvider(WYNNTILS_LANGUAGE_ID, {
         triggerCharacters: ["{", "(", ";"],
-        provideCompletionItems: async (model, position, context) => {
+        provideCompletionItems: async (
+            model: MonacoEditor.ITextModel,
+            position: MonacoPosition,
+            context: MonacoLanguages.CompletionContext,
+        ) => {
             const items = await lspClient.requestCompletion(
                 model.uri.toString(),
                 toLspPosition(position.lineNumber, position.column),
@@ -252,7 +257,7 @@ export function registerWynntilsProviders(monaco: MonacoApi, lspClient: Wynntils
     });
 
     const hoverProvider = monaco.languages.registerHoverProvider(WYNNTILS_LANGUAGE_ID, {
-        provideHover: async (model, position) => {
+        provideHover: async (model: MonacoEditor.ITextModel, position: MonacoPosition) => {
             const hover = await lspClient.requestHover(model.uri.toString(), toLspPosition(position.lineNumber, position.column));
 
             if (!hover) {
