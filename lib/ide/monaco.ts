@@ -219,8 +219,12 @@ export function ensureWynntilsLanguage(monaco: MonacoApi) {
 export function registerWynntilsProviders(monaco: MonacoApi, lspClient: WynntilsLspClient) {
     const completionProvider = monaco.languages.registerCompletionItemProvider(WYNNTILS_LANGUAGE_ID, {
         triggerCharacters: ["{", "(", ";"],
-        provideCompletionItems: async (model, position) => {
-            const items = await lspClient.requestCompletion(model.uri.toString(), toLspPosition(position.lineNumber, position.column));
+        provideCompletionItems: async (model, position, context) => {
+            const items = await lspClient.requestCompletion(
+                model.uri.toString(),
+                toLspPosition(position.lineNumber, position.column),
+                context.triggerCharacter,
+            );
 
             const currentWord = model.getWordUntilPosition(position);
             const fallbackRange = {

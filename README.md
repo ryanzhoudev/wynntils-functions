@@ -48,7 +48,7 @@ A full site redeploy is not required (the app reads dynamically from the DB).
 
 - `/` – redesigned docs UI
 - `/old` – classic docs UI
-- `/ide` – Monaco IDE (connected to upstream-style LSP over WebSocket)
+- `/ide` – Monaco IDE with a browser-local LSP worker
 - `/api/functions` – dynamic function catalog API from Postgres/Prisma
 
 ### IDE/LSP architecture
@@ -57,12 +57,13 @@ Goal: behavior parity with the extension-side language tooling flow.
 
 How it works:
 
-- Upstream tooling is vendored in `vendor/wynntils-functions-tools`.
-- Upstream LSP server (`vendor/.../server/src`) is compiled to `.generated/upstream-lsp`.
-- A WebSocket bridge forwards Monaco JSON-RPC requests to the upstream Node LSP process.
-- IDE compile command uses logic adapted from upstream compile implementation.
+- The IDE behavior is based on `wynntils-functions-tools`.
+- Browser-safe LSP logic lives in `lib/ide/browser-lsp`.
+- The IDE starts a Web Worker in the user's browser for completions, hovers, and diagnostics.
+- The worker catalog is built from `/api/functions`, so IDE metadata comes from the same database-backed function data as the docs.
+- IDE compile command uses logic adapted from the same reference implementation.
 
-Upstream reference:
+Reference:
 <https://github.com/DevChromium/wynntils-functions-tools>
 
 ### Local development
@@ -73,22 +74,11 @@ Upstream reference:
 pnpm install
 ```
 
-#### Docs/web app only
+#### Run locally
 
 ```bash
 pnpm dev
 ```
-
-#### IDE + upstream LSP bridge
-
-```bash
-pnpm dev:ide-upstream
-```
-
-This starts:
-
-- Next app (default port 3000)
-- LSP bridge at `ws://127.0.0.1:3001/wynntils`
 
 #### Quality checks
 
@@ -100,13 +90,7 @@ pnpm build
 
 ### Hosting notes
 
-This setup needs a long-running WebSocket + child-process bridge, so it is not a pure Vercel-serverless fit by itself.
-
-Typical setup:
-
-1. Host Next app on Vercel
-2. Host LSP bridge on a small VPS/container
-3. Set `NEXT_PUBLIC_WYNNTILS_LSP_WS_URL` to that bridge endpoint
+The IDE LSP runs in the user's browser, so the app does not need a separate long-running LSP bridge service.
 
 ### Database/env
 
@@ -118,15 +102,6 @@ DIRECT_URL=postgres://...
 ```
 
 Prisma runtime prefers `DATABASE_URL`, then `DIRECT_URL`, and auto-adds `sslmode=require` when needed.
-
-LSP bridge/frontend env (optional overrides):
-
-```bash
-WYNNTILS_LSP_HOST=127.0.0.1
-WYNNTILS_LSP_PORT=3001
-WYNNTILS_LSP_PATH=/wynntils
-NEXT_PUBLIC_WYNNTILS_LSP_WS_URL=ws://127.0.0.1:3001/wynntils
-```
 
 ### Data model notes
 

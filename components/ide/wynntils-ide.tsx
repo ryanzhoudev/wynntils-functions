@@ -9,6 +9,7 @@ import { WYNNTILS_LANGUAGE, ensureWynntilsLanguage, registerWynntilsProviders } 
 import { createDefaultWorkspace, loadWorkspaceFromStorage, saveWorkspaceToStorage } from "@/lib/ide/storage";
 import { CompileResult, IdeFile, IdeWorkspace, LspDiagnostic } from "@/lib/ide/types";
 import { compileSupersetToWynntils } from "@/lib/ide/upstream-compile";
+import { useFunctionCatalog } from "@/lib/use-function-catalog";
 import {
     AlertTriangle,
     Braces,
@@ -26,9 +27,8 @@ import type { IDisposable, editor as MonacoEditor } from "monaco-editor";
 import Link from "next/link";
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const MARKER_OWNER = "wynntils-upstream-lsp";
+const MARKER_OWNER = "wynntils-browser-lsp";
 const WORKSPACE_SAVE_DEBOUNCE_MS = 250;
-const DEFAULT_LSP_ENDPOINT = "ws://localhost:3001/wynntils";
 
 function createFile(name: string, content: string): IdeFile {
     return {
@@ -85,6 +85,18 @@ function markerSeverityVariant(severity: number) {
     }
 }
 
+function workerStatusDotClass(status: "connecting" | "ready" | "error") {
+    switch (status) {
+        case "ready":
+            return "bg-emerald-400";
+        case "error":
+            return "bg-red-400";
+        case "connecting":
+        default:
+            return "bg-amber-300";
+    }
+}
+
 function mapDiagnosticSeverity(monaco: MonacoApi, severity?: number) {
     switch (severity) {
         case 1:
@@ -101,7 +113,7 @@ function mapDiagnosticSeverity(monaco: MonacoApi, severity?: number) {
 }
 
 export default function WynntilsIde() {
-    const lspEndpoint = process.env.NEXT_PUBLIC_WYNNTILS_LSP_WS_URL ?? DEFAULT_LSP_ENDPOINT;
+    const functionCatalog = useFunctionCatalog();
 
     const [workspace, setWorkspace] = useState<IdeWorkspace>(() => createDefaultWorkspace());
     const [isWorkspaceReady, setIsWorkspaceReady] = useState(false);
@@ -126,6 +138,7 @@ export default function WynntilsIde() {
     const lspClientRef = useRef<WynntilsLspClient | null>(null);
     const diagnosticsByUriRef = useRef<Map<string, LspDiagnostic[]>>(new Map());
     const activeUriRef = useRef<string | null>(null);
+    const activeFileRef = useRef<IdeFile | null>(null);
     const lastActiveFileIdRef = useRef<string | null>(null);
 
     const activeFile = useMemo(() => {
@@ -135,6 +148,11 @@ export default function WynntilsIde() {
     const activeFileUri = useMemo(() => {
         return activeFile ? fileUri(activeFile.id) : null;
     }, [activeFile]);
+
+    useEffect(() => {
+        activeFileRef.current = activeFile;
+        activeUriRef.current = activeFileUri;
+    }, [activeFile, activeFileUri]);
 
     const applyDiagnosticsForUri = useCallback((uri: string) => {
         const monaco = monacoRef.current;
@@ -206,7 +224,13 @@ export default function WynntilsIde() {
     }, [isWorkspaceReady, workspace]);
 
     useEffect(() => {
-        const lspClient = new WynntilsLspClient(lspEndpoint);
+        if (!functionCatalog.data) {
+            setLspStatus("connecting");
+            setLspError(functionCatalog.error);
+            return;
+        }
+
+        const lspClient = new WynntilsLspClient(functionCatalog.data);
         lspClientRef.current = lspClient;
 
         const unsubscribeDiagnostics = lspClient.onDiagnostics((params) => {
@@ -222,10 +246,14 @@ export default function WynntilsIde() {
             .then(() => {
                 setLspStatus("ready");
                 ensureProvidersRegistered();
+
+                if (activeFileRef.current && activeUriRef.current) {
+                    void lspClient.syncDocument(activeUriRef.current, activeFileRef.current.content);
+                }
             })
             .catch((error) => {
                 setLspStatus("error");
-                setLspError(error instanceof Error ? error.message : "Failed to connect to LSP bridge");
+                setLspError(error instanceof Error ? error.message : "Failed to start browser LSP");
             });
 
         return () => {
@@ -237,7 +265,7 @@ export default function WynntilsIde() {
             lspClient.dispose();
             lspClientRef.current = null;
         };
-    }, [applyDiagnosticsForUri, ensureProvidersRegistered, lspEndpoint]);
+    }, [applyDiagnosticsForUri, ensureProvidersRegistered, functionCatalog.data, functionCatalog.error]);
 
     useEffect(() => {
         if (!activeFile || !activeFileUri) {
@@ -520,18 +548,18 @@ export default function WynntilsIde() {
                     <div>
                         <h1 className="flex items-center gap-2 text-xl font-semibold">
                             <Braces className="size-5" />
-                            Wynntils IDE (Upstream LSP)
+                            Wynntils IDE
                         </h1>
-                        {/*<p className="text-xs text-muted-foreground">Monaco + upstream LSP server over WebSocket + local file workspace</p>*/}
+                        {/*<p className="text-xs text-muted-foreground">Monaco + browser LSP worker + local file workspace</p>*/}
                         <p className="text-xs text-muted-foreground">
-                            Language tooling by{" "}
+                            Language tooling based on{" "}
                             <a
                                 href="https://github.com/DevChromium/wynntils-functions-tools"
                                 target="_blank"
                                 rel="noreferrer"
                                 className="underline underline-offset-4"
                             >
-                                DevChromium/wynntils-functions-tools
+                                wynntils-functions-tools
                             </a>
                         </p>
                     </div>
@@ -621,7 +649,13 @@ export default function WynntilsIde() {
                             <Badge variant="secondary">{workspace.files.length} files</Badge>
                             <Badge variant="secondary">{diagnosticMarkers.length} diagnostics</Badge>
                             <span>Ctrl/⌘ + Enter compiles when not focused in IDE</span>
-                            <span className="ml-auto font-mono">{lspEndpoint}</span>
+                            <span className="ml-auto inline-flex items-center gap-1.5 font-mono">
+                                <span
+                                    className={`size-2 rounded-full ${workerStatusDotClass(lspStatus)}`}
+                                    aria-hidden="true"
+                                />
+                                browser worker
+                            </span>
                             {lspError ? <span className="text-red-300">{lspError}</span> : null}
                         </CardDescription>
                     </CardHeader>
@@ -727,9 +761,6 @@ export default function WynntilsIde() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Compiled output</CardTitle>
-                            <CardDescription>
-                                This mirrors the upstream VSCode compile command behavior.
-                            </CardDescription>
                         </CardHeader>
 
                         <CardContent className="space-y-3">

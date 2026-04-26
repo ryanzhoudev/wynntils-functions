@@ -1,4 +1,4 @@
-// Adapted from DevChromium/wynntils-functions-tools/src/compile.ts (MIT License).
+// Adapted from wynntils-functions-tools/src/compile.ts (MIT License).
 
 import { CompileResult } from "@/lib/ide/types";
 
