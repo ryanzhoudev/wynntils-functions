@@ -124,6 +124,7 @@ export default function WynntilsIde() {
     const [isCopyingCompiledOutput, setIsCopyingCompiledOutput] = useState(false);
 
     const [diagnosticMarkers, setDiagnosticMarkers] = useState<MonacoEditor.IMarkerData[]>([]);
+    const [showDiagnostics, setShowDiagnostics] = useState(false);
 
     const [lspStatus, setLspStatus] = useState<"connecting" | "ready" | "error">("connecting");
     const [lspError, setLspError] = useState<string | null>(null);
@@ -570,9 +571,9 @@ export default function WynntilsIde() {
                 </div>
             </header>
 
-            <main className="mx-auto flex w-full max-w-[90vw] flex-col gap-3 p-4">
+            <main className="mx-auto flex w-full max-w-[92vw] flex-col gap-3 p-4">
                 <Card>
-                    <CardHeader className="gap-3">
+                    <CardHeader className="p-3">
                         <div className="flex flex-wrap items-center gap-2">
                             <select
                                 value={activeFile?.id}
@@ -622,7 +623,11 @@ export default function WynntilsIde() {
                                     Delete
                                 </Button>
                             </span>
-                            <Button onClick={() => void compileActiveFile()} disabled={isCompiling || !activeFile}>
+                            <Button
+                                onClick={() => void compileActiveFile()}
+                                disabled={isCompiling || !activeFile}
+                                title="Shortcut: Ctrl/⌘ + Enter"
+                            >
                                 {isCompiling ? (
                                     <LoaderCircle className="size-4 animate-spin" />
                                 ) : (
@@ -640,25 +645,33 @@ export default function WynntilsIde() {
                                     void importFileFromDisk(event);
                                 }}
                             />
-                        </div>
-
-                        <CardDescription className="flex flex-wrap items-center gap-2 text-xs">
-                            <Badge variant={lspStatus === "ready" ? "default" : "outline"}>LSP {lspStatus}</Badge>
-                            <Badge variant="secondary">{workspace.files.length} files</Badge>
-                            <Badge variant="secondary">{diagnosticMarkers.length} diagnostics</Badge>
-                            <span>Ctrl/⌘ + Enter compiles when not focused in IDE</span>
-                            <span className="ml-auto inline-flex items-center gap-1.5 font-mono">
+                            <div className="ml-auto flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                <Badge variant="secondary">{workspace.files.length} files</Badge>
+                                <Button
+                                    variant={showDiagnostics ? "secondary" : "outline"}
+                                    size="sm"
+                                    onClick={() => setShowDiagnostics((current) => !current)}
+                                    disabled={diagnosticMarkers.length === 0}
+                                    aria-pressed={showDiagnostics}
+                                >
+                                    <AlertTriangle className="size-4" />
+                                    {diagnosticMarkers.length} diagnostics
+                                </Button>
                                 <span
-                                    className={`size-2 rounded-full ${workerStatusDotClass(lspStatus)}`}
-                                    aria-hidden="true"
-                                />
-                                browser worker
-                            </span>
-                            {lspError ? <span className="text-red-300">{lspError}</span> : null}
-                        </CardDescription>
+                                    className="inline-flex max-w-48 items-center gap-1.5 truncate font-mono"
+                                    title={lspError ?? `browser worker ${lspStatus}`}
+                                >
+                                    <span
+                                        className={`size-2 shrink-0 rounded-full ${workerStatusDotClass(lspStatus)}`}
+                                        aria-hidden="true"
+                                    />
+                                    <span className="truncate">browser worker</span>
+                                </span>
+                            </div>
+                        </div>
                     </CardHeader>
 
-                    <CardContent>
+                    <CardContent className="px-3 pb-3 pt-0">
                         <div className="overflow-hidden rounded-md border border-border">
                             <Editor
                                 height="68vh"
@@ -682,7 +695,9 @@ export default function WynntilsIde() {
                                     bracketPairColorization: { enabled: true },
                                     glyphMargin: true,
                                     renderValidationDecorations: "on",
+                                    fixedOverflowWidgets: true,
                                     hover: { enabled: true, delay: 120 },
+                                    scrollbar: { alwaysConsumeMouseWheel: false },
                                     suggestOnTriggerCharacters: true,
                                     quickSuggestions: {
                                         strings: true,
@@ -697,7 +712,7 @@ export default function WynntilsIde() {
                     </CardContent>
                 </Card>
 
-                {diagnosticMarkers.length > 0 ? (
+                {showDiagnostics && diagnosticMarkers.length > 0 ? (
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
@@ -733,32 +748,32 @@ export default function WynntilsIde() {
                     </Card>
                 ) : null}
 
-                {compileStatus ? (
-                    <Card
-                        className={compileStatus.tone === "success" ? "border-emerald-500/50" : "border-amber-500/50"}
-                    >
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                {compileStatus.tone === "success" ? (
-                                    <Check className="size-4" />
-                                ) : (
-                                    <AlertTriangle className="size-4" />
-                                )}
-                                Compile status
-                            </CardTitle>
-                            <CardDescription
-                                className={compileStatus.tone === "success" ? "text-emerald-300" : "text-amber-200"}
-                            >
-                                {compileStatus.message}
-                            </CardDescription>
-                        </CardHeader>
-                    </Card>
-                ) : null}
-
                 {compileResult ? (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Compiled output</CardTitle>
+                    <Card
+                        className={
+                            compileStatus?.tone === "success"
+                                ? "border-emerald-500/50"
+                                : compileStatus?.tone === "warning"
+                                  ? "border-amber-500/50"
+                                  : undefined
+                        }
+                    >
+                        <CardHeader className="gap-2">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                {compileStatus?.tone === "success" ? (
+                                    <Check className="size-4" />
+                                ) : compileStatus?.tone === "warning" ? (
+                                    <AlertTriangle className="size-4" />
+                                ) : null}
+                                Compiled output
+                            </CardTitle>
+                            {compileStatus ? (
+                                <CardDescription
+                                    className={compileStatus.tone === "success" ? "text-emerald-300" : "text-amber-200"}
+                                >
+                                    {compileStatus.message}
+                                </CardDescription>
+                            ) : null}
                         </CardHeader>
 
                         <CardContent className="space-y-3">

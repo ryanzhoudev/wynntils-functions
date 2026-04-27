@@ -6,6 +6,8 @@ import { LspDiagnostic } from "@/lib/ide/types";
 
 const VARIABLE_DECLARATION_PATTERN = /^\s*let\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;]*);/gm;
 const PLACEHOLDER_PATTERN = /[@$]\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
+const VALID_FORMATTING_CODES = new Set("0123456789abcdefklmnorABCDEFKLMNOR".split(""));
+const VALID_ESCAPES = new Set(["\\", "n", "{", "}", "E", "B", "L", "M", "H", "&"]);
 
 const DIAGNOSTIC_SEVERITY_ERROR = 1;
 const DIAGNOSTIC_SEVERITY_WARNING = 2;
@@ -22,6 +24,7 @@ export function buildDiagnostics(document: BrowserTextDocument, catalog: Functio
     const declaredVariables = collectVariableDeclarations(documentText, document, diagnostics);
     reportUndefinedPlaceholders(documentText, document, diagnostics, declaredVariables);
     reportFunctionIssues(documentText, document, diagnostics, catalog);
+    reportTemplateSyntaxIssues(documentText, document, diagnostics);
 
     return diagnostics;
 }
@@ -140,7 +143,7 @@ function reportFunctionIssues(
                     documentText,
                     functionCall.startOffset,
                     functionCall.name.length,
-                    DIAGNOSTIC_SEVERITY_WARNING,
+                    DIAGNOSTIC_SEVERITY_ERROR,
                     `Unknown function '${functionCall.name}'`,
                 ),
             );
@@ -242,6 +245,107 @@ function hasValue(argument: ParsedArgument | undefined): argument is ParsedArgum
     }
 
     return argument.text.trim().length > 0;
+}
+
+function reportTemplateSyntaxIssues(
+    documentText: string,
+    document: BrowserTextDocument,
+    diagnostics: LspDiagnostic[],
+) {
+    for (let index = 0; index < documentText.length; index++) {
+        const character = documentText[index];
+
+        if (character === "\\") {
+            const nextCharacter = documentText[index + 1];
+
+            if (!nextCharacter) {
+                diagnostics.push(
+                    createDiagnostic(
+                        document,
+                        documentText,
+                        index,
+                        1,
+                        DIAGNOSTIC_SEVERITY_WARNING,
+                        "Trailing escape character",
+                    ),
+                );
+                continue;
+            }
+
+            if (!VALID_ESCAPES.has(nextCharacter)) {
+                diagnostics.push(
+                    createDiagnostic(
+                        document,
+                        documentText,
+                        index,
+                        2,
+                        DIAGNOSTIC_SEVERITY_WARNING,
+                        `Unknown escape sequence '\\${nextCharacter}'`,
+                    ),
+                );
+            }
+
+            index++;
+            continue;
+        }
+
+        if (character !== "&") {
+            continue;
+        }
+
+        const nextCharacter = documentText[index + 1];
+
+        if (!nextCharacter) {
+            diagnostics.push(
+                createDiagnostic(
+                    document,
+                    documentText,
+                    index,
+                    1,
+                    DIAGNOSTIC_SEVERITY_WARNING,
+                    "Dangling formatting marker '&'",
+                ),
+            );
+            continue;
+        }
+
+        if (nextCharacter === "#") {
+            const hexValue = documentText.slice(index + 2, index + 10);
+
+            if (!/^[0-9A-Fa-f]{8}$/.test(hexValue)) {
+                diagnostics.push(
+                    createDiagnostic(
+                        document,
+                        documentText,
+                        index,
+                        Math.min(10, documentText.length - index),
+                        DIAGNOSTIC_SEVERITY_ERROR,
+                        "Hex color codes must use &#AARRGGBB",
+                    ),
+                );
+                continue;
+            }
+
+            index += 9;
+            continue;
+        }
+
+        if (!VALID_FORMATTING_CODES.has(nextCharacter)) {
+            diagnostics.push(
+                createDiagnostic(
+                    document,
+                    documentText,
+                    index,
+                    2,
+                    DIAGNOSTIC_SEVERITY_WARNING,
+                    `Unknown formatting code '&${nextCharacter}'`,
+                ),
+            );
+            continue;
+        }
+
+        index++;
+    }
 }
 
 function createDiagnostic(

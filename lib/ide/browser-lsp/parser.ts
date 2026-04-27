@@ -44,7 +44,6 @@ export function parse(sourceText: string): ParseResult {
     const parseErrors: ParseError[] = [];
     const openingBraces: Array<{ offset: number; length: number }> = [];
     const expressionRanges: Array<{ startOffset: number; endOffset: number }> = [];
-    const formatSuffixRanges: Array<{ startOffset: number; endOffset: number }> = [];
 
     for (const token of tokens) {
         switch (token.kind) {
@@ -88,7 +87,7 @@ export function parse(sourceText: string): ParseResult {
 
                 const identifierToken: ValueToken = token;
 
-                if (isInsideRange(identifierToken.offset, formatSuffixRanges)) {
+                if (isLikelyFormatSuffixToken(tokens, tokenIndex)) {
                     break;
                 }
 
@@ -109,13 +108,6 @@ export function parse(sourceText: string): ParseResult {
                             isBareExpression: true,
                             formatSuffix,
                         });
-
-                        if (formatSuffix) {
-                            formatSuffixRanges.push({
-                                startOffset: formatSuffix.startOffset,
-                                endOffset: formatSuffix.endOffset,
-                            });
-                        }
                     }
 
                     break;
@@ -169,13 +161,6 @@ export function parse(sourceText: string): ParseResult {
                     isBareExpression: false,
                     formatSuffix,
                 });
-
-                if (formatSuffix) {
-                    formatSuffixRanges.push({
-                        startOffset: formatSuffix.startOffset,
-                        endOffset: formatSuffix.endOffset,
-                    });
-                }
                 break;
             }
 
@@ -185,10 +170,6 @@ export function parse(sourceText: string): ParseResult {
     }
 
     return { calls: functionCalls, errors: parseErrors };
-}
-
-function isInsideRange(offset: number, ranges: Array<{ startOffset: number; endOffset: number }>) {
-    return ranges.some((range) => offset >= range.startOffset && offset < range.endOffset);
 }
 
 function parseFormatSuffix(tokens: Token[], nextTokenIndex: number, sourceText: string): FormatSuffix | undefined {
@@ -231,6 +212,26 @@ function parseFormatSuffix(tokens: Token[], nextTokenIndex: number, sourceText: 
         decimals: match[2] ? Number.parseInt(match[2], 10) : undefined,
         isValid: true,
     };
+}
+
+function isLikelyFormatSuffixToken(tokens: Token[], tokenIndex: number) {
+    let cursor = tokenIndex - 1;
+
+    while (cursor >= 0) {
+        const token = tokens[cursor];
+
+        if (token.kind === TokenKind.Colon) {
+            return true;
+        }
+
+        if (!isFormatSuffixToken(token)) {
+            return false;
+        }
+
+        cursor--;
+    }
+
+    return false;
 }
 
 function isFormatSuffixToken(token: Token) {
