@@ -257,6 +257,7 @@ export function ensureWynntilsLanguage(monaco: MonacoApi) {
             root: [
                 [/\/\/.*/, "comment"],
                 [/\b(let|true|false)\b/, "keyword"],
+                [/[rR]"/, "regexp", "@rawString"],
                 [/[a-zA-Z_][\w]*/, "identifier"],
                 [/[{}()\[\]]/, "delimiter.bracket"],
                 [/;/, "delimiter"],
@@ -271,6 +272,10 @@ export function ensureWynntilsLanguage(monaco: MonacoApi) {
                 [/[^\\"]+/, "string"],
                 [/\\./, "string.escape.invalid"],
                 [/"/, "string", "@pop"],
+            ],
+            rawString: [
+                [/[^"]+/, "regexp"],
+                [/"/, "regexp", "@pop"],
             ],
         },
     });

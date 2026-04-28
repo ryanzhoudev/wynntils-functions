@@ -91,6 +91,23 @@ export function lex(sourceText: string): Token[] {
             continue;
         }
 
+        if ((currentCharacter === "r" || currentCharacter === "R") && sourceText[index + 1] === "\"") {
+            index += 2;
+            let stringValue = "";
+
+            while (index < length && sourceText[index] !== "\"") {
+                stringValue += sourceText[index];
+                index++;
+            }
+
+            if (index < length) {
+                index++;
+            }
+
+            addValueToken(TokenKind.StringLiteral, stringValue, tokenStart, index);
+            continue;
+        }
+
         if (currentCharacter === "\"") {
             index++;
             let stringValue = "";

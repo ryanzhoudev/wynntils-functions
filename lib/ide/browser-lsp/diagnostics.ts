@@ -281,6 +281,11 @@ function reportTemplateSyntaxIssues(
     for (let index = 0; index < documentText.length; index++) {
         const character = documentText[index];
 
+        if (isRawStringStart(documentText, index)) {
+            index = findStringEndOffset(documentText, index + 1);
+            continue;
+        }
+
         if (character === "\\") {
             const nextCharacter = documentText[index + 1];
 
@@ -372,6 +377,31 @@ function reportTemplateSyntaxIssues(
 
         index++;
     }
+}
+
+function isRawStringStart(documentText: string, index: number) {
+    const prefix = documentText[index];
+    const before = index === 0 ? "" : documentText[index - 1];
+
+    return (
+        (prefix === "r" || prefix === "R") &&
+        documentText[index + 1] === "\"" &&
+        (index === 0 || !/[A-Za-z0-9_]/.test(before))
+    );
+}
+
+function findStringEndOffset(documentText: string, openingQuoteOffset: number) {
+    let index = openingQuoteOffset + 1;
+
+    while (index < documentText.length) {
+        if (documentText[index] === "\"") {
+            return index;
+        }
+
+        index++;
+    }
+
+    return documentText.length - 1;
 }
 
 function createDiagnostic(

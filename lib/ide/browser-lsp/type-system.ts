@@ -29,7 +29,16 @@ export function inferArgumentType(
     argument: ParsedArgument,
     callLookup: Map<number, FunctionCall>,
     catalog: FunctionsCatalog,
-) {
+): string | undefined {
+    return inferArgumentTypeWithSeenCalls(argument, callLookup, catalog, new Set());
+}
+
+function inferArgumentTypeWithSeenCalls(
+    argument: ParsedArgument | undefined,
+    callLookup: Map<number, FunctionCall>,
+    catalog: FunctionsCatalog,
+    seenCallOffsets: Set<number>,
+): string | undefined {
     if (!argument || argument.text.length === 0 || argument.tokens.length === 0) {
         return undefined;
     }
@@ -51,11 +60,7 @@ export function inferArgumentType(
                 const possibleCall = callLookup.get(firstToken.offset);
 
                 if (possibleCall && possibleCall.isBareExpression) {
-                    const metadata = catalog.findByName(possibleCall.name);
-
-                    if (metadata) {
-                        return metadata.returnType;
-                    }
+                    return inferFunctionCallReturnType(possibleCall, callLookup, catalog, seenCallOffsets);
                 }
 
                 return "Identifier";
@@ -71,12 +76,58 @@ export function inferArgumentType(
         const possibleCall = callLookup.get(firstToken.offset);
 
         if (possibleCall && possibleCall.endOffset === argument.endOffset) {
-            const metadata = catalog.findByName(possibleCall.name);
-
-            if (metadata) {
-                return metadata.returnType;
-            }
+            return inferFunctionCallReturnType(possibleCall, callLookup, catalog, seenCallOffsets);
         }
+    }
+
+    return undefined;
+}
+
+function inferFunctionCallReturnType(
+    functionCall: FunctionCall,
+    callLookup: Map<number, FunctionCall>,
+    catalog: FunctionsCatalog,
+    seenCallOffsets: Set<number>,
+): string | undefined {
+    const metadata = catalog.findByName(functionCall.name);
+
+    if (!metadata) {
+        return undefined;
+    }
+
+    if (normalizeArgumentType(functionCall.name) !== "if") {
+        return metadata.returnType;
+    }
+
+    if (seenCallOffsets.has(functionCall.startOffset)) {
+        return metadata.returnType;
+    }
+
+    seenCallOffsets.add(functionCall.startOffset);
+
+    const trueBranchType = inferArgumentTypeWithSeenCalls(functionCall.arguments[1], callLookup, catalog, seenCallOffsets);
+    const falseBranchType = inferArgumentTypeWithSeenCalls(functionCall.arguments[2], callLookup, catalog, seenCallOffsets);
+
+    seenCallOffsets.delete(functionCall.startOffset);
+
+    return resolveConditionalReturnType(trueBranchType, falseBranchType) ?? metadata.returnType;
+}
+
+function resolveConditionalReturnType(trueBranchType: string | undefined, falseBranchType: string | undefined): string | undefined {
+    if (!trueBranchType) {
+        return falseBranchType;
+    }
+
+    if (!falseBranchType) {
+        return trueBranchType;
+    }
+
+    if (isTypeCompatible(trueBranchType, falseBranchType)) {
+        return trueBranchType;
+    }
+
+    if (isTypeCompatible(falseBranchType, trueBranchType)) {
+        return falseBranchType;
     }
 
     return undefined;
@@ -86,7 +137,12 @@ export function isTypeCompatible(expectedType: string, actualType: string) {
     const normalizedExpected = normalizeArgumentType(expectedType);
     const normalizedActual = normalizeArgumentType(actualType);
 
-    if (normalizedExpected === "any" || normalizedExpected === "object" || normalizedExpected === "") {
+    if (
+        normalizedExpected === "any" ||
+        normalizedExpected === "object" ||
+        normalizedExpected === "" ||
+        normalizedActual === "object"
+    ) {
         return true;
     }
 
