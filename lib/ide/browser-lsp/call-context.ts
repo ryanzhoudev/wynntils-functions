@@ -12,7 +12,7 @@ export type CallContext = {
 type CallFrame = CallContext;
 
 export function findActiveCallContext(document: BrowserTextDocument, position: LspPosition): CallContext | null {
-    return findCallContext(document.getText(), document.offsetAt(position));
+    return findCallContextStack(document.getText(), document.offsetAt(position)).at(-1) ?? null;
 }
 
 export function findFunctionIdentifierContext(document: BrowserTextDocument, position: LspPosition): CallContext | null {
@@ -20,6 +20,21 @@ export function findFunctionIdentifierContext(document: BrowserTextDocument, pos
 }
 
 export function findCallContext(text: string, offset: number): CallContext | null {
+    return findCallContextStack(text, offset).at(-1) ?? null;
+}
+
+export function findCallContextStack(text: string, offset: number): CallContext[] {
+    const safeOffset = Math.max(0, Math.min(offset, text.length));
+    const identifierContext = findFunctionIdentifierCallContext(text, safeOffset);
+
+    if (identifierContext) {
+        return [...buildCallStack(text, identifierContext.openParenthesisOffset - identifierContext.functionName.length), identifierContext];
+    }
+
+    return buildCallStack(text, safeOffset);
+}
+
+function buildCallStack(text: string, offset: number): CallContext[] {
     const safeOffset = Math.max(0, Math.min(offset, text.length));
     const tokens = lex(text).filter((token) => token.offset < safeOffset);
     const callStack: CallFrame[] = [];
@@ -56,7 +71,7 @@ export function findCallContext(text: string, offset: number): CallContext | nul
         }
     }
 
-    return callStack[callStack.length - 1] ?? null;
+    return callStack;
 }
 
 function findFunctionIdentifierCallContext(text: string, offset: number): CallContext | null {

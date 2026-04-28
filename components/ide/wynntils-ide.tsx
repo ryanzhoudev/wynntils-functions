@@ -7,7 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { WynntilsLspClient } from "@/lib/ide/lsp-client";
 import { WYNNTILS_LANGUAGE, ensureWynntilsLanguage, registerWynntilsProviders } from "@/lib/ide/monaco";
 import { loadWorkspaceFromStorage, saveWorkspaceToStorage } from "@/lib/ide/storage";
-import { CompileResult, IdeFile, IdeWorkspace, LspDiagnostic, LspMarkupContent, LspSignatureHelp } from "@/lib/ide/types";
+import {
+    CompileResult,
+    IdeFile,
+    IdeWorkspace,
+    LspDiagnostic,
+    LspMarkupContent,
+    LspSignatureHelp,
+} from "@/lib/ide/types";
 import { compileSupersetToWynntils } from "@/lib/ide/upstream-compile";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
 import {
@@ -29,6 +36,7 @@ import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } f
 
 const MARKER_OWNER = "wynntils-browser-lsp";
 const WORKSPACE_SAVE_DEBOUNCE_MS = 250;
+const EDITOR_HEIGHT = "calc(100vh - 11.75rem)";
 
 function createFile(name: string, content: string): IdeFile {
     return {
@@ -129,6 +137,12 @@ function formatParameterLabel(label: string | [number, number]) {
     return Array.isArray(label) ? "" : label;
 }
 
+function formatSignatureName(label: string) {
+    const parenthesisIndex = label.indexOf("(");
+
+    return parenthesisIndex >= 0 ? label.slice(0, parenthesisIndex) : label;
+}
+
 export default function WynntilsIde() {
     const functionCatalog = useFunctionCatalog();
 
@@ -152,6 +166,7 @@ export default function WynntilsIde() {
 
     const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
     const monacoRef = useRef<MonacoApi | null>(null);
+    const compiledOutputRef = useRef<HTMLDivElement | null>(null);
     const providerDisposablesRef = useRef<IDisposable[]>([]);
     const editorDisposablesRef = useRef<IDisposable[]>([]);
     const signatureHelpRequestRef = useRef(0);
@@ -318,7 +333,13 @@ export default function WynntilsIde() {
             lspClient.dispose();
             lspClientRef.current = null;
         };
-    }, [applyDiagnosticsForUri, ensureProvidersRegistered, functionCatalog.data, functionCatalog.error, refreshSignatureHelp]);
+    }, [
+        applyDiagnosticsForUri,
+        ensureProvidersRegistered,
+        functionCatalog.data,
+        functionCatalog.error,
+        refreshSignatureHelp,
+    ]);
 
     useEffect(() => {
         return () => {
@@ -545,6 +566,10 @@ export default function WynntilsIde() {
             } else {
                 setCompileStatus({ tone: "success", message: "Compiled successfully." });
             }
+
+            window.setTimeout(() => {
+                compiledOutputRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+            }, 0);
         } finally {
             setIsCompiling(false);
         }
@@ -611,8 +636,10 @@ export default function WynntilsIde() {
         };
     }, [compileActiveFile]);
 
-    const activeSignature = signatureHelp?.signatures[signatureHelp.activeSignature] ?? null;
-    const activeParameter = activeSignature?.parameters?.[signatureHelp?.activeParameter ?? 0] ?? null;
+    const signatureStack = signatureHelp?.signatures ?? [];
+    const activeSignature = signatureStack[signatureHelp?.activeSignature ?? 0] ?? null;
+    const activeSignatureParameterIndex = activeSignature?.activeParameter ?? signatureHelp?.activeParameter ?? 0;
+    const activeParameter = activeSignature?.parameters?.[activeSignatureParameterIndex] ?? null;
     const activeParameterDocumentation = toPlainDocumentation(activeParameter?.documentation);
     const signatureDocumentation = toPlainDocumentation(activeSignature?.documentation);
 
@@ -625,7 +652,6 @@ export default function WynntilsIde() {
                             <Braces className="size-5" />
                             Wynntils IDE
                         </h1>
-                        {/*<p className="text-xs text-muted-foreground">Monaco + browser LSP worker + local file workspace</p>*/}
                         <p className="text-xs text-muted-foreground">
                             Language tooling based on{" "}
                             <a
@@ -751,7 +777,7 @@ export default function WynntilsIde() {
                         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
                             <div className="border border-border bg-[#1e1e1e]">
                                 <Editor
-                                    height="68vh"
+                                    height={EDITOR_HEIGHT}
                                     path={activeFileUri ?? undefined}
                                     defaultLanguage={WYNNTILS_LANGUAGE}
                                     language={WYNNTILS_LANGUAGE}
@@ -787,10 +813,63 @@ export default function WynntilsIde() {
                                 />
                             </div>
 
-                            <aside className="h-44 overflow-y-auto rounded-md border border-border bg-muted/30 px-3 py-2 text-xs xl:h-[68vh]">
-                                <div className="mb-2 text-[11px] font-semibold uppercase text-muted-foreground">Context</div>
+                            <aside className="h-44 overflow-y-auto rounded-md border border-border bg-muted/30 px-3 py-2 text-xs xl:h-[calc(100vh-11.75rem)]">
+                                <div className="mb-2 text-[11px] font-semibold uppercase text-muted-foreground">
+                                    Context
+                                </div>
                                 {activeSignature ? (
                                     <div>
+                                        {signatureStack.length > 1 ? (
+                                            <div className="mb-3 rounded-md border border-border bg-background/45 p-2">
+                                                <div className="mb-2 text-[11px] font-medium uppercase text-muted-foreground">
+                                                    Function Stack
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    {signatureStack.map((signature, index) => {
+                                                        const isActive = index === signatureHelp?.activeSignature;
+                                                        const activeParameterLabel =
+                                                            signature.parameters?.[signature.activeParameter ?? 0]
+                                                                ?.label;
+
+                                                        return (
+                                                            <div
+                                                                key={`${signature.label}-${index}`}
+                                                                className={`rounded border px-2 py-1.5 ${
+                                                                    isActive
+                                                                        ? "border-blue-400 bg-blue-500/15 text-blue-100"
+                                                                        : "border-border bg-card/70 text-muted-foreground"
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="min-w-0 flex-1 truncate font-mono text-[12px]">
+                                                                        {formatSignatureName(signature.label)}
+                                                                    </div>
+                                                                    <span
+                                                                        className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] uppercase ${
+                                                                            isActive
+                                                                                ? "border-blue-300/70 bg-blue-300/15 text-blue-100"
+                                                                                : "border-border bg-background/50 text-muted-foreground"
+                                                                        }`}
+                                                                    >
+                                                                        {isActive ? "cursor" : "parent"}
+                                                                    </span>
+                                                                </div>
+                                                                {activeParameterLabel ? (
+                                                                    <div className="mt-1 flex min-w-0 items-baseline gap-1.5 text-[11px]">
+                                                                        <span className="shrink-0 text-muted-foreground">
+                                                                            argument
+                                                                        </span>
+                                                                        <span className="truncate font-mono">
+                                                                            {formatParameterLabel(activeParameterLabel)}
+                                                                        </span>
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ) : null}
                                         <div className="break-words font-mono text-[13px] leading-relaxed text-foreground">
                                             {activeSignature.label}
                                         </div>
@@ -805,7 +884,7 @@ export default function WynntilsIde() {
                                                     <span
                                                         key={`${formatParameterLabel(parameter.label)}-${index}`}
                                                         className={`rounded border px-2 py-1 font-mono ${
-                                                            index === signatureHelp?.activeParameter
+                                                            index === activeSignatureParameterIndex
                                                                 ? "border-blue-400 bg-blue-500/15 text-blue-100"
                                                                 : "border-border bg-background/60 text-muted-foreground"
                                                         }`}
@@ -870,6 +949,7 @@ export default function WynntilsIde() {
 
                 {compileResult ? (
                     <Card
+                        ref={compiledOutputRef}
                         className={
                             compileStatus?.tone === "success"
                                 ? "border-emerald-500/50"

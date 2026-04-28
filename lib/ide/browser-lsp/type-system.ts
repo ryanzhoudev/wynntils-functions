@@ -86,7 +86,7 @@ export function isTypeCompatible(expectedType: string, actualType: string) {
     const normalizedExpected = normalizeArgumentType(expectedType);
     const normalizedActual = normalizeArgumentType(actualType);
 
-    if (normalizedExpected === "any" || normalizedExpected === "") {
+    if (normalizedExpected === "any" || normalizedExpected === "object" || normalizedExpected === "") {
         return true;
     }
 

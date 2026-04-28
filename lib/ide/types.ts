@@ -69,6 +69,7 @@ export type LspHover = {
 export type LspSignatureInformation = {
     label: string;
     documentation?: string | LspMarkupContent;
+    activeParameter?: number;
     parameters?: Array<{
         label: string;
         documentation?: string | LspMarkupContent;

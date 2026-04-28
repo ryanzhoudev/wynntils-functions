@@ -1,5 +1,5 @@
 import { formatSignature, FunctionMetadata, FunctionsCatalog } from "@/lib/ide/browser-lsp/catalog";
-import { findActiveCallContext, findFunctionIdentifierContext } from "@/lib/ide/browser-lsp/call-context";
+import { CallContext, findCallContextStack } from "@/lib/ide/browser-lsp/call-context";
 import { formatArgumentLabel, resolveArgumentSlot } from "@/lib/ide/browser-lsp/function-arguments";
 import { BrowserTextDocument } from "@/lib/ide/browser-lsp/text-document";
 import { LspPosition, LspSignatureHelp } from "@/lib/ide/types";
@@ -9,31 +9,43 @@ export function createSignatureHelp(
     position: LspPosition,
     catalog: FunctionsCatalog,
 ): LspSignatureHelp | null {
-    const context = findActiveCallContext(document, position) ?? findFunctionIdentifierContext(document, position);
+    const contexts = findCallContextStack(document.getText(), document.offsetAt(position));
 
-    if (!context) {
+    if (contexts.length === 0) {
         return null;
     }
 
-    const metadata = catalog.findByName(context.functionName);
+    const signatures = contexts
+        .map((context) => {
+            const metadata = catalog.findByName(context.functionName);
 
-    if (!metadata) {
+            if (!metadata) {
+                return null;
+            }
+
+            return createSignatureInformation(metadata, context);
+        })
+        .filter((signature) => signature !== null);
+
+    if (signatures.length === 0) {
         return null;
     }
 
-    const parameterCount = metadata.arguments.length;
-    const activeArgumentSlot = resolveArgumentSlot(metadata.arguments, context.activeParameter);
+    const activeSignature = signatures.length - 1;
+    const activeParameter = signatures[activeSignature].activeParameter ?? 0;
 
     return {
-        signatures: [createSignatureInformation(metadata)],
-        activeSignature: 0,
-        activeParameter: activeArgumentSlot?.index ?? Math.min(context.activeParameter, Math.max(parameterCount - 1, 0)),
+        signatures,
+        activeSignature,
+        activeParameter,
     };
 }
 
-function createSignatureInformation(metadata: FunctionMetadata) {
+function createSignatureInformation(metadata: FunctionMetadata, context: CallContext) {
     const signature = formatSignature(metadata, true, true);
     const description = metadata.description ? `\n\n${metadata.description}` : "";
+    const parameterCount = metadata.arguments.length;
+    const activeArgumentSlot = resolveArgumentSlot(metadata.arguments, context.activeParameter);
 
     return {
         label: `${metadata.canonicalName}${signature} -> ${metadata.returnType}`,
@@ -41,6 +53,7 @@ function createSignatureInformation(metadata: FunctionMetadata) {
             kind: "markdown" as const,
             value: description.trim(),
         },
+        activeParameter: activeArgumentSlot?.index ?? Math.min(context.activeParameter, Math.max(parameterCount - 1, 0)),
         parameters: metadata.arguments.map((argument) => {
             const requirement = argument.required ? "required" : "optional";
             const defaultValue =
