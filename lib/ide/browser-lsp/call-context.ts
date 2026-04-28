@@ -15,6 +15,10 @@ export function findActiveCallContext(document: BrowserTextDocument, position: L
     return findCallContext(document.getText(), document.offsetAt(position));
 }
 
+export function findFunctionIdentifierContext(document: BrowserTextDocument, position: LspPosition): CallContext | null {
+    return findFunctionIdentifierCallContext(document.getText(), document.offsetAt(position));
+}
+
 export function findCallContext(text: string, offset: number): CallContext | null {
     const safeOffset = Math.max(0, Math.min(offset, text.length));
     const tokens = lex(text).filter((token) => token.offset < safeOffset);
@@ -53,6 +57,36 @@ export function findCallContext(text: string, offset: number): CallContext | nul
     }
 
     return callStack[callStack.length - 1] ?? null;
+}
+
+function findFunctionIdentifierCallContext(text: string, offset: number): CallContext | null {
+    const safeOffset = Math.max(0, Math.min(offset, text.length));
+    const tokens = lex(text);
+
+    for (let index = 0; index < tokens.length; index++) {
+        const token = tokens[index];
+        const nextToken = tokens[index + 1];
+
+        if (!isFunctionCallStart(token, nextToken) || !nextToken) {
+            continue;
+        }
+
+        const tokenEndOffset = token.offset + token.length;
+        const cursorIsOnIdentifier = safeOffset >= token.offset && safeOffset <= tokenEndOffset;
+
+        if (!cursorIsOnIdentifier) {
+            continue;
+        }
+
+        return {
+            functionName: token.value,
+            activeParameter: 0,
+            openParenthesisOffset: nextToken.offset,
+            argumentStartOffset: nextToken.offset + nextToken.length,
+        };
+    }
+
+    return null;
 }
 
 function isFunctionCallStart(

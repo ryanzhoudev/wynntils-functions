@@ -1,5 +1,5 @@
 import { formatSignature, FunctionMetadata, FunctionsCatalog } from "@/lib/ide/browser-lsp/catalog";
-import { findActiveCallContext } from "@/lib/ide/browser-lsp/call-context";
+import { findActiveCallContext, findFunctionIdentifierContext } from "@/lib/ide/browser-lsp/call-context";
 import { formatArgumentLabel, resolveArgumentSlot } from "@/lib/ide/browser-lsp/function-arguments";
 import { BrowserTextDocument } from "@/lib/ide/browser-lsp/text-document";
 import { LspPosition, LspSignatureHelp } from "@/lib/ide/types";
@@ -9,7 +9,7 @@ export function createSignatureHelp(
     position: LspPosition,
     catalog: FunctionsCatalog,
 ): LspSignatureHelp | null {
-    const context = findActiveCallContext(document, position);
+    const context = findActiveCallContext(document, position) ?? findFunctionIdentifierContext(document, position);
 
     if (!context) {
         return null;

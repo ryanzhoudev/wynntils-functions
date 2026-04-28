@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { WynntilsLspClient } from "@/lib/ide/lsp-client";
-import { WYNNTILS_LANGUAGE, WYNNTILS_THEME, ensureWynntilsLanguage, registerWynntilsProviders } from "@/lib/ide/monaco";
+import { WYNNTILS_LANGUAGE, ensureWynntilsLanguage, registerWynntilsProviders } from "@/lib/ide/monaco";
 import { loadWorkspaceFromStorage, saveWorkspaceToStorage } from "@/lib/ide/storage";
 import { CompileResult, IdeFile, IdeWorkspace, LspDiagnostic, LspMarkupContent, LspSignatureHelp } from "@/lib/ide/types";
 import { compileSupersetToWynntils } from "@/lib/ide/upstream-compile";
@@ -357,7 +357,6 @@ export default function WynntilsIde() {
         monacoRef.current = monaco;
 
         ensureWynntilsLanguage(monaco);
-        monaco.editor.setTheme(WYNNTILS_THEME);
         ensureProvidersRegistered();
 
         editorDisposablesRef.current.forEach((disposable) => disposable.dispose());
@@ -750,7 +749,7 @@ export default function WynntilsIde() {
 
                     <CardContent className="px-3 pb-3 pt-0">
                         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
-                            <div className="border border-border bg-[#101923]">
+                            <div className="border border-border bg-[#1e1e1e]">
                                 <Editor
                                     height="68vh"
                                     path={activeFileUri ?? undefined}
@@ -784,7 +783,7 @@ export default function WynntilsIde() {
                                         },
                                         scrollBeyondLastLine: false,
                                     }}
-                                    theme={WYNNTILS_THEME}
+                                    theme="vs-dark"
                                 />
                             </div>
 

@@ -11,58 +11,9 @@ import {
 import type { editor as MonacoEditor, languages as MonacoLanguages, Position as MonacoPosition } from "monaco-editor";
 
 const WYNNTILS_LANGUAGE_ID = "wynntils";
-const WYNNTILS_THEME_ID = "wynntils-dark";
 let languageRegistered = false;
 
 export const WYNNTILS_LANGUAGE = WYNNTILS_LANGUAGE_ID;
-export const WYNNTILS_THEME = WYNNTILS_THEME_ID;
-
-function defineWynntilsTheme(monaco: MonacoApi) {
-    monaco.editor.defineTheme(WYNNTILS_THEME_ID, {
-        base: "vs-dark",
-        inherit: true,
-        rules: [
-            { token: "comment", foreground: "708194", fontStyle: "italic" },
-            { token: "keyword", foreground: "7dd3fc", fontStyle: "bold" },
-            { token: "identifier", foreground: "dbeafe" },
-            { token: "delimiter", foreground: "94a3b8" },
-            { token: "delimiter.bracket", foreground: "facc15" },
-            { token: "number", foreground: "a7f3d0" },
-            { token: "number.hex", foreground: "86efac" },
-            { token: "type.identifier", foreground: "2dd4bf" },
-            { token: "string", foreground: "fdba74" },
-            { token: "string.invalid", foreground: "f87171" },
-            { token: "string.escape.invalid", foreground: "f87171", fontStyle: "bold" },
-        ],
-        colors: {
-            "editor.background": "#101923",
-            "editor.foreground": "#dbe7f3",
-            "editorLineNumber.foreground": "#64748b",
-            "editorLineNumber.activeForeground": "#cbd5e1",
-            "editorCursor.foreground": "#7dd3fc",
-            "editor.selectionBackground": "#24557a80",
-            "editor.inactiveSelectionBackground": "#22384f80",
-            "editor.lineHighlightBackground": "#172334",
-            "editor.lineHighlightBorder": "#223247",
-            "editorIndentGuide.background1": "#26384d",
-            "editorIndentGuide.activeBackground1": "#3b82f6",
-            "editorWhitespace.foreground": "#31435a",
-            "editorWidget.background": "#111c28",
-            "editorWidget.border": "#334155",
-            "editorSuggestWidget.background": "#111c28",
-            "editorSuggestWidget.border": "#334155",
-            "editorSuggestWidget.foreground": "#dbe7f3",
-            "editorSuggestWidget.selectedBackground": "#1e3a56",
-            "editorSuggestWidget.highlightForeground": "#7dd3fc",
-            "editorHoverWidget.background": "#111c28",
-            "editorHoverWidget.border": "#334155",
-            "editorOverviewRuler.border": "#101923",
-            "scrollbarSlider.background": "#33415588",
-            "scrollbarSlider.hoverBackground": "#475569aa",
-            "scrollbarSlider.activeBackground": "#64748bcc",
-        },
-    });
-}
 
 function toLspPosition(lineNumber: number, column: number) {
     return {
@@ -246,8 +197,6 @@ function resolveDocumentation(item: LspCompletionItem): string | undefined {
 }
 
 export function ensureWynntilsLanguage(monaco: MonacoApi) {
-    defineWynntilsTheme(monaco);
-
     if (languageRegistered) {
         return;
     }
