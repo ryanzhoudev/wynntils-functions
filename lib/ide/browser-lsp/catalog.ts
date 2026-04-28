@@ -1,7 +1,9 @@
 import { FunctionCatalogResponse, FunctionEntry } from "@/lib/types";
+import { formatArgumentLabel } from "@/lib/ide/browser-lsp/function-arguments";
 
 export type FunctionArgumentMetadata = {
     name: string;
+    description?: string | null;
     required: boolean;
     type: string;
     defaultValue?: string | null;
@@ -49,9 +51,7 @@ export function formatSignature(metadata: FunctionMetadata, includeOptionalArgum
     const argumentSource = includeOptionalArguments
         ? metadata.arguments
         : metadata.arguments.filter((argument) => argument.required);
-    const argumentNames = argumentSource.map((argument) =>
-        includeTypes ? `${argument.name}: ${argument.type}` : argument.name,
-    );
+    const argumentNames = argumentSource.map((argument) => (includeTypes ? formatArgumentLabel(argument) : argument.name));
 
     if (argumentNames.length === 0) {
         return "(no args)";
@@ -78,6 +78,7 @@ function normalizeFunctionEntry(entry: FunctionEntry): FunctionMetadata {
         aliases: normalizeAliases(entry.aliases),
         arguments: entry.arguments.map((argument) => ({
             name: argument.name || "arg",
+            description: argument.description,
             required: argument.required,
             type: normalizeType(argument.type),
             defaultValue: argument.defaultValue,

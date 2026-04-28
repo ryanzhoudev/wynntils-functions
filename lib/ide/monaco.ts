@@ -1,12 +1,68 @@
 import type { Monaco as MonacoApi } from "@monaco-editor/react";
 import { WynntilsLspClient } from "@/lib/ide/lsp-client";
-import { LspCompletionItem, LspHover, LspMarkupContent, LspMarkedString, LspRange, LspTextEdit } from "@/lib/ide/types";
+import {
+    LspCompletionItem,
+    LspHover,
+    LspMarkupContent,
+    LspMarkedString,
+    LspRange,
+    LspTextEdit,
+} from "@/lib/ide/types";
 import type { editor as MonacoEditor, languages as MonacoLanguages, Position as MonacoPosition } from "monaco-editor";
 
 const WYNNTILS_LANGUAGE_ID = "wynntils";
+const WYNNTILS_THEME_ID = "wynntils-dark";
 let languageRegistered = false;
 
 export const WYNNTILS_LANGUAGE = WYNNTILS_LANGUAGE_ID;
+export const WYNNTILS_THEME = WYNNTILS_THEME_ID;
+
+function defineWynntilsTheme(monaco: MonacoApi) {
+    monaco.editor.defineTheme(WYNNTILS_THEME_ID, {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+            { token: "comment", foreground: "708194", fontStyle: "italic" },
+            { token: "keyword", foreground: "7dd3fc", fontStyle: "bold" },
+            { token: "identifier", foreground: "dbeafe" },
+            { token: "delimiter", foreground: "94a3b8" },
+            { token: "delimiter.bracket", foreground: "facc15" },
+            { token: "number", foreground: "a7f3d0" },
+            { token: "number.hex", foreground: "86efac" },
+            { token: "type.identifier", foreground: "2dd4bf" },
+            { token: "string", foreground: "fdba74" },
+            { token: "string.invalid", foreground: "f87171" },
+            { token: "string.escape.invalid", foreground: "f87171", fontStyle: "bold" },
+        ],
+        colors: {
+            "editor.background": "#101923",
+            "editor.foreground": "#dbe7f3",
+            "editorLineNumber.foreground": "#64748b",
+            "editorLineNumber.activeForeground": "#cbd5e1",
+            "editorCursor.foreground": "#7dd3fc",
+            "editor.selectionBackground": "#24557a80",
+            "editor.inactiveSelectionBackground": "#22384f80",
+            "editor.lineHighlightBackground": "#172334",
+            "editor.lineHighlightBorder": "#223247",
+            "editorIndentGuide.background1": "#26384d",
+            "editorIndentGuide.activeBackground1": "#3b82f6",
+            "editorWhitespace.foreground": "#31435a",
+            "editorWidget.background": "#111c28",
+            "editorWidget.border": "#334155",
+            "editorSuggestWidget.background": "#111c28",
+            "editorSuggestWidget.border": "#334155",
+            "editorSuggestWidget.foreground": "#dbe7f3",
+            "editorSuggestWidget.selectedBackground": "#1e3a56",
+            "editorSuggestWidget.highlightForeground": "#7dd3fc",
+            "editorHoverWidget.background": "#111c28",
+            "editorHoverWidget.border": "#334155",
+            "editorOverviewRuler.border": "#101923",
+            "scrollbarSlider.background": "#33415588",
+            "scrollbarSlider.hoverBackground": "#475569aa",
+            "scrollbarSlider.activeBackground": "#64748bcc",
+        },
+    });
+}
 
 function toLspPosition(lineNumber: number, column: number) {
     return {
@@ -135,6 +191,34 @@ function resolveRange(
     return fromLspRange(textEdit.range);
 }
 
+function isEscapedCompletionContext(documentText: string, wordStartOffset: number) {
+    return wordStartOffset > 0 && documentText[wordStartOffset - 1] === "\\";
+}
+
+function isPlaceholderCompletionContext(documentText: string, wordStartOffset: number) {
+    const marker = documentText.slice(Math.max(0, wordStartOffset - 2), wordStartOffset);
+
+    return marker === "@{" || marker === "${";
+}
+
+function isFormatSuffixCompletionContext(documentText: string, wordStartOffset: number) {
+    const expressionStart = documentText.lastIndexOf("{", wordStartOffset);
+    const expressionEnd = documentText.lastIndexOf("}", wordStartOffset);
+
+    if (expressionStart < 0 || expressionStart < expressionEnd) {
+        return false;
+    }
+
+    const expressionPrefix = documentText.slice(expressionStart + 1, wordStartOffset);
+    const colonIndex = expressionPrefix.lastIndexOf(":");
+
+    if (colonIndex < 0) {
+        return false;
+    }
+
+    return /^[A-Za-z0-9]*$/.test(expressionPrefix.slice(colonIndex + 1));
+}
+
 function resolveDocumentation(item: LspCompletionItem): string | undefined {
     const documentation = item.documentation;
 
@@ -162,6 +246,8 @@ function resolveDocumentation(item: LspCompletionItem): string | undefined {
 }
 
 export function ensureWynntilsLanguage(monaco: MonacoApi) {
+    defineWynntilsTheme(monaco);
+
     if (languageRegistered) {
         return;
     }
@@ -219,19 +305,37 @@ export function ensureWynntilsLanguage(monaco: MonacoApi) {
 
 export function registerWynntilsProviders(monaco: MonacoApi, lspClient: WynntilsLspClient) {
     const completionProvider = monaco.languages.registerCompletionItemProvider(WYNNTILS_LANGUAGE_ID, {
-        triggerCharacters: ["{", "(", ";"],
+        triggerCharacters: ["{"],
         provideCompletionItems: async (
             model: MonacoEditor.ITextModel,
             position: MonacoPosition,
             context: MonacoLanguages.CompletionContext,
         ) => {
+            const currentWord = model.getWordUntilPosition(position);
+            const isExpressionStart = context.triggerCharacter === "{";
+            const documentText = model.getValue();
+            const wordStartOffset = model.getOffsetAt({
+                lineNumber: position.lineNumber,
+                column: currentWord.startColumn,
+            });
+
+            if (
+                context.triggerCharacter === ";" ||
+                context.triggerCharacter === "(" ||
+                isEscapedCompletionContext(documentText, wordStartOffset) ||
+                isPlaceholderCompletionContext(documentText, wordStartOffset) ||
+                isFormatSuffixCompletionContext(documentText, wordStartOffset) ||
+                (!isExpressionStart && currentWord.word.length === 0)
+            ) {
+                return { suggestions: [] };
+            }
+
             const items = await lspClient.requestCompletion(
                 model.uri.toString(),
                 toLspPosition(position.lineNumber, position.column),
                 context.triggerCharacter,
             );
 
-            const currentWord = model.getWordUntilPosition(position);
             const fallbackRange = {
                 startLineNumber: position.lineNumber,
                 endLineNumber: position.lineNumber,
@@ -251,6 +355,7 @@ export function registerWynntilsProviders(monaco: MonacoApi, lspClient: Wynntils
                             ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
                             : monaco.languages.CompletionItemInsertTextRule.None,
                     range: resolveRange(item, fallbackRange),
+                    sortText: item.sortText,
                 })),
             };
         },

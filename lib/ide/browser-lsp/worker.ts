@@ -39,6 +39,12 @@ type WorkerRequest =
       }
     | {
           id: number;
+          method: "requestSignatureHelp";
+          uri: string;
+          position: LspPosition;
+      }
+    | {
+          id: number;
           method: "dispose";
       };
 
@@ -94,6 +100,14 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
                     type: "response",
                     id: message.id,
                     result: await requireService().requestHover(message.uri, message.position),
+                });
+                break;
+
+            case "requestSignatureHelp":
+                self.postMessage({
+                    type: "response",
+                    id: message.id,
+                    result: await requireService().requestSignatureHelp(message.uri, message.position),
                 });
                 break;
 

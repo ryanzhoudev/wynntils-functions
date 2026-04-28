@@ -1,4 +1,5 @@
-import { FunctionArgumentMetadata, FunctionsCatalog } from "@/lib/ide/browser-lsp/catalog";
+import { formatSignature, FunctionArgumentMetadata, FunctionMetadata, FunctionsCatalog } from "@/lib/ide/browser-lsp/catalog";
+import { canOmitArgument, isListArgument, resolveArgumentSlot } from "@/lib/ide/browser-lsp/function-arguments";
 import { FunctionCall, parse, ParsedArgument } from "@/lib/ide/browser-lsp/parser";
 import { BrowserTextDocument } from "@/lib/ide/browser-lsp/text-document";
 import { inferArgumentType, isTypeCompatible } from "@/lib/ide/browser-lsp/type-system";
@@ -150,28 +151,33 @@ function reportFunctionIssues(
             continue;
         }
 
-        validateArguments(functionCall, metadata.arguments, document, documentText, diagnostics, callLookup, catalog);
+        validateArguments(functionCall, metadata, document, documentText, diagnostics, callLookup, catalog);
     }
 }
 
 function validateArguments(
     functionCall: FunctionCall,
-    expectedArguments: FunctionArgumentMetadata[],
+    metadata: FunctionMetadata,
     document: BrowserTextDocument,
     documentText: string,
     diagnostics: LspDiagnostic[],
     callLookup: Map<number, FunctionCall>,
     catalog: FunctionsCatalog,
 ) {
+    const expectedArguments = metadata.arguments;
     const providedArguments = functionCall.arguments;
     const expectedCount = expectedArguments.length;
+    const firstOptionalIndex = expectedArguments.findIndex((argument) => !argument.required && !isListArgument(argument));
+    const hasProvidedOptionalArgument =
+        firstOptionalIndex >= 0 &&
+        providedArguments.some((argument, index) => index >= firstOptionalIndex && hasValue(argument));
 
     for (let index = 0; index < expectedCount; index++) {
         const expectedArgument = expectedArguments[index];
         const providedArgument = providedArguments[index];
 
         if (!hasValue(providedArgument)) {
-            if (expectedArgument.required) {
+            if (!canOmitArgument(expectedArgument) || (!expectedArgument.required && hasProvidedOptionalArgument)) {
                 diagnostics.push(
                     createDiagnostic(
                         document,
@@ -179,10 +185,14 @@ function validateArguments(
                         functionCall.startOffset,
                         functionCall.endOffset - functionCall.startOffset,
                         DIAGNOSTIC_SEVERITY_ERROR,
-                        `'${functionCall.name}' is missing required argument '${expectedArgument.name}'`,
+                        createMissingArgumentMessage(functionCall.name, metadata, expectedArgument, index),
                     ),
                 );
             }
+            continue;
+        }
+
+        if (isListArgument(expectedArgument)) {
             continue;
         }
 
@@ -206,7 +216,7 @@ function validateArguments(
                     startOffset,
                     endOffset - startOffset,
                     DIAGNOSTIC_SEVERITY_ERROR,
-                    `'${functionCall.name}' argument '${expectedArgument.name}' expects ${expectedArgument.type}; received ${inferredType}`,
+                    `'${functionCall.name}' argument ${index + 1} '${expectedArgument.name}' expects ${expectedArgument.type}; received ${inferredType}.`,
                 ),
             );
         }
@@ -214,6 +224,11 @@ function validateArguments(
 
     for (let index = expectedCount; index < providedArguments.length; index++) {
         const extraArgument = providedArguments[index];
+        const expectedArgumentSlot = resolveArgumentSlot(expectedArguments, index);
+
+        if (expectedArgumentSlot) {
+            continue;
+        }
 
         if (!hasValue(extraArgument)) {
             continue;
@@ -228,11 +243,22 @@ function validateArguments(
                 documentText,
                 startOffset,
                 endOffset - startOffset,
-                DIAGNOSTIC_SEVERITY_WARNING,
-                `'${functionCall.name}' does not accept argument ${index + 1}`,
+                DIAGNOSTIC_SEVERITY_ERROR,
+                `'${functionCall.name}' expects ${expectedCount} argument${expectedCount === 1 ? "" : "s"}; argument ${index + 1} is extra.`,
             ),
         );
     }
+}
+
+function createMissingArgumentMessage(
+    functionName: string,
+    metadata: FunctionMetadata,
+    expectedArgument: FunctionArgumentMetadata,
+    index: number,
+) {
+    const requirement = expectedArgument.required ? "required" : "optional";
+
+    return `'${functionName}' is missing ${requirement} argument ${index + 1} '${expectedArgument.name}'. Expected ${formatSignature(metadata, true, true)}.`;
 }
 
 function hasValue(argument: ParsedArgument | undefined): argument is ParsedArgument {

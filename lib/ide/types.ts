@@ -53,6 +53,7 @@ export type LspCompletionItem = {
     insertText?: string;
     insertTextFormat?: number;
     textEdit?: LspTextEdit;
+    sortText?: string;
 };
 
 export type LspCompletionList = {
@@ -63,6 +64,21 @@ export type LspCompletionList = {
 export type LspHover = {
     contents: string | LspMarkupContent | LspMarkedString | LspMarkedString[];
     range?: LspRange;
+};
+
+export type LspSignatureInformation = {
+    label: string;
+    documentation?: string | LspMarkupContent;
+    parameters?: Array<{
+        label: string;
+        documentation?: string | LspMarkupContent;
+    }>;
+};
+
+export type LspSignatureHelp = {
+    signatures: LspSignatureInformation[];
+    activeSignature: number;
+    activeParameter: number;
 };
 
 export type CompileResult = {

@@ -1,4 +1,5 @@
 import { FunctionsCatalog } from "@/lib/ide/browser-lsp/catalog";
+import { normalizeArgumentType } from "@/lib/ide/browser-lsp/function-arguments";
 import { TokenKind } from "@/lib/ide/browser-lsp/lexer";
 import { FunctionCall, ParsedArgument } from "@/lib/ide/browser-lsp/parser";
 
@@ -9,6 +10,8 @@ const typeCompatibilityMap: Record<string, string[]> = {
     number: ["number"],
     integer: ["integer", "number", "long"],
     long: ["long", "number"],
+    double: ["double", "number"],
+    float: ["float", "number"],
     hexcolor: ["string", "customcolor"],
     customcolor: ["customcolor"],
     cappedvalue: ["cappedvalue"],
@@ -18,6 +21,7 @@ const typeCompatibilityMap: Record<string, string[]> = {
     time: ["time", "number", "integer"],
     namedvalue: ["namedvalue"],
     location: ["location"],
+    styledtext: ["styledtext"],
     any: ["any"],
 };
 
@@ -79,8 +83,8 @@ export function inferArgumentType(
 }
 
 export function isTypeCompatible(expectedType: string, actualType: string) {
-    const normalizedExpected = normalizeType(expectedType);
-    const normalizedActual = normalizeType(actualType);
+    const normalizedExpected = normalizeArgumentType(expectedType);
+    const normalizedActual = normalizeArgumentType(actualType);
 
     if (normalizedExpected === "any" || normalizedExpected === "") {
         return true;
@@ -89,8 +93,4 @@ export function isTypeCompatible(expectedType: string, actualType: string) {
     const compatibleTargets = typeCompatibilityMap[normalizedActual] ?? [normalizedActual];
 
     return compatibleTargets.includes(normalizedExpected);
-}
-
-function normalizeType(typeName: string) {
-    return (typeName ?? "").toLowerCase();
 }

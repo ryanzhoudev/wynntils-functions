@@ -5,9 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { WynntilsLspClient } from "@/lib/ide/lsp-client";
-import { WYNNTILS_LANGUAGE, ensureWynntilsLanguage, registerWynntilsProviders } from "@/lib/ide/monaco";
+import { WYNNTILS_LANGUAGE, WYNNTILS_THEME, ensureWynntilsLanguage, registerWynntilsProviders } from "@/lib/ide/monaco";
 import { loadWorkspaceFromStorage, saveWorkspaceToStorage } from "@/lib/ide/storage";
-import { CompileResult, IdeFile, IdeWorkspace, LspDiagnostic } from "@/lib/ide/types";
+import { CompileResult, IdeFile, IdeWorkspace, LspDiagnostic, LspMarkupContent, LspSignatureHelp } from "@/lib/ide/types";
 import { compileSupersetToWynntils } from "@/lib/ide/upstream-compile";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
 import {
@@ -112,6 +112,23 @@ function mapDiagnosticSeverity(monaco: MonacoApi, severity?: number) {
     }
 }
 
+function toPlainDocumentation(documentation: string | LspMarkupContent | undefined) {
+    if (!documentation) {
+        return "";
+    }
+
+    const value = typeof documentation === "string" ? documentation : documentation.value;
+
+    return value
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/\*\*([^*]+)\*\*/g, "$1")
+        .trim();
+}
+
+function formatParameterLabel(label: string | [number, number]) {
+    return Array.isArray(label) ? "" : label;
+}
+
 export default function WynntilsIde() {
     const functionCatalog = useFunctionCatalog();
 
@@ -125,6 +142,7 @@ export default function WynntilsIde() {
 
     const [diagnosticMarkers, setDiagnosticMarkers] = useState<MonacoEditor.IMarkerData[]>([]);
     const [showDiagnostics, setShowDiagnostics] = useState(false);
+    const [signatureHelp, setSignatureHelp] = useState<LspSignatureHelp | null>(null);
 
     const [lspStatus, setLspStatus] = useState<"connecting" | "ready" | "error">("connecting");
     const [lspError, setLspError] = useState<string | null>(null);
@@ -135,6 +153,8 @@ export default function WynntilsIde() {
     const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
     const monacoRef = useRef<MonacoApi | null>(null);
     const providerDisposablesRef = useRef<IDisposable[]>([]);
+    const editorDisposablesRef = useRef<IDisposable[]>([]);
+    const signatureHelpRequestRef = useRef(0);
 
     const lspClientRef = useRef<WynntilsLspClient | null>(null);
     const diagnosticsByUriRef = useRef<Map<string, LspDiagnostic[]>>(new Map());
@@ -198,6 +218,38 @@ export default function WynntilsIde() {
         providerDisposablesRef.current = registerWynntilsProviders(monaco, lspClient);
     }, []);
 
+    const refreshSignatureHelp = useCallback(() => {
+        const editor = editorRef.current;
+        const lspClient = lspClientRef.current;
+        const activeUri = activeUriRef.current;
+        const position = editor?.getPosition();
+
+        if (!editor || !lspClient || !activeUri || !position) {
+            setSignatureHelp(null);
+            return;
+        }
+
+        const requestId = ++signatureHelpRequestRef.current;
+
+        void lspClient
+            .requestSignatureHelp(activeUri, {
+                line: position.lineNumber - 1,
+                character: position.column - 1,
+            })
+            .then((help) => {
+                if (requestId !== signatureHelpRequestRef.current || activeUri !== activeUriRef.current) {
+                    return;
+                }
+
+                setSignatureHelp(help && help.signatures.length > 0 ? help : null);
+            })
+            .catch(() => {
+                if (requestId === signatureHelpRequestRef.current) {
+                    setSignatureHelp(null);
+                }
+            });
+    }, []);
+
     useEffect(() => {
         if (!isWorkspaceReady) {
             return;
@@ -249,6 +301,8 @@ export default function WynntilsIde() {
                 if (activeFileRef.current && activeUriRef.current) {
                     void lspClient.syncDocument(activeUriRef.current, activeFileRef.current.content);
                 }
+
+                refreshSignatureHelp();
             })
             .catch((error) => {
                 setLspStatus("error");
@@ -264,7 +318,14 @@ export default function WynntilsIde() {
             lspClient.dispose();
             lspClientRef.current = null;
         };
-    }, [applyDiagnosticsForUri, ensureProvidersRegistered, functionCatalog.data, functionCatalog.error]);
+    }, [applyDiagnosticsForUri, ensureProvidersRegistered, functionCatalog.data, functionCatalog.error, refreshSignatureHelp]);
+
+    useEffect(() => {
+        return () => {
+            editorDisposablesRef.current.forEach((disposable) => disposable.dispose());
+            editorDisposablesRef.current = [];
+        };
+    }, []);
 
     useEffect(() => {
         if (!activeFile || !activeFileUri) {
@@ -279,6 +340,7 @@ export default function WynntilsIde() {
             lastActiveFileIdRef.current = activeFile.id;
             setCompileResult(null);
             setCompileStatus(null);
+            setSignatureHelp(null);
 
             const lspClient = lspClientRef.current;
             if (lspClient) {
@@ -287,14 +349,24 @@ export default function WynntilsIde() {
         }
 
         applyDiagnosticsForUri(activeFileUri);
-    }, [activeFile, activeFileUri, applyDiagnosticsForUri]);
+        refreshSignatureHelp();
+    }, [activeFile, activeFileUri, applyDiagnosticsForUri, refreshSignatureHelp]);
 
     const onEditorMount: OnMount = (editor, monaco) => {
         editorRef.current = editor;
         monacoRef.current = monaco;
 
         ensureWynntilsLanguage(monaco);
+        monaco.editor.setTheme(WYNNTILS_THEME);
         ensureProvidersRegistered();
+
+        editorDisposablesRef.current.forEach((disposable) => disposable.dispose());
+        editorDisposablesRef.current = [
+            editor.onDidChangeCursorPosition(refreshSignatureHelp),
+            editor.onDidChangeModelContent(refreshSignatureHelp),
+            editor.onDidChangeModel(refreshSignatureHelp),
+        ];
+        refreshSignatureHelp();
 
         if (activeUriRef.current) {
             applyDiagnosticsForUri(activeUriRef.current);
@@ -540,6 +612,11 @@ export default function WynntilsIde() {
         };
     }, [compileActiveFile]);
 
+    const activeSignature = signatureHelp?.signatures[signatureHelp.activeSignature] ?? null;
+    const activeParameter = activeSignature?.parameters?.[signatureHelp?.activeParameter ?? 0] ?? null;
+    const activeParameterDocumentation = toPlainDocumentation(activeParameter?.documentation);
+    const signatureDocumentation = toPlainDocumentation(activeSignature?.documentation);
+
     return (
         <div className="min-h-screen bg-background text-foreground">
             <header className="border-b border-border px-4 py-3">
@@ -672,42 +749,86 @@ export default function WynntilsIde() {
                     </CardHeader>
 
                     <CardContent className="px-3 pb-3 pt-0">
-                        <div className="overflow-hidden rounded-md border border-border">
-                            <Editor
-                                height="68vh"
-                                path={activeFileUri ?? undefined}
-                                defaultLanguage={WYNNTILS_LANGUAGE}
-                                language={WYNNTILS_LANGUAGE}
-                                value={activeFile?.content ?? ""}
-                                onMount={onEditorMount}
-                                onChange={(value) => {
-                                    upsertActiveFileContent(value ?? "");
-                                    setCompileResult(null);
-                                    setCompileStatus(null);
-                                }}
-                                options={{
-                                    minimap: { enabled: false },
-                                    fontSize: 14,
-                                    tabSize: 4,
-                                    smoothScrolling: true,
-                                    wordWrap: "off",
-                                    automaticLayout: true,
-                                    bracketPairColorization: { enabled: true },
-                                    glyphMargin: true,
-                                    renderValidationDecorations: "on",
-                                    fixedOverflowWidgets: true,
-                                    hover: { enabled: true, delay: 120 },
-                                    scrollbar: { alwaysConsumeMouseWheel: false },
-                                    suggestOnTriggerCharacters: true,
-                                    quickSuggestions: {
-                                        strings: true,
-                                        comments: false,
-                                        other: true,
-                                    },
-                                    scrollBeyondLastLine: false,
-                                }}
-                                theme="vs-dark"
-                            />
+                        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+                            <div className="border border-border bg-[#101923]">
+                                <Editor
+                                    height="68vh"
+                                    path={activeFileUri ?? undefined}
+                                    defaultLanguage={WYNNTILS_LANGUAGE}
+                                    language={WYNNTILS_LANGUAGE}
+                                    value={activeFile?.content ?? ""}
+                                    onMount={onEditorMount}
+                                    onChange={(value) => {
+                                        upsertActiveFileContent(value ?? "");
+                                        setCompileResult(null);
+                                        setCompileStatus(null);
+                                    }}
+                                    options={{
+                                        minimap: { enabled: false },
+                                        fontSize: 14,
+                                        tabSize: 4,
+                                        smoothScrolling: true,
+                                        wordWrap: "off",
+                                        automaticLayout: true,
+                                        bracketPairColorization: { enabled: true },
+                                        glyphMargin: true,
+                                        renderValidationDecorations: "on",
+                                        fixedOverflowWidgets: true,
+                                        hover: { enabled: true, delay: 120 },
+                                        scrollbar: { alwaysConsumeMouseWheel: false },
+                                        suggestOnTriggerCharacters: true,
+                                        quickSuggestions: {
+                                            strings: true,
+                                            comments: false,
+                                            other: true,
+                                        },
+                                        scrollBeyondLastLine: false,
+                                    }}
+                                    theme={WYNNTILS_THEME}
+                                />
+                            </div>
+
+                            <aside className="h-44 overflow-y-auto rounded-md border border-border bg-muted/30 px-3 py-2 text-xs xl:h-[68vh]">
+                                <div className="mb-2 text-[11px] font-semibold uppercase text-muted-foreground">Context</div>
+                                {activeSignature ? (
+                                    <div>
+                                        <div className="break-words font-mono text-[13px] leading-relaxed text-foreground">
+                                            {activeSignature.label}
+                                        </div>
+                                        {signatureDocumentation ? (
+                                            <p className="mt-2 whitespace-pre-line leading-relaxed text-muted-foreground">
+                                                {signatureDocumentation}
+                                            </p>
+                                        ) : null}
+                                        {activeSignature.parameters && activeSignature.parameters.length > 0 ? (
+                                            <div className="mt-3 flex flex-wrap gap-1.5">
+                                                {activeSignature.parameters.map((parameter, index) => (
+                                                    <span
+                                                        key={`${formatParameterLabel(parameter.label)}-${index}`}
+                                                        className={`rounded border px-2 py-1 font-mono ${
+                                                            index === signatureHelp?.activeParameter
+                                                                ? "border-blue-400 bg-blue-500/15 text-blue-100"
+                                                                : "border-border bg-background/60 text-muted-foreground"
+                                                        }`}
+                                                    >
+                                                        {formatParameterLabel(parameter.label)}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                        {activeParameterDocumentation ? (
+                                            <div className="mt-3 border-t border-border pt-3">
+                                                <span className="font-medium text-foreground">Active argument</span>
+                                                <p className="mt-1 whitespace-pre-line leading-relaxed text-muted-foreground">
+                                                    {activeParameterDocumentation}
+                                                </p>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                ) : (
+                                    <div className="font-mono text-muted-foreground">No active function</div>
+                                )}
+                            </aside>
                         </div>
                     </CardContent>
                 </Card>

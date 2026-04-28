@@ -1,27 +1,27 @@
 import { createCatalogFromResponse, FunctionsCatalog } from "@/lib/ide/browser-lsp/catalog";
+import { findActiveCallContext } from "@/lib/ide/browser-lsp/call-context";
 import { createFunctionCompletionItems } from "@/lib/ide/browser-lsp/completions";
 import { buildDiagnostics } from "@/lib/ide/browser-lsp/diagnostics";
+import { resolveArgumentSlot, resolveCompletionType } from "@/lib/ide/browser-lsp/function-arguments";
 import { createHoverForPosition } from "@/lib/ide/browser-lsp/hover";
+import { createSignatureHelp } from "@/lib/ide/browser-lsp/signature-help";
 import { createTextDocument } from "@/lib/ide/browser-lsp/text-document";
 import { FunctionCatalogResponse } from "@/lib/types";
-import { LspCompletionItem, LspHover, LspPosition, LspPublishDiagnosticsParams } from "@/lib/ide/types";
+import { LspCompletionItem, LspHover, LspPosition, LspPublishDiagnosticsParams, LspSignatureHelp } from "@/lib/ide/types";
 
 type DiagnosticsHandler = (params: LspPublishDiagnosticsParams) => void;
 
 export class WynntilsBrowserLspService {
     private catalog: FunctionsCatalog;
-    private completionItems: LspCompletionItem[];
     private readonly documents = new Map<string, string>();
     private readonly diagnosticsHandlers = new Set<DiagnosticsHandler>();
 
     constructor(catalogResponse: FunctionCatalogResponse) {
         this.catalog = createCatalogFromResponse(catalogResponse);
-        this.completionItems = createFunctionCompletionItems(this.catalog);
     }
 
     updateCatalog(catalogResponse: FunctionCatalogResponse) {
         this.catalog = createCatalogFromResponse(catalogResponse);
-        this.completionItems = createFunctionCompletionItems(this.catalog);
 
         for (const [uri, text] of this.documents) {
             this.publishDiagnostics(uri, text);
@@ -49,11 +49,16 @@ export class WynntilsBrowserLspService {
     requestCompletion(uri: string, position: LspPosition, triggerCharacter?: string): Promise<LspCompletionItem[]> {
         const documentText = this.documents.get(uri);
 
-        if (documentText && triggerCharacter === ";" && isVariableDeclarationLine(documentText, position.line)) {
+        if (triggerCharacter === ";" || triggerCharacter === "(") {
             return Promise.resolve([]);
         }
 
-        return Promise.resolve(this.completionItems);
+        const document = documentText ? createTextDocument(uri, documentText) : null;
+        const callContext = document ? findActiveCallContext(document, position) : null;
+
+        const expectedType = callContext ? this.resolveExpectedArgumentType(callContext.functionName, callContext.activeParameter) : undefined;
+
+        return Promise.resolve(createFunctionCompletionItems(this.catalog, { expectedType }));
     }
 
     requestHover(uri: string, position: LspPosition): Promise<LspHover | null> {
@@ -66,6 +71,18 @@ export class WynntilsBrowserLspService {
         const document = createTextDocument(uri, documentText);
 
         return Promise.resolve(createHoverForPosition(document, position, this.catalog));
+    }
+
+    requestSignatureHelp(uri: string, position: LspPosition): Promise<LspSignatureHelp | null> {
+        const documentText = this.documents.get(uri);
+
+        if (!documentText) {
+            return Promise.resolve(null);
+        }
+
+        const document = createTextDocument(uri, documentText);
+
+        return Promise.resolve(createSignatureHelp(document, position, this.catalog));
     }
 
     onDiagnostics(handler: DiagnosticsHandler) {
@@ -91,16 +108,14 @@ export class WynntilsBrowserLspService {
     private emitDiagnostics(params: LspPublishDiagnosticsParams) {
         this.diagnosticsHandlers.forEach((handler) => handler(params));
     }
-}
 
-function isVariableDeclarationLine(documentText: string, lineNumber: number) {
-    const document = createTextDocument("inmemory://wynntils/check.wynntils", documentText);
-    const lineStartOffset = document.offsetAt({ line: lineNumber, character: 0 });
-    const lineEndOffset =
-        lineNumber + 1 < document.lineCount
-            ? document.offsetAt({ line: lineNumber + 1, character: 0 })
-            : documentText.length;
-    const lineText = documentText.slice(lineStartOffset, lineEndOffset);
+    private resolveExpectedArgumentType(functionName: string, activeParameter: number) {
+        const metadata = this.catalog.findByName(functionName);
 
-    return /^\s*let\s+/.test(lineText);
+        if (!metadata) {
+            return undefined;
+        }
+
+        return resolveCompletionType(resolveArgumentSlot(metadata.arguments, activeParameter)?.argument);
+    }
 }

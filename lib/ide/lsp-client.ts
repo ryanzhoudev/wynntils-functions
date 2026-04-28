@@ -3,6 +3,7 @@ import {
     LspHover,
     LspPosition,
     LspPublishDiagnosticsParams,
+    LspSignatureHelp,
 } from "@/lib/ide/types";
 import { FunctionCatalogResponse } from "@/lib/types";
 
@@ -92,6 +93,12 @@ export class WynntilsLspClient {
         await this.connect();
 
         return (await this.request("requestHover", { uri, position })) as LspHover | null;
+    }
+
+    async requestSignatureHelp(uri: string, position: LspPosition): Promise<LspSignatureHelp | null> {
+        await this.connect();
+
+        return (await this.request("requestSignatureHelp", { uri, position })) as LspSignatureHelp | null;
     }
 
     onDiagnostics(handler: DiagnosticsHandler) {

@@ -240,7 +240,7 @@ function isFormatSuffixToken(token: Token) {
     }
 
     if (token.kind === TokenKind.Identifier) {
-        return /^[A-Za-z]+$/.test(token.value);
+        return /^[A-Za-z][A-Za-z0-9]*$/.test(token.value);
     }
 
     if (token.kind === TokenKind.Number) {
