@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
     title: "Wynntils Functions",
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <body className="min-h-screen bg-background text-foreground antialiased">
                 {children}
                 <Analytics />
+                <SpeedInsights />
             </body>
         </html>
     );
