@@ -196,6 +196,30 @@ function resolveDocumentation(item: LspCompletionItem): string | undefined {
     return documentation.value;
 }
 
+function parseHexColor(matchText: string) {
+    const hex = matchText.startsWith("&#") ? matchText.slice(2) : matchText.slice(1);
+    const expanded =
+        hex.length === 3
+            ? hex
+                  .split("")
+                  .map((character) => character + character)
+                  .join("")
+            : hex;
+
+    const red = Number.parseInt(expanded.slice(0, 2), 16) / 255;
+    const green = Number.parseInt(expanded.slice(2, 4), 16) / 255;
+    const blue = Number.parseInt(expanded.slice(4, 6), 16) / 255;
+    const alpha = expanded.length >= 8 ? Number.parseInt(expanded.slice(6, 8), 16) / 255 : 1;
+
+    return { red, green, blue, alpha };
+}
+
+function toHexByte(value: number) {
+    return Math.round(value * 255)
+        .toString(16)
+        .padStart(2, "0");
+}
+
 export function ensureWynntilsLanguage(monaco: MonacoApi) {
     if (languageRegistered) {
         return;
@@ -325,5 +349,39 @@ export function registerWynntilsProviders(monaco: MonacoApi, lspClient: Wynntils
         },
     });
 
-    return [completionProvider, hoverProvider];
+    const colorProvider = monaco.languages.registerColorProvider(WYNNTILS_LANGUAGE_ID, {
+        provideDocumentColors: (model: MonacoEditor.ITextModel) => {
+            const colors: MonacoLanguages.IColorInformation[] = [];
+            const colorExpression = /&#[0-9a-fA-F]{8}\b|#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/g;
+            const text = model.getValue();
+            let match: RegExpExecArray | null;
+
+            while ((match = colorExpression.exec(text)) !== null) {
+                const start = model.getPositionAt(match.index);
+                const end = model.getPositionAt(match.index + match[0].length);
+
+                colors.push({
+                    color: parseHexColor(match[0]),
+                    range: {
+                        startLineNumber: start.lineNumber,
+                        startColumn: start.column,
+                        endLineNumber: end.lineNumber,
+                        endColumn: end.column,
+                    },
+                });
+            }
+
+            return colors;
+        },
+        provideColorPresentations: (_model: MonacoEditor.ITextModel, colorInfo: MonacoLanguages.IColorInformation) => {
+            const { red, green, blue, alpha } = colorInfo.color;
+            const label = `#${toHexByte(red)}${toHexByte(green)}${toHexByte(blue)}${
+                alpha < 1 ? toHexByte(alpha) : ""
+            }`;
+
+            return [{ label }];
+        },
+    });
+
+    return [completionProvider, hoverProvider, colorProvider];
 }

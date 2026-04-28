@@ -870,7 +870,7 @@ export default function WynntilsIde() {
                                                 </div>
                                             </div>
                                         ) : null}
-                                        <div className="break-words font-mono text-[13px] leading-relaxed text-foreground">
+                                        <div className="wrap-break-word font-mono text-[13px] leading-relaxed text-foreground">
                                             {activeSignature.label}
                                         </div>
                                         {signatureDocumentation ? (
