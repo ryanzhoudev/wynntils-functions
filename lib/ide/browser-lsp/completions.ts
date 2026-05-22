@@ -5,12 +5,21 @@ import { LspCompletionItem } from "@/lib/ide/types";
 const INCLUDE_OPTIONAL_ARGUMENTS_IN_SNIPPETS = false;
 const COMPLETION_ITEM_KIND_FUNCTION = 3;
 const INSERT_TEXT_FORMAT_SNIPPET = 2;
+const completionItemsByCatalog = new WeakMap<FunctionsCatalog, Map<string, LspCompletionItem[]>>();
 
 type CompletionOptions = {
     expectedType?: string;
 };
 
 export function createFunctionCompletionItems(catalog: FunctionsCatalog, options: CompletionOptions = {}): LspCompletionItem[] {
+    const cacheKey = options.expectedType ?? "";
+    const catalogCache = completionItemsByCatalog.get(catalog) ?? new Map<string, LspCompletionItem[]>();
+    const cachedItems = catalogCache.get(cacheKey);
+
+    if (cachedItems) {
+        return cachedItems;
+    }
+
     const completionItems: LspCompletionItem[] = [];
 
     for (const metadata of catalog.getAllFunctions()) {
@@ -20,6 +29,9 @@ export function createFunctionCompletionItems(catalog: FunctionsCatalog, options
             completionItems.push(createCompletionItem(metadata, alias, options.expectedType));
         }
     }
+
+    catalogCache.set(cacheKey, completionItems);
+    completionItemsByCatalog.set(catalog, catalogCache);
 
     return completionItems;
 }

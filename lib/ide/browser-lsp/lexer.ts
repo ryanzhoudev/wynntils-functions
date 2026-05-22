@@ -161,7 +161,17 @@ export function lex(sourceText: string): Token[] {
         }
 
         if (numericStarterExpression.test(currentCharacter)) {
+            if (currentCharacter === "-" && !/[0-9]/.test(sourceText[index + 1] ?? "")) {
+                index++;
+                continue;
+            }
+
             let numericValue = "";
+
+            if (currentCharacter === "-") {
+                numericValue += currentCharacter;
+                index++;
+            }
 
             while (index < length && numericBodyExpression.test(sourceText[index])) {
                 numericValue += sourceText[index];

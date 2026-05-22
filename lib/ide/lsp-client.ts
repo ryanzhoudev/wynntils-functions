@@ -28,11 +28,21 @@ type PendingRequest = {
     reject: (error: Error) => void;
 };
 
+type QueuedDocumentSync = {
+    text: string;
+    resolvers: Array<{
+        resolve: () => void;
+        reject: (error: Error) => void;
+    }>;
+    isFlushing: boolean;
+};
+
 export class WynntilsLspClient {
     private worker: Worker | null = null;
     private requestId = 1;
     private connectPromise: Promise<void> | null = null;
     private readonly pendingRequests = new Map<number, PendingRequest>();
+    private readonly queuedDocumentSyncs = new Map<string, QueuedDocumentSync>();
     private readonly diagnosticsHandlers = new Set<DiagnosticsHandler>();
 
     constructor(private catalog: FunctionCatalogResponse) {}
@@ -71,7 +81,25 @@ export class WynntilsLspClient {
 
     async syncDocument(uri: string, text: string) {
         await this.connect();
-        await this.request("syncDocument", { uri, text });
+
+        return new Promise<void>((resolve, reject) => {
+            const queued = this.queuedDocumentSyncs.get(uri);
+
+            if (queued) {
+                queued.resolvers.forEach(({ resolve }) => resolve());
+                queued.text = text;
+                queued.resolvers = [{ resolve, reject }];
+                return;
+            }
+
+            this.queuedDocumentSyncs.set(uri, {
+                text,
+                resolvers: [{ resolve, reject }],
+                isFlushing: false,
+            });
+
+            this.flushDocumentSync(uri);
+        });
     }
 
     async closeDocument(uri: string) {
@@ -110,6 +138,11 @@ export class WynntilsLspClient {
     }
 
     dispose() {
+        this.queuedDocumentSyncs.forEach((queued) => {
+            queued.resolvers.forEach(({ reject }) => reject(new Error("LSP client disposed")));
+        });
+        this.queuedDocumentSyncs.clear();
+
         this.pendingRequests.forEach((pending) => pending.reject(new Error("LSP client disposed")));
         this.pendingRequests.clear();
         this.diagnosticsHandlers.clear();
@@ -133,6 +166,45 @@ export class WynntilsLspClient {
             this.pendingRequests.set(id, { resolve, reject });
             this.worker?.postMessage({ id, method, ...params });
         });
+    }
+
+    private flushDocumentSync(uri: string) {
+        const queued = this.queuedDocumentSyncs.get(uri);
+
+        if (!queued || queued.isFlushing) {
+            return;
+        }
+
+        queued.isFlushing = true;
+        const text = queued.text;
+
+        void this.request("syncDocument", { uri, text })
+            .then(() => {
+                const latest = this.queuedDocumentSyncs.get(uri);
+
+                if (!latest) {
+                    return;
+                }
+
+                if (latest.text !== text) {
+                    latest.isFlushing = false;
+                    this.flushDocumentSync(uri);
+                    return;
+                }
+
+                this.queuedDocumentSyncs.delete(uri);
+                latest.resolvers.forEach(({ resolve }) => resolve());
+            })
+            .catch((error) => {
+                const latest = this.queuedDocumentSyncs.get(uri);
+
+                if (!latest) {
+                    return;
+                }
+
+                this.queuedDocumentSyncs.delete(uri);
+                latest.resolvers.forEach(({ reject }) => reject(error instanceof Error ? error : new Error("Document sync failed")));
+            });
     }
 
     private handleWorkerMessage(message: WorkerMessage) {

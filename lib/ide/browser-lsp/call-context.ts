@@ -1,4 +1,5 @@
 import { isValueToken, lex, Token, TokenKind } from "@/lib/ide/browser-lsp/lexer";
+import { parse } from "@/lib/ide/browser-lsp/parser";
 import { BrowserTextDocument } from "@/lib/ide/browser-lsp/text-document";
 import { LspPosition } from "@/lib/ide/types";
 
@@ -77,12 +78,13 @@ function buildCallStack(text: string, offset: number): CallContext[] {
 function findFunctionIdentifierCallContext(text: string, offset: number): CallContext | null {
     const safeOffset = Math.max(0, Math.min(offset, text.length));
     const tokens = lex(text);
+    const bareCalls = parse(text).calls.filter((call) => !call.hasArgumentList);
 
     for (let index = 0; index < tokens.length; index++) {
         const token = tokens[index];
         const nextToken = tokens[index + 1];
 
-        if (!isFunctionCallStart(token, nextToken) || !nextToken) {
+        if (!isIdentifierToken(token)) {
             continue;
         }
 
@@ -91,6 +93,21 @@ function findFunctionIdentifierCallContext(text: string, offset: number): CallCo
 
         if (!cursorIsOnIdentifier) {
             continue;
+        }
+
+        if (nextToken?.kind !== TokenKind.LeftParenthesis) {
+            const bareCall = bareCalls.find((call) => call.startOffset === token.offset);
+
+            if (!bareCall) {
+                continue;
+            }
+
+            return {
+                functionName: token.value,
+                activeParameter: 0,
+                openParenthesisOffset: tokenEndOffset,
+                argumentStartOffset: tokenEndOffset,
+            };
         }
 
         return {
@@ -104,9 +121,13 @@ function findFunctionIdentifierCallContext(text: string, offset: number): CallCo
     return null;
 }
 
+function isIdentifierToken(token: Token): token is Token & { kind: TokenKind.Identifier; value: string } {
+    return isValueToken(token) && token.kind === TokenKind.Identifier;
+}
+
 function isFunctionCallStart(
     token: Token,
     nextToken: Token | undefined,
 ): token is Token & { kind: TokenKind.Identifier; value: string } {
-    return isValueToken(token) && token.kind === TokenKind.Identifier && nextToken?.kind === TokenKind.LeftParenthesis;
+    return isIdentifierToken(token) && nextToken?.kind === TokenKind.LeftParenthesis;
 }

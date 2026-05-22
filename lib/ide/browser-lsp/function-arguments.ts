@@ -35,8 +35,25 @@ export function isListArgument(argument: FunctionArgumentMetadata | undefined) {
     return normalizeArgumentType(argument?.type) === "list";
 }
 
+export function hasDefaultValue(argument: FunctionArgumentMetadata | undefined) {
+    if (!argument) {
+        return false;
+    }
+
+    return (
+        argument.defaultValue !== undefined &&
+        argument.defaultValue !== null &&
+        String(argument.defaultValue).length > 0 &&
+        String(argument.defaultValue).toLowerCase() !== "null"
+    );
+}
+
+export function isOmittableArgument(argument: FunctionArgumentMetadata | undefined) {
+    return Boolean(argument && (!argument.required || hasDefaultValue(argument) || isListArgument(argument)));
+}
+
 export function canOmitArgument(argument: FunctionArgumentMetadata) {
-    return !argument.required || isListArgument(argument);
+    return isOmittableArgument(argument);
 }
 
 export function formatArgumentLabel(argument: FunctionArgumentMetadata) {

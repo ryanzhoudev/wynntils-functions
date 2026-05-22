@@ -1,8 +1,18 @@
 import { formatSignature, FunctionArgumentMetadata, FunctionMetadata, FunctionsCatalog } from "@/lib/ide/browser-lsp/catalog";
-import { canOmitArgument, isListArgument, resolveArgumentSlot } from "@/lib/ide/browser-lsp/function-arguments";
+import {
+    canOmitArgument,
+    isListArgument,
+    isOmittableArgument,
+    resolveArgumentSlot,
+} from "@/lib/ide/browser-lsp/function-arguments";
 import { FunctionCall, parse, ParsedArgument } from "@/lib/ide/browser-lsp/parser";
 import { BrowserTextDocument } from "@/lib/ide/browser-lsp/text-document";
-import { inferArgumentType, isTypeCompatible } from "@/lib/ide/browser-lsp/type-system";
+import {
+    createTypeInferenceContext,
+    inferArgumentType,
+    isTypeCompatible,
+    type TypeInferenceContext,
+} from "@/lib/ide/browser-lsp/type-system";
 import { LspDiagnostic } from "@/lib/ide/types";
 
 const VARIABLE_DECLARATION_PATTERN = /^\s*let\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;]*);/gm;
@@ -103,6 +113,7 @@ function reportFunctionIssues(
 ) {
     const parseResult = parse(documentText);
     const callLookup = new Map<number, FunctionCall>();
+    const typeInferenceContext = createTypeInferenceContext();
 
     for (const functionCall of parseResult.calls) {
         callLookup.set(functionCall.startOffset, functionCall);
@@ -151,7 +162,16 @@ function reportFunctionIssues(
             continue;
         }
 
-        validateArguments(functionCall, metadata, document, documentText, diagnostics, callLookup, catalog);
+        validateArguments(
+            functionCall,
+            metadata,
+            document,
+            documentText,
+            diagnostics,
+            callLookup,
+            catalog,
+            typeInferenceContext,
+        );
     }
 }
 
@@ -163,11 +183,12 @@ function validateArguments(
     diagnostics: LspDiagnostic[],
     callLookup: Map<number, FunctionCall>,
     catalog: FunctionsCatalog,
+    typeInferenceContext: TypeInferenceContext,
 ) {
     const expectedArguments = metadata.arguments;
     const providedArguments = functionCall.arguments;
     const expectedCount = expectedArguments.length;
-    const firstOptionalIndex = expectedArguments.findIndex((argument) => !argument.required && !isListArgument(argument));
+    const firstOptionalIndex = expectedArguments.findIndex((argument) => isOmittableArgument(argument) && !isListArgument(argument));
     const hasProvidedOptionalArgument =
         firstOptionalIndex >= 0 &&
         providedArguments.some((argument, index) => index >= firstOptionalIndex && hasValue(argument));
@@ -177,7 +198,10 @@ function validateArguments(
         const providedArgument = providedArguments[index];
 
         if (!hasValue(providedArgument)) {
-            if (!canOmitArgument(expectedArgument) || (!expectedArgument.required && hasProvidedOptionalArgument)) {
+            if (
+                !canOmitArgument(expectedArgument) ||
+                (isOmittableArgument(expectedArgument) && !isListArgument(expectedArgument) && hasProvidedOptionalArgument)
+            ) {
                 diagnostics.push(
                     createDiagnostic(
                         document,
@@ -196,7 +220,7 @@ function validateArguments(
             continue;
         }
 
-        const inferredType = inferArgumentType(providedArgument, callLookup, catalog);
+        const inferredType = inferArgumentType(providedArgument, callLookup, catalog, typeInferenceContext);
 
         if (!inferredType) {
             continue;

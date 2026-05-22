@@ -170,6 +170,9 @@ export default function WynntilsIde() {
     const providerDisposablesRef = useRef<IDisposable[]>([]);
     const editorDisposablesRef = useRef<IDisposable[]>([]);
     const signatureHelpRequestRef = useRef(0);
+    const signatureHelpFrameRef = useRef<number | null>(null);
+    const signatureHelpInFlightRef = useRef(false);
+    const signatureHelpQueuedRef = useRef(false);
 
     const lspClientRef = useRef<WynntilsLspClient | null>(null);
     const diagnosticsByUriRef = useRef<Map<string, LspDiagnostic[]>>(new Map());
@@ -181,9 +184,11 @@ export default function WynntilsIde() {
         return workspace.files.find((file) => file.id === workspace.activeFileId) ?? workspace.files[0] ?? null;
     }, [workspace.activeFileId, workspace.files]);
 
+    const activeFileId = activeFile?.id ?? null;
+
     const activeFileUri = useMemo(() => {
-        return activeFile ? fileUri(activeFile.id) : null;
-    }, [activeFile]);
+        return activeFileId ? fileUri(activeFileId) : null;
+    }, [activeFileId]);
 
     useEffect(() => {
         activeFileRef.current = activeFile;
@@ -234,35 +239,60 @@ export default function WynntilsIde() {
     }, []);
 
     const refreshSignatureHelp = useCallback(() => {
-        const editor = editorRef.current;
-        const lspClient = lspClientRef.current;
-        const activeUri = activeUriRef.current;
-        const position = editor?.getPosition();
-
-        if (!editor || !lspClient || !activeUri || !position) {
-            setSignatureHelp(null);
+        if (signatureHelpFrameRef.current !== null) {
             return;
         }
 
-        const requestId = ++signatureHelpRequestRef.current;
+        const runScheduledRefresh = () => {
+            signatureHelpFrameRef.current = null;
 
-        void lspClient
-            .requestSignatureHelp(activeUri, {
-                line: position.lineNumber - 1,
-                character: position.column - 1,
-            })
-            .then((help) => {
-                if (requestId !== signatureHelpRequestRef.current || activeUri !== activeUriRef.current) {
-                    return;
-                }
+            if (signatureHelpInFlightRef.current) {
+                signatureHelpQueuedRef.current = true;
+                return;
+            }
 
-                setSignatureHelp(help && help.signatures.length > 0 ? help : null);
-            })
-            .catch(() => {
-                if (requestId === signatureHelpRequestRef.current) {
-                    setSignatureHelp(null);
-                }
-            });
+            const editor = editorRef.current;
+            const lspClient = lspClientRef.current;
+            const activeUri = activeUriRef.current;
+            const position = editor?.getPosition();
+
+            if (!editor || !lspClient || !activeUri || !position) {
+                signatureHelpRequestRef.current++;
+                setSignatureHelp(null);
+                return;
+            }
+
+            const requestId = ++signatureHelpRequestRef.current;
+            signatureHelpInFlightRef.current = true;
+
+            void lspClient
+                .requestSignatureHelp(activeUri, {
+                    line: position.lineNumber - 1,
+                    character: position.column - 1,
+                })
+                .then((help) => {
+                    if (requestId !== signatureHelpRequestRef.current || activeUri !== activeUriRef.current) {
+                        return;
+                    }
+
+                    setSignatureHelp(help && help.signatures.length > 0 ? help : null);
+                })
+                .catch(() => {
+                    if (requestId === signatureHelpRequestRef.current) {
+                        setSignatureHelp(null);
+                    }
+                })
+                .finally(() => {
+                    signatureHelpInFlightRef.current = false;
+
+                    if (signatureHelpQueuedRef.current) {
+                        signatureHelpQueuedRef.current = false;
+                        signatureHelpFrameRef.current = window.requestAnimationFrame(runScheduledRefresh);
+                    }
+                });
+        };
+
+        signatureHelpFrameRef.current = window.requestAnimationFrame(runScheduledRefresh);
     }, []);
 
     useEffect(() => {
@@ -342,36 +372,55 @@ export default function WynntilsIde() {
     ]);
 
     useEffect(() => {
+        const requestRef = signatureHelpRequestRef;
+        const frameRef = signatureHelpFrameRef;
+        const queuedRef = signatureHelpQueuedRef;
+        const inFlightRef = signatureHelpInFlightRef;
+        const disposablesRef = editorDisposablesRef;
+
         return () => {
-            editorDisposablesRef.current.forEach((disposable) => disposable.dispose());
-            editorDisposablesRef.current = [];
+            requestRef.current++;
+
+            if (frameRef.current !== null) {
+                window.cancelAnimationFrame(frameRef.current);
+                frameRef.current = null;
+            }
+
+            queuedRef.current = false;
+            inFlightRef.current = false;
+
+            disposablesRef.current.forEach((disposable) => disposable.dispose());
+            disposablesRef.current = [];
         };
     }, []);
 
     useEffect(() => {
-        if (!activeFile || !activeFileUri) {
+        if (!activeFileId || !activeFileUri) {
             return;
         }
 
         activeUriRef.current = activeFileUri;
 
-        const fileSwitched = lastActiveFileIdRef.current !== activeFile.id;
+        const fileSwitched = lastActiveFileIdRef.current !== activeFileId;
 
         if (fileSwitched) {
-            lastActiveFileIdRef.current = activeFile.id;
+            lastActiveFileIdRef.current = activeFileId;
             setCompileResult(null);
             setCompileStatus(null);
             setSignatureHelp(null);
 
             const lspClient = lspClientRef.current;
-            if (lspClient) {
-                void lspClient.syncDocument(activeFileUri, activeFile.content);
+            const currentFile = activeFileRef.current;
+
+            if (lspClient && currentFile) {
+                void lspClient.syncDocument(activeFileUri, currentFile.content);
             }
+
+            refreshSignatureHelp();
         }
 
         applyDiagnosticsForUri(activeFileUri);
-        refreshSignatureHelp();
-    }, [activeFile, activeFileUri, applyDiagnosticsForUri, refreshSignatureHelp]);
+    }, [activeFileId, activeFileUri, applyDiagnosticsForUri, refreshSignatureHelp]);
 
     const onEditorMount: OnMount = (editor, monaco) => {
         editorRef.current = editor;
@@ -402,6 +451,14 @@ export default function WynntilsIde() {
 
         if (!activeId) {
             return;
+        }
+
+        if (activeFileRef.current?.id === activeId) {
+            activeFileRef.current = {
+                ...activeFileRef.current,
+                content,
+                updatedAt: Date.now(),
+            };
         }
 
         updateWorkspace((previous) => ({
@@ -548,14 +605,16 @@ export default function WynntilsIde() {
     };
 
     const compileActiveFile = useCallback(async () => {
-        if (!activeFile) {
+        const currentFile = activeFileRef.current;
+
+        if (!currentFile) {
             return;
         }
 
         setIsCompiling(true);
 
         try {
-            const result = compileSupersetToWynntils(activeFile.content);
+            const result = compileSupersetToWynntils(currentFile.content);
             setCompileResult(result);
 
             if (result.errors.length > 0) {
@@ -573,7 +632,7 @@ export default function WynntilsIde() {
         } finally {
             setIsCompiling(false);
         }
-    }, [activeFile]);
+    }, []);
 
     const createFileFromCompiledOutput = () => {
         if (!compileResult || compileResult.code.length === 0) {
@@ -781,7 +840,7 @@ export default function WynntilsIde() {
                                     path={activeFileUri ?? undefined}
                                     defaultLanguage={WYNNTILS_LANGUAGE}
                                     language={WYNNTILS_LANGUAGE}
-                                    value={activeFile?.content ?? ""}
+                                    defaultValue={activeFile?.content ?? ""}
                                     onMount={onEditorMount}
                                     onChange={(value) => {
                                         upsertActiveFileContent(value ?? "");

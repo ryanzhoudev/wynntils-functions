@@ -29,8 +29,21 @@ export function inferArgumentType(
     argument: ParsedArgument,
     callLookup: Map<number, FunctionCall>,
     catalog: FunctionsCatalog,
+    context = createTypeInferenceContext(),
 ): string | undefined {
-    return inferArgumentTypeWithSeenCalls(argument, callLookup, catalog, new Set());
+    return inferArgumentTypeWithSeenCalls(argument, callLookup, catalog, new Set(), context);
+}
+
+export type TypeInferenceContext = {
+    argumentTypes: Map<string, string | undefined>;
+    callReturnTypes: Map<number, string | undefined>;
+};
+
+export function createTypeInferenceContext(): TypeInferenceContext {
+    return {
+        argumentTypes: new Map(),
+        callReturnTypes: new Map(),
+    };
 }
 
 function inferArgumentTypeWithSeenCalls(
@@ -38,11 +51,30 @@ function inferArgumentTypeWithSeenCalls(
     callLookup: Map<number, FunctionCall>,
     catalog: FunctionsCatalog,
     seenCallOffsets: Set<number>,
+    context: TypeInferenceContext,
 ): string | undefined {
     if (!argument || argument.text.length === 0 || argument.tokens.length === 0) {
         return undefined;
     }
 
+    const cacheKey = argumentCacheKey(argument);
+    if (context.argumentTypes.has(cacheKey)) {
+        return context.argumentTypes.get(cacheKey);
+    }
+
+    const inferredType = inferArgumentTypeUncached(argument, callLookup, catalog, seenCallOffsets, context);
+    context.argumentTypes.set(cacheKey, inferredType);
+
+    return inferredType;
+}
+
+function inferArgumentTypeUncached(
+    argument: ParsedArgument,
+    callLookup: Map<number, FunctionCall>,
+    catalog: FunctionsCatalog,
+    seenCallOffsets: Set<number>,
+    context: TypeInferenceContext,
+): string | undefined {
     const firstToken = argument.tokens[0];
     const tokenCount = argument.tokens.length;
 
@@ -60,7 +92,7 @@ function inferArgumentTypeWithSeenCalls(
                 const possibleCall = callLookup.get(firstToken.offset);
 
                 if (possibleCall && possibleCall.isBareExpression) {
-                    return inferFunctionCallReturnType(possibleCall, callLookup, catalog, seenCallOffsets);
+                    return inferFunctionCallReturnType(possibleCall, callLookup, catalog, seenCallOffsets, context);
                 }
 
                 return "Identifier";
@@ -76,11 +108,15 @@ function inferArgumentTypeWithSeenCalls(
         const possibleCall = callLookup.get(firstToken.offset);
 
         if (possibleCall && possibleCall.endOffset === argument.endOffset) {
-            return inferFunctionCallReturnType(possibleCall, callLookup, catalog, seenCallOffsets);
+            return inferFunctionCallReturnType(possibleCall, callLookup, catalog, seenCallOffsets, context);
         }
     }
 
     return undefined;
+}
+
+function argumentCacheKey(argument: ParsedArgument) {
+    return `${argument.startOffset}:${argument.endOffset}:${argument.tokens.length}`;
 }
 
 function inferFunctionCallReturnType(
@@ -88,7 +124,12 @@ function inferFunctionCallReturnType(
     callLookup: Map<number, FunctionCall>,
     catalog: FunctionsCatalog,
     seenCallOffsets: Set<number>,
+    context: TypeInferenceContext,
 ): string | undefined {
+    if (context.callReturnTypes.has(functionCall.startOffset)) {
+        return context.callReturnTypes.get(functionCall.startOffset);
+    }
+
     const metadata = catalog.findByName(functionCall.name);
 
     if (!metadata) {
@@ -96,6 +137,7 @@ function inferFunctionCallReturnType(
     }
 
     if (normalizeArgumentType(functionCall.name) !== "if") {
+        context.callReturnTypes.set(functionCall.startOffset, metadata.returnType);
         return metadata.returnType;
     }
 
@@ -105,12 +147,27 @@ function inferFunctionCallReturnType(
 
     seenCallOffsets.add(functionCall.startOffset);
 
-    const trueBranchType = inferArgumentTypeWithSeenCalls(functionCall.arguments[1], callLookup, catalog, seenCallOffsets);
-    const falseBranchType = inferArgumentTypeWithSeenCalls(functionCall.arguments[2], callLookup, catalog, seenCallOffsets);
+    const trueBranchType = inferArgumentTypeWithSeenCalls(
+        functionCall.arguments[1],
+        callLookup,
+        catalog,
+        seenCallOffsets,
+        context,
+    );
+    const falseBranchType = inferArgumentTypeWithSeenCalls(
+        functionCall.arguments[2],
+        callLookup,
+        catalog,
+        seenCallOffsets,
+        context,
+    );
 
     seenCallOffsets.delete(functionCall.startOffset);
 
-    return resolveConditionalReturnType(trueBranchType, falseBranchType) ?? metadata.returnType;
+    const returnType = resolveConditionalReturnType(trueBranchType, falseBranchType) ?? metadata.returnType;
+    context.callReturnTypes.set(functionCall.startOffset, returnType);
+
+    return returnType;
 }
 
 function resolveConditionalReturnType(trueBranchType: string | undefined, falseBranchType: string | undefined): string | undefined {

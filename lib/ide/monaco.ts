@@ -170,6 +170,40 @@ function isFormatSuffixCompletionContext(documentText: string, wordStartOffset: 
     return /^[A-Za-z0-9]*$/.test(expressionPrefix.slice(colonIndex + 1));
 }
 
+function isWynntilsExpressionCompletionContext(documentText: string, wordStartOffset: number) {
+    const expressionStart = documentText.lastIndexOf("{", wordStartOffset);
+    const expressionEnd = documentText.lastIndexOf("}", wordStartOffset);
+
+    if (expressionStart < 0 || expressionStart < expressionEnd) {
+        return false;
+    }
+
+    return !isInsideString(documentText.slice(expressionStart + 1, wordStartOffset));
+}
+
+function isInsideString(text: string) {
+    let isInString = false;
+    let isEscaped = false;
+
+    for (const character of text) {
+        if (isEscaped) {
+            isEscaped = false;
+            continue;
+        }
+
+        if (character === "\\") {
+            isEscaped = true;
+            continue;
+        }
+
+        if (character === "\"") {
+            isInString = !isInString;
+        }
+    }
+
+    return isInString;
+}
+
 function resolveDocumentation(item: LspCompletionItem): string | undefined {
     const documentation = item.documentation;
 
@@ -303,6 +337,7 @@ export function registerWynntilsProviders(monaco: MonacoApi, lspClient: Wynntils
                 isEscapedCompletionContext(documentText, wordStartOffset) ||
                 isPlaceholderCompletionContext(documentText, wordStartOffset) ||
                 isFormatSuffixCompletionContext(documentText, wordStartOffset) ||
+                !isWynntilsExpressionCompletionContext(documentText, wordStartOffset) ||
                 (!isExpressionStart && currentWord.word.length === 0)
             ) {
                 return { suggestions: [] };
