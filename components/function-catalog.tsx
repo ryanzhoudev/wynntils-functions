@@ -18,6 +18,7 @@ import {
 import { formatDateTime } from "@/lib/date-time";
 import { FunctionArgument, FunctionEntry } from "@/lib/types";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
+import { cn } from "@/lib/utils";
 import { AlertTriangle, CheckCircle2, ListRestart, RefreshCcw, Search, X } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -45,12 +46,33 @@ function FunctionArgumentCard({ argument }: { argument: FunctionArgument }) {
     );
 }
 
-function FunctionCard({ entry }: { entry: FunctionEntry }) {
+type ExactFunctionMatch = "name" | "alias";
+
+function getExactFunctionMatch(entry: FunctionEntry, query: string): ExactFunctionMatch | null {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (normalizedQuery.length === 0) {
+        return null;
+    }
+
+    if (entry.name.toLowerCase() === normalizedQuery) {
+        return "name";
+    }
+
+    return entry.aliases.some((alias) => alias.toLowerCase() === normalizedQuery) ? "alias" : null;
+}
+
+function FunctionCard({ entry, exactMatch }: { entry: FunctionEntry; exactMatch?: ExactFunctionMatch | null }) {
     const argumentSuffix =
         entry.arguments.length === 0 ? "" : `(${entry.arguments.map((argument) => argument.name).join("; ")})`;
 
     return (
-        <Card>
+        <Card
+            className={cn(
+                exactMatch &&
+                    "border-emerald-400/55 bg-[linear-gradient(180deg,rgba(52,211,153,0.10),rgba(52,211,153,0.04))]",
+            )}
+        >
             <CardHeader className="gap-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <CardTitle className="font-mono text-xl">
@@ -58,6 +80,11 @@ function FunctionCard({ entry }: { entry: FunctionEntry }) {
                         {argumentSuffix}
                     </CardTitle>
                     <div className="flex gap-2">
+                        {exactMatch ? (
+                            <Badge variant="outline" className="border-emerald-400/60 text-emerald-200">
+                                exact {exactMatch}
+                            </Badge>
+                        ) : null}
                         <Badge variant="secondary">{entry.returnType}</Badge>
                     </div>
                 </div>
@@ -143,14 +170,40 @@ export default function FunctionCatalog() {
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     const queryTokens = useMemo(() => normalizeQueryTokens(query), [query]);
+    const exactMatchByFunctionId = useMemo(() => {
+        return new Map((data?.functions ?? []).map((entry) => [entry.id, getExactFunctionMatch(entry, query)]));
+    }, [data?.functions, query]);
 
     const sortedFunctions = useMemo(() => {
         return [...(data?.functions ?? [])].sort((first, second) => first.name.localeCompare(second.name));
     }, [data]);
 
     const filteredFunctions = useMemo(() => {
-        return sortedFunctions.filter((entry) => matchesQuery(entry, searchScope, queryTokens));
-    }, [queryTokens, searchScope, sortedFunctions]);
+        return sortedFunctions
+            .filter((entry) => matchesQuery(entry, searchScope, queryTokens))
+            .sort((first, second) => {
+                const firstExactMatch = exactMatchByFunctionId.get(first.id);
+                const secondExactMatch = exactMatchByFunctionId.get(second.id);
+
+                if (firstExactMatch && !secondExactMatch) {
+                    return -1;
+                }
+
+                if (!firstExactMatch && secondExactMatch) {
+                    return 1;
+                }
+
+                if (firstExactMatch === "name" && secondExactMatch === "alias") {
+                    return -1;
+                }
+
+                if (firstExactMatch === "alias" && secondExactMatch === "name") {
+                    return 1;
+                }
+
+                return 0;
+            });
+    }, [exactMatchByFunctionId, queryTokens, searchScope, sortedFunctions]);
 
     const activeFilterCount = useMemo(() => {
         return Object.values(searchScope).filter(Boolean).length;
@@ -432,7 +485,11 @@ export default function FunctionCatalog() {
                         ) : (
                             <div className="space-y-4">
                                 {filteredFunctions.map((entry) => (
-                                    <FunctionCard key={entry.id} entry={entry} />
+                                    <FunctionCard
+                                        key={entry.id}
+                                        entry={entry}
+                                        exactMatch={exactMatchByFunctionId.get(entry.id)}
+                                    />
                                 ))}
                             </div>
                         )
