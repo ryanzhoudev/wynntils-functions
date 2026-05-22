@@ -3,29 +3,39 @@ generator client {
 }
 
 datasource db {
-    provider  = "postgresql"
-    url       = env("DATABASE_URL")
-    directUrl = env("DIRECT_URL")
+    provider = "postgresql"
 }
 
-model arguments {
-    id           Int        @id @default(autoincrement())
-    name         String     @db.VarChar(255)
+model WynntilsArgument {
+    id           Int               @id @default(autoincrement())
+    name         String            @db.VarChar(255)
     description  String
     required     Boolean
-    functionid   Int?
+    functionId   Int?              @map("functionid")
     type         type
-    defaultvalue String?    @db.VarChar(255)
-    functions    functions? @relation(fields: [functionid], references: [id], onDelete: NoAction, onUpdate: NoAction)
+    defaultValue String?           @map("defaultvalue") @db.VarChar(255)
+    function     WynntilsFunction? @relation(fields: [functionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+    @@map("wynntilsargument")
 }
 
-model functions {
-    id          Int         @id @default(autoincrement())
-    name        String      @unique @db.VarChar(255)
+model WynntilsFunction {
+    id          Int               @id @default(autoincrement())
+    name        String            @unique @db.VarChar(255)
     description String
-    aliases     String[]    @db.VarChar(255)
-    returntype  type
-    arguments   arguments[]
+    aliases     String[]          @db.VarChar(255)
+    returnType  type              @map("returntype")
+    arguments   WynntilsArgument[]
+
+    @@map("wynntilsfunction")
+}
+
+model WynntilsDataVersion {
+    id          Int    @id @default(autoincrement())
+    harvestedAt BigInt @map("harvestedat")
+    modVersion  String @map("modversion") @db.VarChar(255)
+
+    @@map("wynntilsdataversion")
 }
 
 enum type {

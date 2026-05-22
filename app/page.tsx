@@ -1,9 +1,5 @@
-import prisma from "@/lib/prisma";
-import Docs from "@/components/docs";
+import FunctionCatalog from "@/components/function-catalog";
 
-export default async function Page() {
-    const functions = await prisma.functions.findMany();
-    const args = await prisma.arguments.findMany();
-
-    return <Docs functions={functions} args={args} />;
+export default function Page() {
+    return <FunctionCatalog />;
 }

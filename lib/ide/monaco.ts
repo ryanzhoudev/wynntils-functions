@@ -1,0 +1,427 @@
+import type { Monaco as MonacoApi } from "@monaco-editor/react";
+import { WynntilsLspClient } from "@/lib/ide/lsp-client";
+import {
+    LspCompletionItem,
+    LspHover,
+    LspMarkupContent,
+    LspMarkedString,
+    LspRange,
+    LspTextEdit,
+} from "@/lib/ide/types";
+import type { editor as MonacoEditor, languages as MonacoLanguages, Position as MonacoPosition } from "monaco-editor";
+
+const WYNNTILS_LANGUAGE_ID = "wynntils";
+let languageRegistered = false;
+
+export const WYNNTILS_LANGUAGE = WYNNTILS_LANGUAGE_ID;
+
+function toLspPosition(lineNumber: number, column: number) {
+    return {
+        line: lineNumber - 1,
+        character: column - 1,
+    };
+}
+
+function fromLspRange(range: LspRange) {
+    return {
+        startLineNumber: range.start.line + 1,
+        startColumn: range.start.character + 1,
+        endLineNumber: range.end.line + 1,
+        endColumn: range.end.character + 1,
+    };
+}
+
+function toMarkdownStrings(contents: LspHover["contents"]) {
+    if (typeof contents === "string") {
+        return [{ value: contents }];
+    }
+
+    if (Array.isArray(contents)) {
+        return contents.map((entry) => {
+            if (typeof entry === "string") {
+                return { value: entry };
+            }
+
+            const marked = entry as Exclude<LspMarkedString, string>;
+
+            return {
+                value: `\`\`\`${marked.language}\n${marked.value}\n\`\`\``,
+            };
+        });
+    }
+
+    const markup = contents as LspMarkupContent;
+
+    return [{ value: markup.value }];
+}
+
+function mapCompletionItemKind(monaco: MonacoApi, kind?: number) {
+    switch (kind) {
+        case 1:
+            return monaco.languages.CompletionItemKind.Text;
+        case 2:
+            return monaco.languages.CompletionItemKind.Method;
+        case 3:
+            return monaco.languages.CompletionItemKind.Function;
+        case 4:
+            return monaco.languages.CompletionItemKind.Constructor;
+        case 5:
+            return monaco.languages.CompletionItemKind.Field;
+        case 6:
+            return monaco.languages.CompletionItemKind.Variable;
+        case 7:
+            return monaco.languages.CompletionItemKind.Class;
+        case 8:
+            return monaco.languages.CompletionItemKind.Interface;
+        case 9:
+            return monaco.languages.CompletionItemKind.Module;
+        case 10:
+            return monaco.languages.CompletionItemKind.Property;
+        case 11:
+            return monaco.languages.CompletionItemKind.Unit;
+        case 12:
+            return monaco.languages.CompletionItemKind.Value;
+        case 13:
+            return monaco.languages.CompletionItemKind.Enum;
+        case 14:
+            return monaco.languages.CompletionItemKind.Keyword;
+        case 15:
+            return monaco.languages.CompletionItemKind.Snippet;
+        case 16:
+            return monaco.languages.CompletionItemKind.Color;
+        case 17:
+            return monaco.languages.CompletionItemKind.File;
+        case 18:
+            return monaco.languages.CompletionItemKind.Reference;
+        case 19:
+            return monaco.languages.CompletionItemKind.Folder;
+        case 20:
+            return monaco.languages.CompletionItemKind.EnumMember;
+        case 21:
+            return monaco.languages.CompletionItemKind.Constant;
+        case 22:
+            return monaco.languages.CompletionItemKind.Struct;
+        case 23:
+            return monaco.languages.CompletionItemKind.Event;
+        case 24:
+            return monaco.languages.CompletionItemKind.Operator;
+        case 25:
+            return monaco.languages.CompletionItemKind.TypeParameter;
+        default:
+            return monaco.languages.CompletionItemKind.Function;
+    }
+}
+
+function resolveInsertText(item: LspCompletionItem) {
+    if (item.textEdit && typeof item.textEdit.newText === "string") {
+        return item.textEdit.newText;
+    }
+
+    if (typeof item.insertText === "string") {
+        return item.insertText;
+    }
+
+    return item.label;
+}
+
+function resolveRange(
+    item: LspCompletionItem,
+    fallbackRange: {
+        startLineNumber: number;
+        endLineNumber: number;
+        startColumn: number;
+        endColumn: number;
+    },
+) {
+    const textEdit = item.textEdit as LspTextEdit | undefined;
+
+    if (!textEdit?.range) {
+        return fallbackRange;
+    }
+
+    return fromLspRange(textEdit.range);
+}
+
+function isEscapedCompletionContext(documentText: string, wordStartOffset: number) {
+    return wordStartOffset > 0 && documentText[wordStartOffset - 1] === "\\";
+}
+
+function isPlaceholderCompletionContext(documentText: string, wordStartOffset: number) {
+    const marker = documentText.slice(Math.max(0, wordStartOffset - 2), wordStartOffset);
+
+    return marker === "@{" || marker === "${";
+}
+
+function isFormatSuffixCompletionContext(documentText: string, wordStartOffset: number) {
+    const expressionStart = documentText.lastIndexOf("{", wordStartOffset);
+    const expressionEnd = documentText.lastIndexOf("}", wordStartOffset);
+
+    if (expressionStart < 0 || expressionStart < expressionEnd) {
+        return false;
+    }
+
+    const expressionPrefix = documentText.slice(expressionStart + 1, wordStartOffset);
+    const colonIndex = expressionPrefix.lastIndexOf(":");
+
+    if (colonIndex < 0) {
+        return false;
+    }
+
+    return /^[A-Za-z0-9]*$/.test(expressionPrefix.slice(colonIndex + 1));
+}
+
+function isWynntilsExpressionCompletionContext(documentText: string, wordStartOffset: number) {
+    const expressionStart = documentText.lastIndexOf("{", wordStartOffset);
+    const expressionEnd = documentText.lastIndexOf("}", wordStartOffset);
+
+    if (expressionStart < 0 || expressionStart < expressionEnd) {
+        return false;
+    }
+
+    return !isInsideString(documentText.slice(expressionStart + 1, wordStartOffset));
+}
+
+function isInsideString(text: string) {
+    let isInString = false;
+    let isEscaped = false;
+
+    for (const character of text) {
+        if (isEscaped) {
+            isEscaped = false;
+            continue;
+        }
+
+        if (character === "\\") {
+            isEscaped = true;
+            continue;
+        }
+
+        if (character === "\"") {
+            isInString = !isInString;
+        }
+    }
+
+    return isInString;
+}
+
+function resolveDocumentation(item: LspCompletionItem): string | undefined {
+    const documentation = item.documentation;
+
+    if (!documentation) {
+        return undefined;
+    }
+
+    if (typeof documentation === "string") {
+        return documentation;
+    }
+
+    if (Array.isArray(documentation)) {
+        return documentation
+            .map((entry) => {
+                if (typeof entry === "string") {
+                    return entry;
+                }
+
+                return `\`\`\`${entry.language}\n${entry.value}\n\`\`\``;
+            })
+            .join("\n\n");
+    }
+
+    return documentation.value;
+}
+
+function parseHexColor(matchText: string) {
+    const hex = matchText.startsWith("&#") ? matchText.slice(2) : matchText.slice(1);
+    const expanded =
+        hex.length === 3
+            ? hex
+                  .split("")
+                  .map((character) => character + character)
+                  .join("")
+            : hex;
+
+    const red = Number.parseInt(expanded.slice(0, 2), 16) / 255;
+    const green = Number.parseInt(expanded.slice(2, 4), 16) / 255;
+    const blue = Number.parseInt(expanded.slice(4, 6), 16) / 255;
+    const alpha = expanded.length >= 8 ? Number.parseInt(expanded.slice(6, 8), 16) / 255 : 1;
+
+    return { red, green, blue, alpha };
+}
+
+function toHexByte(value: number) {
+    return Math.round(value * 255)
+        .toString(16)
+        .padStart(2, "0");
+}
+
+export function ensureWynntilsLanguage(monaco: MonacoApi) {
+    if (languageRegistered) {
+        return;
+    }
+
+    languageRegistered = true;
+
+    monaco.languages.register({ id: WYNNTILS_LANGUAGE_ID });
+
+    monaco.languages.setLanguageConfiguration(WYNNTILS_LANGUAGE_ID, {
+        comments: {
+            lineComment: "//",
+        },
+        brackets: [
+            ["(", ")"],
+            ["{", "}"],
+            ["[", "]"],
+        ],
+        autoClosingPairs: [
+            { open: "(", close: ")" },
+            { open: "{", close: "}" },
+            { open: "[", close: "]" },
+            { open: '"', close: '"' },
+        ],
+        surroundingPairs: [
+            { open: "(", close: ")" },
+            { open: "{", close: "}" },
+            { open: "[", close: "]" },
+            { open: '"', close: '"' },
+        ],
+    });
+
+    monaco.languages.setMonarchTokensProvider(WYNNTILS_LANGUAGE_ID, {
+        tokenizer: {
+            root: [
+                [/\/\/.*/, "comment"],
+                [/\b(let|true|false)\b/, "keyword"],
+                [/[rR]"/, "regexp", "@rawString"],
+                [/[a-zA-Z_][\w]*/, "identifier"],
+                [/[{}()\[\]]/, "delimiter.bracket"],
+                [/;/, "delimiter"],
+                [/[0-9]+(\.[0-9]+)?/, "number"],
+                [/@\{[A-Za-z_][A-Za-z0-9_]*\}/, "type.identifier"],
+                [/\$\{[A-Za-z_][A-Za-z0-9_]*\}/, "type.identifier"],
+                [/#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/, "number.hex"],
+                [/"([^"\\]|\\.)*$/, "string.invalid"],
+                [/"/, "string", "@string"],
+            ],
+            string: [
+                [/[^\\"]+/, "string"],
+                [/\\./, "string.escape.invalid"],
+                [/"/, "string", "@pop"],
+            ],
+            rawString: [
+                [/[^"]+/, "regexp"],
+                [/"/, "regexp", "@pop"],
+            ],
+        },
+    });
+}
+
+export function registerWynntilsProviders(monaco: MonacoApi, lspClient: WynntilsLspClient) {
+    const completionProvider = monaco.languages.registerCompletionItemProvider(WYNNTILS_LANGUAGE_ID, {
+        triggerCharacters: ["{"],
+        provideCompletionItems: async (
+            model: MonacoEditor.ITextModel,
+            position: MonacoPosition,
+            context: MonacoLanguages.CompletionContext,
+        ) => {
+            const currentWord = model.getWordUntilPosition(position);
+            const isExpressionStart = context.triggerCharacter === "{";
+            const documentText = model.getValue();
+            const wordStartOffset = model.getOffsetAt({
+                lineNumber: position.lineNumber,
+                column: currentWord.startColumn,
+            });
+
+            if (
+                context.triggerCharacter === ";" ||
+                context.triggerCharacter === "(" ||
+                isEscapedCompletionContext(documentText, wordStartOffset) ||
+                isPlaceholderCompletionContext(documentText, wordStartOffset) ||
+                isFormatSuffixCompletionContext(documentText, wordStartOffset) ||
+                !isWynntilsExpressionCompletionContext(documentText, wordStartOffset) ||
+                (!isExpressionStart && currentWord.word.length === 0)
+            ) {
+                return { suggestions: [] };
+            }
+
+            const items = await lspClient.requestCompletion(
+                model.uri.toString(),
+                toLspPosition(position.lineNumber, position.column),
+                context.triggerCharacter,
+            );
+
+            const fallbackRange = {
+                startLineNumber: position.lineNumber,
+                endLineNumber: position.lineNumber,
+                startColumn: currentWord.startColumn,
+                endColumn: currentWord.endColumn,
+            };
+
+            return {
+                suggestions: items.map((item) => ({
+                    label: item.label,
+                    kind: mapCompletionItemKind(monaco, item.kind),
+                    detail: item.detail,
+                    documentation: resolveDocumentation(item),
+                    insertText: resolveInsertText(item),
+                    insertTextRules:
+                        item.insertTextFormat === 2
+                            ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
+                            : monaco.languages.CompletionItemInsertTextRule.None,
+                    range: resolveRange(item, fallbackRange),
+                    sortText: item.sortText,
+                })),
+            };
+        },
+    });
+
+    const hoverProvider = monaco.languages.registerHoverProvider(WYNNTILS_LANGUAGE_ID, {
+        provideHover: async (model: MonacoEditor.ITextModel, position: MonacoPosition) => {
+            const hover = await lspClient.requestHover(model.uri.toString(), toLspPosition(position.lineNumber, position.column));
+
+            if (!hover) {
+                return null;
+            }
+
+            return {
+                contents: toMarkdownStrings(hover.contents),
+                range: hover.range ? fromLspRange(hover.range) : undefined,
+            };
+        },
+    });
+
+    const colorProvider = monaco.languages.registerColorProvider(WYNNTILS_LANGUAGE_ID, {
+        provideDocumentColors: (model: MonacoEditor.ITextModel) => {
+            const colors: MonacoLanguages.IColorInformation[] = [];
+            const colorExpression = /&#[0-9a-fA-F]{8}\b|#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/g;
+            const text = model.getValue();
+            let match: RegExpExecArray | null;
+
+            while ((match = colorExpression.exec(text)) !== null) {
+                const start = model.getPositionAt(match.index);
+                const end = model.getPositionAt(match.index + match[0].length);
+
+                colors.push({
+                    color: parseHexColor(match[0]),
+                    range: {
+                        startLineNumber: start.lineNumber,
+                        startColumn: start.column,
+                        endLineNumber: end.lineNumber,
+                        endColumn: end.column,
+                    },
+                });
+            }
+
+            return colors;
+        },
+        provideColorPresentations: (_model: MonacoEditor.ITextModel, colorInfo: MonacoLanguages.IColorInformation) => {
+            const { red, green, blue, alpha } = colorInfo.color;
+            const label = `#${toHexByte(red)}${toHexByte(green)}${toHexByte(blue)}${
+                alpha < 1 ? toHexByte(alpha) : ""
+            }`;
+
+            return [{ label }];
+        },
+    });
+
+    return [completionProvider, hoverProvider, colorProvider];
+}
