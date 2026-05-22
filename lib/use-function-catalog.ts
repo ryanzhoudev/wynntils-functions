@@ -286,7 +286,9 @@ export function useFunctionCatalog() {
     useEffect(() => {
         const controller = new AbortController();
 
-        void fetchCatalog({ signal: controller.signal });
+        window.queueMicrotask(() => {
+            void fetchCatalog({ signal: controller.signal });
+        });
 
         return () => {
             controller.abort();

@@ -1,324 +1,132 @@
 import {
     LspCompletionItem,
-    LspCompletionList,
     LspHover,
     LspPosition,
     LspPublishDiagnosticsParams,
+    LspSignatureHelp,
 } from "@/lib/ide/types";
+import { FunctionCatalogResponse } from "@/lib/types";
 
-type JsonRpcRequest = {
-    jsonrpc: "2.0";
-    id: number;
-    method: string;
-    params?: unknown;
-};
+type DiagnosticsHandler = (params: LspPublishDiagnosticsParams) => void;
 
-type JsonRpcNotification = {
-    jsonrpc: "2.0";
-    method: string;
-    params?: unknown;
-};
-
-type JsonRpcResponse = {
-    jsonrpc: "2.0";
+type WorkerResponse = {
+    type: "response";
     id: number;
     result?: unknown;
-    error?: {
-        code: number;
-        message: string;
-        data?: unknown;
-    };
+    error?: string;
 };
+
+type WorkerDiagnostics = {
+    type: "diagnostics";
+    params: LspPublishDiagnosticsParams;
+};
+
+type WorkerMessage = WorkerResponse | WorkerDiagnostics;
 
 type PendingRequest = {
     resolve: (value: unknown) => void;
     reject: (error: Error) => void;
 };
 
-type DiagnosticsHandler = (params: LspPublishDiagnosticsParams) => void;
-
-function isResponseMessage(message: unknown): message is JsonRpcResponse {
-    if (typeof message !== "object" || message === null) {
-        return false;
-    }
-
-    return "id" in message && ("result" in message || "error" in message);
-}
-
-function isNotificationMessage(message: unknown): message is JsonRpcNotification {
-    if (typeof message !== "object" || message === null) {
-        return false;
-    }
-
-    return "method" in message && !("id" in message);
-}
-
-function toErrorMessage(error: unknown) {
-    if (error instanceof Error) {
-        return error.message;
-    }
-
-    return "Unknown LSP error";
-}
+type QueuedDocumentSync = {
+    text: string;
+    resolvers: Array<{
+        resolve: () => void;
+        reject: (error: Error) => void;
+    }>;
+    isFlushing: boolean;
+};
 
 export class WynntilsLspClient {
-    private readonly endpoint: string;
-
-    private websocket: WebSocket | null = null;
+    private worker: Worker | null = null;
     private requestId = 1;
     private connectPromise: Promise<void> | null = null;
-    private isInitialized = false;
-
     private readonly pendingRequests = new Map<number, PendingRequest>();
+    private readonly queuedDocumentSyncs = new Map<string, QueuedDocumentSync>();
     private readonly diagnosticsHandlers = new Set<DiagnosticsHandler>();
 
-    private readonly openedDocuments = new Map<string, number>();
-
-    constructor(endpoint: string) {
-        this.endpoint = endpoint;
-    }
-
-    private handleMessage(message: unknown) {
-        if (isResponseMessage(message)) {
-            const pending = this.pendingRequests.get(message.id);
-
-            if (!pending) {
-                return;
-            }
-
-            this.pendingRequests.delete(message.id);
-
-            if (message.error) {
-                pending.reject(new Error(message.error.message));
-                return;
-            }
-
-            pending.resolve(message.result);
-            return;
-        }
-
-        if (!isNotificationMessage(message)) {
-            return;
-        }
-
-        if (message.method === "textDocument/publishDiagnostics") {
-            const params = message.params as LspPublishDiagnosticsParams;
-
-            this.diagnosticsHandlers.forEach((handler) => handler(params));
-        }
-    }
-
-    private send(message: JsonRpcRequest | JsonRpcNotification) {
-        if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
-            throw new Error("LSP websocket is not connected");
-        }
-
-        this.websocket.send(JSON.stringify(message));
-    }
-
-    private sendRequestInternal(method: string, params?: unknown) {
-        const id = this.requestId++;
-
-        return new Promise<unknown>((resolve, reject) => {
-            this.pendingRequests.set(id, { resolve, reject });
-
-            try {
-                this.send({
-                    jsonrpc: "2.0",
-                    id,
-                    method,
-                    params,
-                });
-            } catch (error) {
-                this.pendingRequests.delete(id);
-                reject(error instanceof Error ? error : new Error(toErrorMessage(error)));
-            }
-        });
-    }
-
-    private async request(method: string, params?: unknown) {
-        await this.connect();
-
-        return this.sendRequestInternal(method, params);
-    }
-
-    private notifyInternal(method: string, params?: unknown) {
-        this.send({
-            jsonrpc: "2.0",
-            method,
-            params,
-        });
-    }
-
-    private async notify(method: string, params?: unknown) {
-        await this.connect();
-
-        this.notifyInternal(method, params);
-    }
+    constructor(private catalog: FunctionCatalogResponse) {}
 
     async connect() {
         if (this.connectPromise) {
             return this.connectPromise;
         }
 
-        this.connectPromise = new Promise<void>((resolve, reject) => {
-            const websocket = new WebSocket(this.endpoint);
-            this.websocket = websocket;
-
-            websocket.onopen = () => {
-                void this
-                    .sendRequestInternal("initialize", {
-                        processId: null,
-                        rootUri: null,
-                        capabilities: {
-                            textDocument: {
-                                completion: {
-                                    completionItem: {
-                                        snippetSupport: true,
-                                        documentationFormat: ["markdown", "plaintext"],
-                                    },
-                                },
-                                hover: {
-                                    contentFormat: ["markdown", "plaintext"],
-                                },
-                            },
-                        },
-                        clientInfo: {
-                            name: "wynntils-functions-web",
-                            version: "1.0.0",
-                        },
-                        trace: "off",
-                    })
-                    .then(() => this.notifyInternal("initialized", {}))
-                    .then(() => {
-                        this.isInitialized = true;
-                        resolve();
-                    })
-                    .catch((error) => {
-                        this.isInitialized = false;
-                        reject(error instanceof Error ? error : new Error(toErrorMessage(error)));
-                    });
-            };
-
-            websocket.onmessage = (event) => {
-                if (typeof event.data !== "string") {
-                    return;
-                }
-
-                try {
-                    const parsed = JSON.parse(event.data) as unknown;
-
-                    if (Array.isArray(parsed)) {
-                        parsed.forEach((entry) => this.handleMessage(entry));
-                        return;
-                    }
-
-                    this.handleMessage(parsed);
-                } catch {
-                    // Ignore malformed messages.
-                }
-            };
-
-            websocket.onerror = () => {
-                if (!this.isInitialized) {
-                    reject(new Error(`Failed to connect to LSP websocket: ${this.endpoint}`));
-                }
-            };
-
-            websocket.onclose = () => {
-                this.isInitialized = false;
-                this.websocket = null;
-                this.connectPromise = null;
-                this.openedDocuments.clear();
-
-                this.pendingRequests.forEach((pending) => pending.reject(new Error("LSP websocket closed")));
-                this.pendingRequests.clear();
-            };
+        this.worker = new Worker(new URL("./browser-lsp/worker.ts", import.meta.url), {
+            type: "module",
         });
 
+        this.worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
+            this.handleWorkerMessage(event.data);
+        };
+
+        this.worker.onerror = (event) => {
+            const error = new Error(event.message || "Browser LSP worker failed");
+
+            this.pendingRequests.forEach((pending) => pending.reject(error));
+            this.pendingRequests.clear();
+            this.connectPromise = null;
+        };
+
+        this.connectPromise = this.request("initialize", { catalog: this.catalog }).then(() => undefined);
+
         return this.connectPromise;
+    }
+
+    async updateCatalog(catalog: FunctionCatalogResponse) {
+        this.catalog = catalog;
+        await this.connect();
+        await this.request("updateCatalog", { catalog });
     }
 
     async syncDocument(uri: string, text: string) {
         await this.connect();
 
-        const currentVersion = this.openedDocuments.get(uri);
+        return new Promise<void>((resolve, reject) => {
+            const queued = this.queuedDocumentSyncs.get(uri);
 
-        if (!currentVersion) {
-            this.openedDocuments.set(uri, 1);
+            if (queued) {
+                queued.resolvers.forEach(({ resolve }) => resolve());
+                queued.text = text;
+                queued.resolvers = [{ resolve, reject }];
+                return;
+            }
 
-            await this.notify("textDocument/didOpen", {
-                textDocument: {
-                    uri,
-                    languageId: "wynntils",
-                    version: 1,
-                    text,
-                },
+            this.queuedDocumentSyncs.set(uri, {
+                text,
+                resolvers: [{ resolve, reject }],
+                isFlushing: false,
             });
-            return;
-        }
 
-        const nextVersion = currentVersion + 1;
-        this.openedDocuments.set(uri, nextVersion);
-
-        await this.notify("textDocument/didChange", {
-            textDocument: {
-                uri,
-                version: nextVersion,
-            },
-            contentChanges: [
-                {
-                    text,
-                },
-            ],
+            this.flushDocumentSync(uri);
         });
     }
 
     async closeDocument(uri: string) {
-        if (!this.openedDocuments.has(uri)) {
-            return;
-        }
-
-        this.openedDocuments.delete(uri);
-
-        await this.notify("textDocument/didClose", {
-            textDocument: {
-                uri,
-            },
-        });
+        await this.connect();
+        await this.request("closeDocument", { uri });
     }
 
-    async requestCompletion(uri: string, position: LspPosition): Promise<LspCompletionItem[]> {
-        const completionResult = (await this.request("textDocument/completion", {
-            textDocument: {
-                uri,
-            },
+    async requestCompletion(uri: string, position: LspPosition, triggerCharacter?: string): Promise<LspCompletionItem[]> {
+        await this.connect();
+
+        return (await this.request("requestCompletion", {
+            uri,
             position,
-            context: {
-                triggerKind: 1,
-            },
-        })) as LspCompletionItem[] | LspCompletionList | null;
-
-        if (!completionResult) {
-            return [];
-        }
-
-        if (Array.isArray(completionResult)) {
-            return completionResult;
-        }
-
-        return completionResult.items ?? [];
+            triggerCharacter,
+        })) as LspCompletionItem[];
     }
 
     async requestHover(uri: string, position: LspPosition): Promise<LspHover | null> {
-        const hoverResult = (await this.request("textDocument/hover", {
-            textDocument: {
-                uri,
-            },
-            position,
-        })) as LspHover | null;
+        await this.connect();
 
-        return hoverResult ?? null;
+        return (await this.request("requestHover", { uri, position })) as LspHover | null;
+    }
+
+    async requestSignatureHelp(uri: string, position: LspPosition): Promise<LspSignatureHelp | null> {
+        await this.connect();
+
+        return (await this.request("requestSignatureHelp", { uri, position })) as LspSignatureHelp | null;
     }
 
     onDiagnostics(handler: DiagnosticsHandler) {
@@ -330,18 +138,94 @@ export class WynntilsLspClient {
     }
 
     dispose() {
+        this.queuedDocumentSyncs.forEach((queued) => {
+            queued.resolvers.forEach(({ reject }) => reject(new Error("LSP client disposed")));
+        });
+        this.queuedDocumentSyncs.clear();
+
         this.pendingRequests.forEach((pending) => pending.reject(new Error("LSP client disposed")));
         this.pendingRequests.clear();
-
-        this.openedDocuments.clear();
         this.diagnosticsHandlers.clear();
-        this.isInitialized = false;
 
-        if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-            this.websocket.close();
+        if (this.worker) {
+            this.worker.terminate();
         }
 
-        this.websocket = null;
+        this.worker = null;
         this.connectPromise = null;
+    }
+
+    private request(method: string, params?: Record<string, unknown>) {
+        if (!this.worker) {
+            return Promise.reject(new Error("Browser LSP worker is not running"));
+        }
+
+        const id = this.requestId++;
+
+        return new Promise<unknown>((resolve, reject) => {
+            this.pendingRequests.set(id, { resolve, reject });
+            this.worker?.postMessage({ id, method, ...params });
+        });
+    }
+
+    private flushDocumentSync(uri: string) {
+        const queued = this.queuedDocumentSyncs.get(uri);
+
+        if (!queued || queued.isFlushing) {
+            return;
+        }
+
+        queued.isFlushing = true;
+        const text = queued.text;
+
+        void this.request("syncDocument", { uri, text })
+            .then(() => {
+                const latest = this.queuedDocumentSyncs.get(uri);
+
+                if (!latest) {
+                    return;
+                }
+
+                if (latest.text !== text) {
+                    latest.isFlushing = false;
+                    this.flushDocumentSync(uri);
+                    return;
+                }
+
+                this.queuedDocumentSyncs.delete(uri);
+                latest.resolvers.forEach(({ resolve }) => resolve());
+            })
+            .catch((error) => {
+                const latest = this.queuedDocumentSyncs.get(uri);
+
+                if (!latest) {
+                    return;
+                }
+
+                this.queuedDocumentSyncs.delete(uri);
+                latest.resolvers.forEach(({ reject }) => reject(error instanceof Error ? error : new Error("Document sync failed")));
+            });
+    }
+
+    private handleWorkerMessage(message: WorkerMessage) {
+        if (message.type === "diagnostics") {
+            this.diagnosticsHandlers.forEach((handler) => handler(message.params));
+            return;
+        }
+
+        const pending = this.pendingRequests.get(message.id);
+
+        if (!pending) {
+            return;
+        }
+
+        this.pendingRequests.delete(message.id);
+
+        if (message.error) {
+            pending.reject(new Error(message.error));
+            return;
+        }
+
+        pending.resolve(message.result);
     }
 }

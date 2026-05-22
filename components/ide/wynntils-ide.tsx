@@ -6,9 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { WynntilsLspClient } from "@/lib/ide/lsp-client";
 import { WYNNTILS_LANGUAGE, ensureWynntilsLanguage, registerWynntilsProviders } from "@/lib/ide/monaco";
-import { createDefaultWorkspace, loadWorkspaceFromStorage, saveWorkspaceToStorage } from "@/lib/ide/storage";
-import { CompileResult, IdeFile, IdeWorkspace, LspDiagnostic } from "@/lib/ide/types";
+import { loadWorkspaceFromStorage, saveWorkspaceToStorage } from "@/lib/ide/storage";
+import {
+    CompileResult,
+    IdeFile,
+    IdeWorkspace,
+    LspDiagnostic,
+    LspMarkupContent,
+    LspSignatureHelp,
+} from "@/lib/ide/types";
 import { compileSupersetToWynntils } from "@/lib/ide/upstream-compile";
+import { useFunctionCatalog } from "@/lib/use-function-catalog";
 import {
     AlertTriangle,
     Braces,
@@ -26,9 +34,9 @@ import type { IDisposable, editor as MonacoEditor } from "monaco-editor";
 import Link from "next/link";
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const MARKER_OWNER = "wynntils-upstream-lsp";
+const MARKER_OWNER = "wynntils-browser-lsp";
 const WORKSPACE_SAVE_DEBOUNCE_MS = 250;
-const DEFAULT_LSP_ENDPOINT = "ws://localhost:3001/wynntils";
+const EDITOR_HEIGHT = "calc(100vh - 11.75rem)";
 
 function createFile(name: string, content: string): IdeFile {
     return {
@@ -85,6 +93,18 @@ function markerSeverityVariant(severity: number) {
     }
 }
 
+function workerStatusDotClass(status: "connecting" | "ready" | "error") {
+    switch (status) {
+        case "ready":
+            return "bg-emerald-400";
+        case "error":
+            return "bg-red-400";
+        case "connecting":
+        default:
+            return "bg-amber-300";
+    }
+}
+
 function mapDiagnosticSeverity(monaco: MonacoApi, severity?: number) {
     switch (severity) {
         case 1:
@@ -100,11 +120,34 @@ function mapDiagnosticSeverity(monaco: MonacoApi, severity?: number) {
     }
 }
 
-export default function WynntilsIde() {
-    const lspEndpoint = process.env.NEXT_PUBLIC_WYNNTILS_LSP_WS_URL ?? DEFAULT_LSP_ENDPOINT;
+function toPlainDocumentation(documentation: string | LspMarkupContent | undefined) {
+    if (!documentation) {
+        return "";
+    }
 
-    const [workspace, setWorkspace] = useState<IdeWorkspace>(() => createDefaultWorkspace());
-    const [isWorkspaceReady, setIsWorkspaceReady] = useState(false);
+    const value = typeof documentation === "string" ? documentation : documentation.value;
+
+    return value
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/\*\*([^*]+)\*\*/g, "$1")
+        .trim();
+}
+
+function formatParameterLabel(label: string | [number, number]) {
+    return Array.isArray(label) ? "" : label;
+}
+
+function formatSignatureName(label: string) {
+    const parenthesisIndex = label.indexOf("(");
+
+    return parenthesisIndex >= 0 ? label.slice(0, parenthesisIndex) : label;
+}
+
+export default function WynntilsIde() {
+    const functionCatalog = useFunctionCatalog();
+
+    const [workspace, setWorkspace] = useState<IdeWorkspace>(() => loadWorkspaceFromStorage());
+    const [isWorkspaceReady] = useState(true);
 
     const [compileResult, setCompileResult] = useState<CompileResult | null>(null);
     const [compileStatus, setCompileStatus] = useState<{ tone: "success" | "warning"; message: string } | null>(null);
@@ -112,6 +155,8 @@ export default function WynntilsIde() {
     const [isCopyingCompiledOutput, setIsCopyingCompiledOutput] = useState(false);
 
     const [diagnosticMarkers, setDiagnosticMarkers] = useState<MonacoEditor.IMarkerData[]>([]);
+    const [showDiagnostics, setShowDiagnostics] = useState(false);
+    const [signatureHelp, setSignatureHelp] = useState<LspSignatureHelp | null>(null);
 
     const [lspStatus, setLspStatus] = useState<"connecting" | "ready" | "error">("connecting");
     const [lspError, setLspError] = useState<string | null>(null);
@@ -121,20 +166,34 @@ export default function WynntilsIde() {
 
     const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
     const monacoRef = useRef<MonacoApi | null>(null);
+    const compiledOutputRef = useRef<HTMLDivElement | null>(null);
     const providerDisposablesRef = useRef<IDisposable[]>([]);
+    const editorDisposablesRef = useRef<IDisposable[]>([]);
+    const signatureHelpRequestRef = useRef(0);
+    const signatureHelpFrameRef = useRef<number | null>(null);
+    const signatureHelpInFlightRef = useRef(false);
+    const signatureHelpQueuedRef = useRef(false);
 
     const lspClientRef = useRef<WynntilsLspClient | null>(null);
     const diagnosticsByUriRef = useRef<Map<string, LspDiagnostic[]>>(new Map());
     const activeUriRef = useRef<string | null>(null);
+    const activeFileRef = useRef<IdeFile | null>(null);
     const lastActiveFileIdRef = useRef<string | null>(null);
 
     const activeFile = useMemo(() => {
         return workspace.files.find((file) => file.id === workspace.activeFileId) ?? workspace.files[0] ?? null;
     }, [workspace.activeFileId, workspace.files]);
 
+    const activeFileId = activeFile?.id ?? null;
+
     const activeFileUri = useMemo(() => {
-        return activeFile ? fileUri(activeFile.id) : null;
-    }, [activeFile]);
+        return activeFileId ? fileUri(activeFileId) : null;
+    }, [activeFileId]);
+
+    useEffect(() => {
+        activeFileRef.current = activeFile;
+        activeUriRef.current = activeFileUri;
+    }, [activeFile, activeFileUri]);
 
     const applyDiagnosticsForUri = useCallback((uri: string) => {
         const monaco = monacoRef.current;
@@ -179,10 +238,61 @@ export default function WynntilsIde() {
         providerDisposablesRef.current = registerWynntilsProviders(monaco, lspClient);
     }, []);
 
-    useEffect(() => {
-        const loadedWorkspace = loadWorkspaceFromStorage();
-        setWorkspace(loadedWorkspace);
-        setIsWorkspaceReady(true);
+    const refreshSignatureHelp = useCallback(() => {
+        if (signatureHelpFrameRef.current !== null) {
+            return;
+        }
+
+        const runScheduledRefresh = () => {
+            signatureHelpFrameRef.current = null;
+
+            if (signatureHelpInFlightRef.current) {
+                signatureHelpQueuedRef.current = true;
+                return;
+            }
+
+            const editor = editorRef.current;
+            const lspClient = lspClientRef.current;
+            const activeUri = activeUriRef.current;
+            const position = editor?.getPosition();
+
+            if (!editor || !lspClient || !activeUri || !position) {
+                signatureHelpRequestRef.current++;
+                setSignatureHelp(null);
+                return;
+            }
+
+            const requestId = ++signatureHelpRequestRef.current;
+            signatureHelpInFlightRef.current = true;
+
+            void lspClient
+                .requestSignatureHelp(activeUri, {
+                    line: position.lineNumber - 1,
+                    character: position.column - 1,
+                })
+                .then((help) => {
+                    if (requestId !== signatureHelpRequestRef.current || activeUri !== activeUriRef.current) {
+                        return;
+                    }
+
+                    setSignatureHelp(help && help.signatures.length > 0 ? help : null);
+                })
+                .catch(() => {
+                    if (requestId === signatureHelpRequestRef.current) {
+                        setSignatureHelp(null);
+                    }
+                })
+                .finally(() => {
+                    signatureHelpInFlightRef.current = false;
+
+                    if (signatureHelpQueuedRef.current) {
+                        signatureHelpQueuedRef.current = false;
+                        signatureHelpFrameRef.current = window.requestAnimationFrame(runScheduledRefresh);
+                    }
+                });
+        };
+
+        signatureHelpFrameRef.current = window.requestAnimationFrame(runScheduledRefresh);
     }, []);
 
     useEffect(() => {
@@ -206,7 +316,15 @@ export default function WynntilsIde() {
     }, [isWorkspaceReady, workspace]);
 
     useEffect(() => {
-        const lspClient = new WynntilsLspClient(lspEndpoint);
+        if (!functionCatalog.data) {
+            window.queueMicrotask(() => {
+                setLspStatus("connecting");
+                setLspError(functionCatalog.error);
+            });
+            return;
+        }
+
+        const lspClient = new WynntilsLspClient(functionCatalog.data);
         lspClientRef.current = lspClient;
 
         const unsubscribeDiagnostics = lspClient.onDiagnostics((params) => {
@@ -214,18 +332,26 @@ export default function WynntilsIde() {
             applyDiagnosticsForUri(params.uri);
         });
 
-        setLspStatus("connecting");
-        setLspError(null);
+        window.queueMicrotask(() => {
+            setLspStatus("connecting");
+            setLspError(null);
+        });
 
         void lspClient
             .connect()
             .then(() => {
                 setLspStatus("ready");
                 ensureProvidersRegistered();
+
+                if (activeFileRef.current && activeUriRef.current) {
+                    void lspClient.syncDocument(activeUriRef.current, activeFileRef.current.content);
+                }
+
+                refreshSignatureHelp();
             })
             .catch((error) => {
                 setLspStatus("error");
-                setLspError(error instanceof Error ? error.message : "Failed to connect to LSP bridge");
+                setLspError(error instanceof Error ? error.message : "Failed to start browser LSP");
             });
 
         return () => {
@@ -237,30 +363,64 @@ export default function WynntilsIde() {
             lspClient.dispose();
             lspClientRef.current = null;
         };
-    }, [applyDiagnosticsForUri, ensureProvidersRegistered, lspEndpoint]);
+    }, [
+        applyDiagnosticsForUri,
+        ensureProvidersRegistered,
+        functionCatalog.data,
+        functionCatalog.error,
+        refreshSignatureHelp,
+    ]);
 
     useEffect(() => {
-        if (!activeFile || !activeFileUri) {
+        const requestRef = signatureHelpRequestRef;
+        const frameRef = signatureHelpFrameRef;
+        const queuedRef = signatureHelpQueuedRef;
+        const inFlightRef = signatureHelpInFlightRef;
+        const disposablesRef = editorDisposablesRef;
+
+        return () => {
+            requestRef.current++;
+
+            if (frameRef.current !== null) {
+                window.cancelAnimationFrame(frameRef.current);
+                frameRef.current = null;
+            }
+
+            queuedRef.current = false;
+            inFlightRef.current = false;
+
+            disposablesRef.current.forEach((disposable) => disposable.dispose());
+            disposablesRef.current = [];
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!activeFileId || !activeFileUri) {
             return;
         }
 
         activeUriRef.current = activeFileUri;
 
-        const fileSwitched = lastActiveFileIdRef.current !== activeFile.id;
+        const fileSwitched = lastActiveFileIdRef.current !== activeFileId;
 
         if (fileSwitched) {
-            lastActiveFileIdRef.current = activeFile.id;
+            lastActiveFileIdRef.current = activeFileId;
             setCompileResult(null);
             setCompileStatus(null);
+            setSignatureHelp(null);
 
             const lspClient = lspClientRef.current;
-            if (lspClient) {
-                void lspClient.syncDocument(activeFileUri, activeFile.content);
+            const currentFile = activeFileRef.current;
+
+            if (lspClient && currentFile) {
+                void lspClient.syncDocument(activeFileUri, currentFile.content);
             }
+
+            refreshSignatureHelp();
         }
 
         applyDiagnosticsForUri(activeFileUri);
-    }, [activeFile, activeFileUri, applyDiagnosticsForUri]);
+    }, [activeFileId, activeFileUri, applyDiagnosticsForUri, refreshSignatureHelp]);
 
     const onEditorMount: OnMount = (editor, monaco) => {
         editorRef.current = editor;
@@ -268,6 +428,14 @@ export default function WynntilsIde() {
 
         ensureWynntilsLanguage(monaco);
         ensureProvidersRegistered();
+
+        editorDisposablesRef.current.forEach((disposable) => disposable.dispose());
+        editorDisposablesRef.current = [
+            editor.onDidChangeCursorPosition(refreshSignatureHelp),
+            editor.onDidChangeModelContent(refreshSignatureHelp),
+            editor.onDidChangeModel(refreshSignatureHelp),
+        ];
+        refreshSignatureHelp();
 
         if (activeUriRef.current) {
             applyDiagnosticsForUri(activeUriRef.current);
@@ -283,6 +451,14 @@ export default function WynntilsIde() {
 
         if (!activeId) {
             return;
+        }
+
+        if (activeFileRef.current?.id === activeId) {
+            activeFileRef.current = {
+                ...activeFileRef.current,
+                content,
+                updatedAt: Date.now(),
+            };
         }
 
         updateWorkspace((previous) => ({
@@ -429,14 +605,16 @@ export default function WynntilsIde() {
     };
 
     const compileActiveFile = useCallback(async () => {
-        if (!activeFile) {
+        const currentFile = activeFileRef.current;
+
+        if (!currentFile) {
             return;
         }
 
         setIsCompiling(true);
 
         try {
-            const result = compileSupersetToWynntils(activeFile.content);
+            const result = compileSupersetToWynntils(currentFile.content);
             setCompileResult(result);
 
             if (result.errors.length > 0) {
@@ -447,10 +625,14 @@ export default function WynntilsIde() {
             } else {
                 setCompileStatus({ tone: "success", message: "Compiled successfully." });
             }
+
+            window.setTimeout(() => {
+                compiledOutputRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+            }, 0);
         } finally {
             setIsCompiling(false);
         }
-    }, [activeFile]);
+    }, []);
 
     const createFileFromCompiledOutput = () => {
         if (!compileResult || compileResult.code.length === 0) {
@@ -513,6 +695,13 @@ export default function WynntilsIde() {
         };
     }, [compileActiveFile]);
 
+    const signatureStack = signatureHelp?.signatures ?? [];
+    const activeSignature = signatureStack[signatureHelp?.activeSignature ?? 0] ?? null;
+    const activeSignatureParameterIndex = activeSignature?.activeParameter ?? signatureHelp?.activeParameter ?? 0;
+    const activeParameter = activeSignature?.parameters?.[activeSignatureParameterIndex] ?? null;
+    const activeParameterDocumentation = toPlainDocumentation(activeParameter?.documentation);
+    const signatureDocumentation = toPlainDocumentation(activeSignature?.documentation);
+
     return (
         <div className="min-h-screen bg-background text-foreground">
             <header className="border-b border-border px-4 py-3">
@@ -520,18 +709,17 @@ export default function WynntilsIde() {
                     <div>
                         <h1 className="flex items-center gap-2 text-xl font-semibold">
                             <Braces className="size-5" />
-                            Wynntils IDE (Upstream LSP)
+                            Wynntils IDE
                         </h1>
-                        {/*<p className="text-xs text-muted-foreground">Monaco + upstream LSP server over WebSocket + local file workspace</p>*/}
                         <p className="text-xs text-muted-foreground">
-                            Language tooling by{" "}
+                            Language tooling based on{" "}
                             <a
                                 href="https://github.com/DevChromium/wynntils-functions-tools"
                                 target="_blank"
                                 rel="noreferrer"
                                 className="underline underline-offset-4"
                             >
-                                DevChromium/wynntils-functions-tools
+                                wynntils-functions-tools
                             </a>
                         </p>
                     </div>
@@ -544,9 +732,9 @@ export default function WynntilsIde() {
                 </div>
             </header>
 
-            <main className="mx-auto flex w-full max-w-[90vw] flex-col gap-3 p-4">
+            <main className="mx-auto flex w-full max-w-[92vw] flex-col gap-3 p-4">
                 <Card>
-                    <CardHeader className="gap-3">
+                    <CardHeader className="p-3">
                         <div className="flex flex-wrap items-center gap-2">
                             <select
                                 value={activeFile?.id}
@@ -596,7 +784,11 @@ export default function WynntilsIde() {
                                     Delete
                                 </Button>
                             </span>
-                            <Button onClick={() => void compileActiveFile()} disabled={isCompiling || !activeFile}>
+                            <Button
+                                onClick={() => void compileActiveFile()}
+                                disabled={isCompiling || !activeFile}
+                                title="Shortcut: Ctrl/⌘ + Enter"
+                            >
                                 {isCompiling ? (
                                     <LoaderCircle className="size-4 animate-spin" />
                                 ) : (
@@ -614,58 +806,171 @@ export default function WynntilsIde() {
                                     void importFileFromDisk(event);
                                 }}
                             />
+                            <div className="ml-auto flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                <Badge variant="secondary">{workspace.files.length} files</Badge>
+                                <Button
+                                    variant={showDiagnostics ? "secondary" : "outline"}
+                                    size="sm"
+                                    onClick={() => setShowDiagnostics((current) => !current)}
+                                    disabled={diagnosticMarkers.length === 0}
+                                    aria-pressed={showDiagnostics}
+                                >
+                                    <AlertTriangle className="size-4" />
+                                    {diagnosticMarkers.length} diagnostics
+                                </Button>
+                                <span
+                                    className="inline-flex max-w-48 items-center gap-1.5 truncate font-mono"
+                                    title={lspError ?? `browser worker ${lspStatus}`}
+                                >
+                                    <span
+                                        className={`size-2 shrink-0 rounded-full ${workerStatusDotClass(lspStatus)}`}
+                                        aria-hidden="true"
+                                    />
+                                    <span className="truncate">browser worker</span>
+                                </span>
+                            </div>
                         </div>
-
-                        <CardDescription className="flex flex-wrap items-center gap-2 text-xs">
-                            <Badge variant={lspStatus === "ready" ? "default" : "outline"}>LSP {lspStatus}</Badge>
-                            <Badge variant="secondary">{workspace.files.length} files</Badge>
-                            <Badge variant="secondary">{diagnosticMarkers.length} diagnostics</Badge>
-                            <span>Ctrl/⌘ + Enter compiles when not focused in IDE</span>
-                            <span className="ml-auto font-mono">{lspEndpoint}</span>
-                            {lspError ? <span className="text-red-300">{lspError}</span> : null}
-                        </CardDescription>
                     </CardHeader>
 
-                    <CardContent>
-                        <div className="overflow-hidden rounded-md border border-border">
-                            <Editor
-                                height="68vh"
-                                path={activeFileUri ?? undefined}
-                                defaultLanguage={WYNNTILS_LANGUAGE}
-                                language={WYNNTILS_LANGUAGE}
-                                value={activeFile?.content ?? ""}
-                                onMount={onEditorMount}
-                                onChange={(value) => {
-                                    upsertActiveFileContent(value ?? "");
-                                    setCompileResult(null);
-                                    setCompileStatus(null);
-                                }}
-                                options={{
-                                    minimap: { enabled: false },
-                                    fontSize: 14,
-                                    tabSize: 4,
-                                    smoothScrolling: true,
-                                    wordWrap: "off",
-                                    automaticLayout: true,
-                                    bracketPairColorization: { enabled: true },
-                                    glyphMargin: true,
-                                    renderValidationDecorations: "on",
-                                    hover: { enabled: true, delay: 120 },
-                                    suggestOnTriggerCharacters: true,
-                                    quickSuggestions: {
-                                        strings: true,
-                                        comments: false,
-                                        other: true,
-                                    },
-                                    scrollBeyondLastLine: false,
-                                }}
-                                theme="vs-dark"
-                            />
+                    <CardContent className="px-3 pb-3 pt-0">
+                        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+                            <div className="border border-border bg-[#1e1e1e]">
+                                <Editor
+                                    height={EDITOR_HEIGHT}
+                                    path={activeFileUri ?? undefined}
+                                    defaultLanguage={WYNNTILS_LANGUAGE}
+                                    language={WYNNTILS_LANGUAGE}
+                                    defaultValue={activeFile?.content ?? ""}
+                                    onMount={onEditorMount}
+                                    onChange={(value) => {
+                                        upsertActiveFileContent(value ?? "");
+                                        setCompileResult(null);
+                                        setCompileStatus(null);
+                                    }}
+                                    options={{
+                                        minimap: { enabled: false },
+                                        fontSize: 14,
+                                        tabSize: 4,
+                                        smoothScrolling: true,
+                                        wordWrap: "off",
+                                        automaticLayout: true,
+                                        bracketPairColorization: { enabled: true },
+                                        glyphMargin: true,
+                                        renderValidationDecorations: "on",
+                                        fixedOverflowWidgets: true,
+                                        hover: { enabled: true, delay: 120 },
+                                        scrollbar: { alwaysConsumeMouseWheel: false },
+                                        suggestOnTriggerCharacters: true,
+                                        quickSuggestions: {
+                                            strings: true,
+                                            comments: false,
+                                            other: true,
+                                        },
+                                        scrollBeyondLastLine: false,
+                                    }}
+                                    theme="vs-dark"
+                                />
+                            </div>
+
+                            <aside className="h-44 overflow-y-auto rounded-md border border-border bg-muted/30 px-3 py-2 text-xs xl:h-[calc(100vh-11.75rem)]">
+                                <div className="mb-2 text-[11px] font-semibold uppercase text-muted-foreground">
+                                    Context
+                                </div>
+                                {activeSignature ? (
+                                    <div>
+                                        {signatureStack.length > 1 ? (
+                                            <div className="mb-3 rounded-md border border-border bg-background/45 p-2">
+                                                <div className="mb-2 text-[11px] font-medium uppercase text-muted-foreground">
+                                                    Function Stack
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    {signatureStack.map((signature, index) => {
+                                                        const isActive = index === signatureHelp?.activeSignature;
+                                                        const activeParameterLabel =
+                                                            signature.parameters?.[signature.activeParameter ?? 0]
+                                                                ?.label;
+
+                                                        return (
+                                                            <div
+                                                                key={`${signature.label}-${index}`}
+                                                                className={`rounded border px-2 py-1.5 ${
+                                                                    isActive
+                                                                        ? "border-blue-400 bg-blue-500/15 text-blue-100"
+                                                                        : "border-border bg-card/70 text-muted-foreground"
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="min-w-0 flex-1 truncate font-mono text-[12px]">
+                                                                        {formatSignatureName(signature.label)}
+                                                                    </div>
+                                                                    <span
+                                                                        className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] uppercase ${
+                                                                            isActive
+                                                                                ? "border-blue-300/70 bg-blue-300/15 text-blue-100"
+                                                                                : "border-border bg-background/50 text-muted-foreground"
+                                                                        }`}
+                                                                    >
+                                                                        {isActive ? "cursor" : "parent"}
+                                                                    </span>
+                                                                </div>
+                                                                {activeParameterLabel ? (
+                                                                    <div className="mt-1 flex min-w-0 items-baseline gap-1.5 text-[11px]">
+                                                                        <span className="shrink-0 text-muted-foreground">
+                                                                            argument
+                                                                        </span>
+                                                                        <span className="truncate font-mono">
+                                                                            {formatParameterLabel(activeParameterLabel)}
+                                                                        </span>
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ) : null}
+                                        <div className="wrap-break-word font-mono text-[13px] leading-relaxed text-foreground">
+                                            {activeSignature.label}
+                                        </div>
+                                        {signatureDocumentation ? (
+                                            <p className="mt-2 whitespace-pre-line leading-relaxed text-muted-foreground">
+                                                {signatureDocumentation}
+                                            </p>
+                                        ) : null}
+                                        {activeSignature.parameters && activeSignature.parameters.length > 0 ? (
+                                            <div className="mt-3 flex flex-wrap gap-1.5">
+                                                {activeSignature.parameters.map((parameter, index) => (
+                                                    <span
+                                                        key={`${formatParameterLabel(parameter.label)}-${index}`}
+                                                        className={`rounded border px-2 py-1 font-mono ${
+                                                            index === activeSignatureParameterIndex
+                                                                ? "border-blue-400 bg-blue-500/15 text-blue-100"
+                                                                : "border-border bg-background/60 text-muted-foreground"
+                                                        }`}
+                                                    >
+                                                        {formatParameterLabel(parameter.label)}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                        {activeParameterDocumentation ? (
+                                            <div className="mt-3 border-t border-border pt-3">
+                                                <span className="font-medium text-foreground">Active argument</span>
+                                                <p className="mt-1 whitespace-pre-line leading-relaxed text-muted-foreground">
+                                                    {activeParameterDocumentation}
+                                                </p>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                ) : (
+                                    <div className="font-mono text-muted-foreground">No active function</div>
+                                )}
+                            </aside>
                         </div>
                     </CardContent>
                 </Card>
 
-                {diagnosticMarkers.length > 0 ? (
+                {showDiagnostics && diagnosticMarkers.length > 0 ? (
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
@@ -701,35 +1006,33 @@ export default function WynntilsIde() {
                     </Card>
                 ) : null}
 
-                {compileStatus ? (
-                    <Card
-                        className={compileStatus.tone === "success" ? "border-emerald-500/50" : "border-amber-500/50"}
-                    >
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                {compileStatus.tone === "success" ? (
-                                    <Check className="size-4" />
-                                ) : (
-                                    <AlertTriangle className="size-4" />
-                                )}
-                                Compile status
-                            </CardTitle>
-                            <CardDescription
-                                className={compileStatus.tone === "success" ? "text-emerald-300" : "text-amber-200"}
-                            >
-                                {compileStatus.message}
-                            </CardDescription>
-                        </CardHeader>
-                    </Card>
-                ) : null}
-
                 {compileResult ? (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Compiled output</CardTitle>
-                            <CardDescription>
-                                This mirrors the upstream VSCode compile command behavior.
-                            </CardDescription>
+                    <Card
+                        ref={compiledOutputRef}
+                        className={
+                            compileStatus?.tone === "success"
+                                ? "border-emerald-500/50"
+                                : compileStatus?.tone === "warning"
+                                  ? "border-amber-500/50"
+                                  : undefined
+                        }
+                    >
+                        <CardHeader className="gap-2">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                {compileStatus?.tone === "success" ? (
+                                    <Check className="size-4" />
+                                ) : compileStatus?.tone === "warning" ? (
+                                    <AlertTriangle className="size-4" />
+                                ) : null}
+                                Compiled output
+                            </CardTitle>
+                            {compileStatus ? (
+                                <CardDescription
+                                    className={compileStatus.tone === "success" ? "text-emerald-300" : "text-amber-200"}
+                                >
+                                    {compileStatus.message}
+                                </CardDescription>
+                            ) : null}
                         </CardHeader>
 
                         <CardContent className="space-y-3">

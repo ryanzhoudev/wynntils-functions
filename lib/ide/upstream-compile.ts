@@ -1,4 +1,4 @@
-// Adapted from DevChromium/wynntils-functions-tools/src/compile.ts (MIT License).
+// Adapted from wynntils-functions-tools/src/compile.ts (MIT License).
 
 import { CompileResult } from "@/lib/ide/types";
 
@@ -49,7 +49,8 @@ export function compileSupersetToWynntils(sourceText: string): CompileResult {
         return resolvedValue;
     });
 
-    const normalizedCode = normalizeCompiledCode(substitutedCode);
+    const withoutRawStringPrefixes = stripRawStringPrefixes(substitutedCode);
+    const normalizedCode = normalizeCompiledCode(withoutRawStringPrefixes);
 
     return { code: normalizedCode, errors };
 }
@@ -145,6 +146,46 @@ function normalizeCompiledCode(compiledCode: string): string {
     const withoutCarriageReturns = compiledCode.replace(/\r/g, "");
     const withoutNewlines = withoutCarriageReturns.replace(/\n+/g, "");
     return withoutNewlines.trim();
+}
+
+function stripRawStringPrefixes(sourceText: string) {
+    let result = "";
+    let index = 0;
+
+    while (index < sourceText.length) {
+        if (isRawStringStart(sourceText, index)) {
+            result += "\"";
+            index += 2;
+
+            while (index < sourceText.length) {
+                const character = sourceText[index];
+                result += character;
+                index++;
+
+                if (character === "\"") {
+                    break;
+                }
+            }
+
+            continue;
+        }
+
+        result += sourceText[index];
+        index++;
+    }
+
+    return result;
+}
+
+function isRawStringStart(sourceText: string, index: number) {
+    const prefix = sourceText[index];
+    const before = index === 0 ? "" : sourceText[index - 1];
+
+    return (
+        (prefix === "r" || prefix === "R") &&
+        sourceText[index + 1] === "\"" &&
+        (index === 0 || !/[A-Za-z0-9_]/.test(before))
+    );
 }
 
 function extractVariableDeclarations(sourceText: string): VariableDeclaration[] {

@@ -1,6 +1,14 @@
 import type { Monaco as MonacoApi } from "@monaco-editor/react";
 import { WynntilsLspClient } from "@/lib/ide/lsp-client";
-import { LspCompletionItem, LspHover, LspMarkupContent, LspMarkedString, LspRange, LspTextEdit } from "@/lib/ide/types";
+import {
+    LspCompletionItem,
+    LspHover,
+    LspMarkupContent,
+    LspMarkedString,
+    LspRange,
+    LspTextEdit,
+} from "@/lib/ide/types";
+import type { editor as MonacoEditor, languages as MonacoLanguages, Position as MonacoPosition } from "monaco-editor";
 
 const WYNNTILS_LANGUAGE_ID = "wynntils";
 let languageRegistered = false;
@@ -134,6 +142,68 @@ function resolveRange(
     return fromLspRange(textEdit.range);
 }
 
+function isEscapedCompletionContext(documentText: string, wordStartOffset: number) {
+    return wordStartOffset > 0 && documentText[wordStartOffset - 1] === "\\";
+}
+
+function isPlaceholderCompletionContext(documentText: string, wordStartOffset: number) {
+    const marker = documentText.slice(Math.max(0, wordStartOffset - 2), wordStartOffset);
+
+    return marker === "@{" || marker === "${";
+}
+
+function isFormatSuffixCompletionContext(documentText: string, wordStartOffset: number) {
+    const expressionStart = documentText.lastIndexOf("{", wordStartOffset);
+    const expressionEnd = documentText.lastIndexOf("}", wordStartOffset);
+
+    if (expressionStart < 0 || expressionStart < expressionEnd) {
+        return false;
+    }
+
+    const expressionPrefix = documentText.slice(expressionStart + 1, wordStartOffset);
+    const colonIndex = expressionPrefix.lastIndexOf(":");
+
+    if (colonIndex < 0) {
+        return false;
+    }
+
+    return /^[A-Za-z0-9]*$/.test(expressionPrefix.slice(colonIndex + 1));
+}
+
+function isWynntilsExpressionCompletionContext(documentText: string, wordStartOffset: number) {
+    const expressionStart = documentText.lastIndexOf("{", wordStartOffset);
+    const expressionEnd = documentText.lastIndexOf("}", wordStartOffset);
+
+    if (expressionStart < 0 || expressionStart < expressionEnd) {
+        return false;
+    }
+
+    return !isInsideString(documentText.slice(expressionStart + 1, wordStartOffset));
+}
+
+function isInsideString(text: string) {
+    let isInString = false;
+    let isEscaped = false;
+
+    for (const character of text) {
+        if (isEscaped) {
+            isEscaped = false;
+            continue;
+        }
+
+        if (character === "\\") {
+            isEscaped = true;
+            continue;
+        }
+
+        if (character === "\"") {
+            isInString = !isInString;
+        }
+    }
+
+    return isInString;
+}
+
 function resolveDocumentation(item: LspCompletionItem): string | undefined {
     const documentation = item.documentation;
 
@@ -158,6 +228,30 @@ function resolveDocumentation(item: LspCompletionItem): string | undefined {
     }
 
     return documentation.value;
+}
+
+function parseHexColor(matchText: string) {
+    const hex = matchText.startsWith("&#") ? matchText.slice(2) : matchText.slice(1);
+    const expanded =
+        hex.length === 3
+            ? hex
+                  .split("")
+                  .map((character) => character + character)
+                  .join("")
+            : hex;
+
+    const red = Number.parseInt(expanded.slice(0, 2), 16) / 255;
+    const green = Number.parseInt(expanded.slice(2, 4), 16) / 255;
+    const blue = Number.parseInt(expanded.slice(4, 6), 16) / 255;
+    const alpha = expanded.length >= 8 ? Number.parseInt(expanded.slice(6, 8), 16) / 255 : 1;
+
+    return { red, green, blue, alpha };
+}
+
+function toHexByte(value: number) {
+    return Math.round(value * 255)
+        .toString(16)
+        .padStart(2, "0");
 }
 
 export function ensureWynntilsLanguage(monaco: MonacoApi) {
@@ -197,6 +291,7 @@ export function ensureWynntilsLanguage(monaco: MonacoApi) {
             root: [
                 [/\/\/.*/, "comment"],
                 [/\b(let|true|false)\b/, "keyword"],
+                [/[rR]"/, "regexp", "@rawString"],
                 [/[a-zA-Z_][\w]*/, "identifier"],
                 [/[{}()\[\]]/, "delimiter.bracket"],
                 [/;/, "delimiter"],
@@ -212,17 +307,48 @@ export function ensureWynntilsLanguage(monaco: MonacoApi) {
                 [/\\./, "string.escape.invalid"],
                 [/"/, "string", "@pop"],
             ],
+            rawString: [
+                [/[^"]+/, "regexp"],
+                [/"/, "regexp", "@pop"],
+            ],
         },
     });
 }
 
 export function registerWynntilsProviders(monaco: MonacoApi, lspClient: WynntilsLspClient) {
     const completionProvider = monaco.languages.registerCompletionItemProvider(WYNNTILS_LANGUAGE_ID, {
-        triggerCharacters: ["{", "(", ";"],
-        provideCompletionItems: async (model, position) => {
-            const items = await lspClient.requestCompletion(model.uri.toString(), toLspPosition(position.lineNumber, position.column));
-
+        triggerCharacters: ["{"],
+        provideCompletionItems: async (
+            model: MonacoEditor.ITextModel,
+            position: MonacoPosition,
+            context: MonacoLanguages.CompletionContext,
+        ) => {
             const currentWord = model.getWordUntilPosition(position);
+            const isExpressionStart = context.triggerCharacter === "{";
+            const documentText = model.getValue();
+            const wordStartOffset = model.getOffsetAt({
+                lineNumber: position.lineNumber,
+                column: currentWord.startColumn,
+            });
+
+            if (
+                context.triggerCharacter === ";" ||
+                context.triggerCharacter === "(" ||
+                isEscapedCompletionContext(documentText, wordStartOffset) ||
+                isPlaceholderCompletionContext(documentText, wordStartOffset) ||
+                isFormatSuffixCompletionContext(documentText, wordStartOffset) ||
+                !isWynntilsExpressionCompletionContext(documentText, wordStartOffset) ||
+                (!isExpressionStart && currentWord.word.length === 0)
+            ) {
+                return { suggestions: [] };
+            }
+
+            const items = await lspClient.requestCompletion(
+                model.uri.toString(),
+                toLspPosition(position.lineNumber, position.column),
+                context.triggerCharacter,
+            );
+
             const fallbackRange = {
                 startLineNumber: position.lineNumber,
                 endLineNumber: position.lineNumber,
@@ -242,13 +368,14 @@ export function registerWynntilsProviders(monaco: MonacoApi, lspClient: Wynntils
                             ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
                             : monaco.languages.CompletionItemInsertTextRule.None,
                     range: resolveRange(item, fallbackRange),
+                    sortText: item.sortText,
                 })),
             };
         },
     });
 
     const hoverProvider = monaco.languages.registerHoverProvider(WYNNTILS_LANGUAGE_ID, {
-        provideHover: async (model, position) => {
+        provideHover: async (model: MonacoEditor.ITextModel, position: MonacoPosition) => {
             const hover = await lspClient.requestHover(model.uri.toString(), toLspPosition(position.lineNumber, position.column));
 
             if (!hover) {
@@ -262,5 +389,39 @@ export function registerWynntilsProviders(monaco: MonacoApi, lspClient: Wynntils
         },
     });
 
-    return [completionProvider, hoverProvider];
+    const colorProvider = monaco.languages.registerColorProvider(WYNNTILS_LANGUAGE_ID, {
+        provideDocumentColors: (model: MonacoEditor.ITextModel) => {
+            const colors: MonacoLanguages.IColorInformation[] = [];
+            const colorExpression = /&#[0-9a-fA-F]{8}\b|#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/g;
+            const text = model.getValue();
+            let match: RegExpExecArray | null;
+
+            while ((match = colorExpression.exec(text)) !== null) {
+                const start = model.getPositionAt(match.index);
+                const end = model.getPositionAt(match.index + match[0].length);
+
+                colors.push({
+                    color: parseHexColor(match[0]),
+                    range: {
+                        startLineNumber: start.lineNumber,
+                        startColumn: start.column,
+                        endLineNumber: end.lineNumber,
+                        endColumn: end.column,
+                    },
+                });
+            }
+
+            return colors;
+        },
+        provideColorPresentations: (_model: MonacoEditor.ITextModel, colorInfo: MonacoLanguages.IColorInformation) => {
+            const { red, green, blue, alpha } = colorInfo.color;
+            const label = `#${toHexByte(red)}${toHexByte(green)}${toHexByte(blue)}${
+                alpha < 1 ? toHexByte(alpha) : ""
+            }`;
+
+            return [{ label }];
+        },
+    });
+
+    return [completionProvider, hoverProvider, colorProvider];
 }
