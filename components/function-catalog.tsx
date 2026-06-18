@@ -19,7 +19,7 @@ import { formatDateTime } from "@/lib/date-time";
 import { FunctionArgument, FunctionEntry } from "@/lib/types";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, CheckCircle2, ListRestart, RefreshCcw, Search, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ListRestart, RefreshCw, Search, X } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
@@ -287,13 +287,13 @@ export default function FunctionCatalog() {
                     </Button>
                     <Button onClick={() => void handleRefresh()} disabled={isRefreshDisabled}>
                         {isRefreshing ? (
-                            <RefreshCcw className="size-4 animate-spin" />
+                            <RefreshCw className="size-4 animate-spin" />
                         ) : isRefreshRateLimited ? (
                             <AlertTriangle className="size-4" />
                         ) : refreshIndicator === "success" ? (
                             <CheckCircle2 className="size-4" />
                         ) : (
-                            <RefreshCcw className="size-4" />
+                            <RefreshCw className="size-4" />
                         )}
                         {isRefreshing
                             ? "Refreshing..."
@@ -458,13 +458,13 @@ export default function FunctionCatalog() {
                             <CardContent>
                                 <Button onClick={() => void handleRefresh()} disabled={isRefreshDisabled}>
                                     {isRefreshing ? (
-                                        <RefreshCcw className="size-4 animate-spin" />
+                                        <RefreshCw className="size-4 animate-spin" />
                                     ) : isRefreshRateLimited ? (
                                         <AlertTriangle className="size-4" />
                                     ) : refreshIndicator === "success" ? (
                                         <CheckCircle2 className="size-4" />
                                     ) : (
-                                        <RefreshCcw className="size-4" />
+                                        <RefreshCw className="size-4" />
                                     )}
                                     {isRefreshing ? "Retrying..." : isRefreshRateLimited ? "Rate limited" : "Retry"}
                                 </Button>
