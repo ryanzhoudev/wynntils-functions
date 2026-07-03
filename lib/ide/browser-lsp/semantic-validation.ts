@@ -155,6 +155,10 @@ semanticSpecs.set("lootrun_task_name", {
     constraints: [allowedLiterals(0, LOOTRUN_BEACON_COLORS)],
 });
 
+semanticSpecs.set("lootrun_task_type", {
+    constraints: [allowedLiterals(0, LOOTRUN_BEACON_COLORS)],
+});
+
 export function validateFunctionSemantics(
     functionCall: FunctionCall,
     metadata: FunctionMetadata,
