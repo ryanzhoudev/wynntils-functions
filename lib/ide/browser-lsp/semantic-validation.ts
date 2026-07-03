@@ -95,6 +95,10 @@ semanticSpecs.set("bomb_formatted_string", {
     constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
 });
 
+semanticSpecs.set("bomb_length", {
+    constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
+});
+
 export function validateFunctionSemantics(
     functionCall: FunctionCall,
     metadata: FunctionMetadata,
