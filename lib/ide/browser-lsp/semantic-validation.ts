@@ -134,6 +134,10 @@ semanticSpecs.set("equipped_accessory_name", {
     constraints: [allowedLiterals(0, ACCESSORY_SLOTS)],
 });
 
+semanticSpecs.set("equipped_armor_name", {
+    constraints: [allowedLiterals(0, ARMOR_SLOTS)],
+});
+
 export function validateFunctionSemantics(
     functionCall: FunctionCall,
     metadata: FunctionMetadata,
