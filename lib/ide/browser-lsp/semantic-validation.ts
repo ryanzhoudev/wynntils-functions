@@ -60,6 +60,7 @@ export type PairKeyConstraint = {
 const COMPLETION_ITEM_KIND_ENUM_MEMBER = 20;
 const ARMOR_SLOTS = ["Helmet", "Chestplate", "Leggings", "Boots"];
 const BOMB_SORT_ORDERS = ["NEWEST", "OLDEST"];
+const CAPPED_MOUNT_STATS = ["acceleration", "altitude", "jumpHeight", "energy", "handling", "boost", "speed", "toughness", "training"];
 
 const semanticSpecs = new Map<string, FunctionSemanticSpec>([
     [
@@ -117,6 +118,10 @@ semanticSpecs.set("bomb_type", {
 
 semanticSpecs.set("bomb_world", {
     constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
+});
+
+semanticSpecs.set("capped_mount_stat", {
+    constraints: [allowedLiterals(0, CAPPED_MOUNT_STATS)],
 });
 
 export function validateFunctionSemantics(
