@@ -60,6 +60,7 @@ export type PairKeyConstraint = {
 const COMPLETION_ITEM_KIND_ENUM_MEMBER = 20;
 const ARMOR_SLOTS = ["Helmet", "Chestplate", "Leggings", "Boots"];
 const BOMB_SORT_ORDERS = ["NEWEST", "OLDEST"];
+const PROFESSIONS = ["Woodcutting", "Mining", "Fishing", "Farming", "Alchemism", "Armouring", "Cooking", "Jeweling", "Scribing", "Tailoring", "Weaponsmithing", "Woodworking"];
 const MOUNT_STATS = ["acceleration", "altitude", "jumpHeight", "energy", "handling", "potential", "boost", "speed", "toughness", "training"];
 const LOOTRUN_BEACON_COLORS = ["GREEN", "YELLOW", "BLUE", "PURPLE", "GRAY", "ORANGE", "RED", "DARK_GRAY", "WHITE", "AQUA", "PINK", "CRIMSON", "RAINBOW"];
 const ACCESSORY_SLOTS = ["Ring_1", "Ring_2", "Bracelet", "Necklace"];
@@ -166,6 +167,10 @@ semanticSpecs.set("mount_stat", {
 
 semanticSpecs.set("mount_stat_max", {
     constraints: [allowedLiterals(0, CAPPED_MOUNT_STATS)],
+});
+
+semanticSpecs.set("profession_level", {
+    constraints: [allowedLiterals(0, PROFESSIONS)],
 });
 
 export function validateFunctionSemantics(
