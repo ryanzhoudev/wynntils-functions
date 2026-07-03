@@ -107,6 +107,10 @@ semanticSpecs.set("bomb_remaining_time", {
     constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
 });
 
+semanticSpecs.set("bomb_start_time", {
+    constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
+});
+
 export function validateFunctionSemantics(
     functionCall: FunctionCall,
     metadata: FunctionMetadata,
