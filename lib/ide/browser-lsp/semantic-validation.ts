@@ -27,6 +27,7 @@ export type SemanticConstraint = {
     validate?(context: SemanticValidationContext): SemanticIssue[];
     complete?(context: SemanticCompletionContext): LspCompletionItem[];
     ownsBareIdentifier?(argumentIndex: number): boolean;
+    validatesArgument?(argumentIndex: number): boolean;
 };
 
 export type FunctionSemanticSpec = {
@@ -285,12 +286,21 @@ export function createSemanticCompletionItems(
     return items.concat(spec.complete?.(context) ?? []);
 }
 
+export function hasSemanticArgumentValidation(functionName: string, argumentIndex: number) {
+    const spec = semanticSpecs.get(normalizeName(functionName));
+
+    return Boolean(spec?.constraints.some((constraint) => constraint.validatesArgument?.(argumentIndex)));
+}
+
 export function allowedLiterals(argumentIndex: number, values: string[]): SemanticConstraint {
     const allowedValues = new Set(values);
     const expectedValues = values.map((value) => `'${value}'`).join(", ");
 
     return {
         ownsBareIdentifier(activeArgumentIndex) {
+            return activeArgumentIndex === argumentIndex;
+        },
+        validatesArgument(activeArgumentIndex) {
             return activeArgumentIndex === argumentIndex;
         },
         validate(context) {
@@ -327,6 +337,9 @@ export function allowedLiterals(argumentIndex: number, values: string[]): Semant
 
 export function variadicPairs(options: VariadicPairOptions): SemanticConstraint {
     return {
+        validatesArgument(argumentIndex) {
+            return argumentIndex === options.startIndex;
+        },
         validate(context) {
             const listArgument = context.functionCall.arguments[options.startIndex];
             const elements = listArgument

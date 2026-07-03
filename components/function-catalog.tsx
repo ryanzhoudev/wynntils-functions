@@ -16,6 +16,7 @@ import {
     SearchScope,
 } from "@/lib/search";
 import { formatDateTime } from "@/lib/date-time";
+import { hasSemanticArgumentValidation } from "@/lib/ide/browser-lsp/semantic-validation";
 import { FunctionArgument, FunctionEntry } from "@/lib/types";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
 import { cn } from "@/lib/utils";
@@ -23,7 +24,13 @@ import { AlertTriangle, CheckCircle2, ListRestart, RefreshCw, Search, X } from "
 import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-function FunctionArgumentCard({ argument }: { argument: FunctionArgument }) {
+function FunctionArgumentCard({
+    argument,
+    hasIdeValidation,
+}: {
+    argument: FunctionArgument;
+    hasIdeValidation: boolean;
+}) {
     return (
         <div className="rounded-md border border-border bg-background p-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -33,6 +40,7 @@ function FunctionArgumentCard({ argument }: { argument: FunctionArgument }) {
                     <Badge variant={argument.required ? "default" : "outline"}>
                         {argument.required ? "required" : "optional"}
                     </Badge>
+                    {hasIdeValidation ? <Badge variant="outline">IDE validation</Badge> : null}
                 </div>
             </div>
 
@@ -98,8 +106,12 @@ function FunctionCard({ entry, exactMatch }: { entry: FunctionEntry; exactMatch?
                         <p className="text-sm text-muted-foreground">No arguments.</p>
                     ) : (
                         <div className="space-y-2">
-                            {entry.arguments.map((argument) => (
-                                <FunctionArgumentCard key={argument.id} argument={argument} />
+                            {entry.arguments.map((argument, argumentIndex) => (
+                                <FunctionArgumentCard
+                                    key={argument.id}
+                                    argument={argument}
+                                    hasIdeValidation={hasSemanticArgumentValidation(entry.name, argumentIndex)}
+                                />
                             ))}
                         </div>
                     )}

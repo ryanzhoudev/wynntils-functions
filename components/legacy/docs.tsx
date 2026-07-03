@@ -1,6 +1,8 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/legacy/card";
+import { Badge } from "@/components/ui/badge";
+import { hasSemanticArgumentValidation } from "@/lib/ide/browser-lsp/semantic-validation";
 import {
     DEFAULT_SEARCH_SCOPE,
     SEARCH_SCOPE_OPTIONS,
@@ -113,13 +115,17 @@ export default function LegacyDocs() {
 
                                 <CardHeader>{func.arguments.length === 0 ? "No arguments" : "Arguments:"}</CardHeader>
                                 <CardContent>
-                                    {func.arguments.map((argument) => (
+                                    {func.arguments.map((argument, argumentIndex) => (
                                         <div key={argument.id}>
                                             - <code>{argument.name}</code> (<code>{argument.type}</code>,{" "}
                                             {argument.required
                                                 ? "required"
                                                 : `optional${argument.defaultValue ? `, default: ${argument.defaultValue}` : ""}`}
-                                            ){argument.description ? ` -- ${argument.description}` : ""}
+                                            ){" "}
+                                            {hasSemanticArgumentValidation(func.name, argumentIndex) ? (
+                                                <Badge variant="outline">IDE validation</Badge>
+                                            ) : null}
+                                            {argument.description ? ` -- ${argument.description}` : ""}
                                         </div>
                                     ))}
                                 </CardContent>
