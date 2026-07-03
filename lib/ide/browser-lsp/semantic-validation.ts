@@ -164,6 +164,10 @@ semanticSpecs.set("mount_stat", {
     constraints: [allowedLiterals(0, MOUNT_STATS)],
 });
 
+semanticSpecs.set("mount_stat_max", {
+    constraints: [allowedLiterals(0, CAPPED_MOUNT_STATS)],
+});
+
 export function validateFunctionSemantics(
     functionCall: FunctionCall,
     metadata: FunctionMetadata,
