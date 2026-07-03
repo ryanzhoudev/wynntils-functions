@@ -1,0 +1,126 @@
+name: CI
+
+on:
+    pull_request:
+    push:
+        branches: [main]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+env:
+    NODE_VERSION: 22
+    PNPM_VERSION: 10.30.1
+
+jobs:
+    quality:
+        name: Quality and build
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: ${{ env.PNPM_VERSION }}
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile
+            - run: pnpm check
+            - name: Upload coverage
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: coverage
+                  path: coverage
+                  if-no-files-found: error
+            - name: Upload production build
+              uses: actions/upload-artifact@v4
+              with:
+                  name: production-build
+                  path: .next
+                  include-hidden-files: true
+                  if-no-files-found: error
+
+    live-catalog:
+        name: Live catalog contract
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: ${{ env.PNPM_VERSION }}
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile
+            - run: pnpm test:catalog
+            - name: Upload exact catalog snapshot
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: function-catalog
+                  path: .test-artifacts/function-catalog.json
+                  include-hidden-files: true
+                  if-no-files-found: error
+
+    e2e:
+        name: E2E (${{ matrix.browser }})
+        needs: [quality, live-catalog]
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                browser: [chromium, firefox, webkit]
+        steps:
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: ${{ env.PNPM_VERSION }}
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile
+            - uses: actions/download-artifact@v4
+              with:
+                  name: production-build
+                  path: .next
+            - uses: actions/download-artifact@v4
+              with:
+                  name: function-catalog
+                  path: .test-artifacts
+            - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+            - name: Run Playwright
+              run: pnpm exec playwright test --project=${{ matrix.browser }}
+              env:
+                  PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm start
+                  WYNNTILS_CATALOG_ARTIFACT: .test-artifacts/function-catalog.json
+            - name: Upload Playwright report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: playwright-${{ matrix.browser }}
+                  path: |
+                      playwright-report
+                      test-results
+                  if-no-files-found: ignore
+
+    ci:
+        name: CI
+        if: always()
+        needs: [quality, live-catalog, e2e]
+        runs-on: ubuntu-latest
+        steps:
+            - name: Require every CI layer
+              env:
+                  QUALITY_RESULT: ${{ needs.quality.result }}
+                  CATALOG_RESULT: ${{ needs.live-catalog.result }}
+                  E2E_RESULT: ${{ needs.e2e.result }}
+              run: |
+                  if [ "$QUALITY_RESULT" != "success" ] || [ "$CATALOG_RESULT" != "success" ] || [ "$E2E_RESULT" != "success" ]; then
+                    echo "CI failed: quality=$QUALITY_RESULT catalog=$CATALOG_RESULT e2e=$E2E_RESULT"
+                    exit 1
+                  fi

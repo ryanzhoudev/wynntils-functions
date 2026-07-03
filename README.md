@@ -80,13 +80,46 @@ pnpm install
 pnpm dev
 ```
 
-#### Quality checks
+#### Tests and quality checks
+
+The test suite checks this repository's declared language behavior; full parity with the Wynntils runtime is not assumed. It has three layers:
+
+- deterministic Vitest coverage for parsing, language features, semantic validators, catalog utilities, storage, and compilation
+- a live contract check that detects production catalog drift affecting semantic overrides
+- Playwright coverage through the production build, real browser Worker, Monaco editor, and both documentation UIs
+
+Run the same deterministic checks and production build used by CI:
 
 ```bash
-pnpm lint
-pnpm typecheck
-pnpm build
+pnpm check
 ```
+
+Validate the current production catalog (network/database availability is required):
+
+```bash
+pnpm test:catalog
+```
+
+Run the fast local browser suite, which fetches one catalog snapshot before starting:
+
+```bash
+pnpm test:e2e:chromium
+```
+
+Other useful commands:
+
+```bash
+pnpm test
+pnpm test:watch
+pnpm test:coverage
+pnpm test:e2e
+```
+
+Coverage produces text, HTML, LCOV, and JSON reports without percentage gates. Playwright keeps screenshots, video, traces, and its HTML report when a test fails.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs for pull requests, pushes to `main`, and manual dispatch. It pins pnpm 10.30.1, caches pnpm dependencies, builds once, fetches the live catalog once, and reuses those exact artifacts for parallel Chromium, Firefox, and WebKit jobs. The final `CI` job is the single aggregate status intended for branch protection; configure GitHub to require `CI` before merging.
 
 ### Hosting notes
 
