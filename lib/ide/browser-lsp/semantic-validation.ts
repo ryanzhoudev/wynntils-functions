@@ -60,6 +60,7 @@ export type PairKeyConstraint = {
 const COMPLETION_ITEM_KIND_ENUM_MEMBER = 20;
 const ARMOR_SLOTS = ["Helmet", "Chestplate", "Leggings", "Boots"];
 const BOMB_SORT_ORDERS = ["NEWEST", "OLDEST"];
+const ACCESSORY_SLOTS = ["Ring_1", "Ring_2", "Bracelet", "Necklace"];
 const DEBUFF_NAMES = ["Bleeding", "Blindness", "Burning", "Confused", "Contaminated", "Crystallized", "Curse", "Discombobulated", "Enkindled", "Freezing", "Marked", "Poison", "Provoked", "Resistance", "Slowness", "Trick", "Twilight", "Weakness", "Whipped", "Wind Prison"];
 const CAPPED_MOUNT_STATS = ["acceleration", "altitude", "jumpHeight", "energy", "handling", "boost", "speed", "toughness", "training"];
 
@@ -67,7 +68,7 @@ const semanticSpecs = new Map<string, FunctionSemanticSpec>([
     [
         "accessory_durability",
         {
-            constraints: [allowedLiterals(0, ["Ring_1", "Ring_2", "Bracelet", "Necklace"])],
+            constraints: [allowedLiterals(0, ACCESSORY_SLOTS)],
         },
     ],
     [
@@ -127,6 +128,10 @@ semanticSpecs.set("capped_mount_stat", {
 
 semanticSpecs.set("debuffs_in_radius_value", {
     constraints: [allowedLiterals(1, DEBUFF_NAMES)],
+});
+
+semanticSpecs.set("equipped_accessory_name", {
+    constraints: [allowedLiterals(0, ACCESSORY_SLOTS)],
 });
 
 export function validateFunctionSemantics(
