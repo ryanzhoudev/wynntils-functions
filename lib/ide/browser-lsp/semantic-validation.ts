@@ -181,6 +181,10 @@ semanticSpecs.set("profession_xp", {
     constraints: [allowedLiterals(0, PROFESSIONS)],
 });
 
+semanticSpecs.set("profession_xp_per_minute", {
+    constraints: [allowedLiterals(0, PROFESSIONS)],
+});
+
 export function validateFunctionSemantics(
     functionCall: FunctionCall,
     metadata: FunctionMetadata,
