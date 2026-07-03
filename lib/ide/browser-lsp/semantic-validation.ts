@@ -60,6 +60,7 @@ export type PairKeyConstraint = {
 const COMPLETION_ITEM_KIND_ENUM_MEMBER = 20;
 const ARMOR_SLOTS = ["Helmet", "Chestplate", "Leggings", "Boots"];
 const BOMB_SORT_ORDERS = ["NEWEST", "OLDEST"];
+const MOUNT_STATS = ["acceleration", "altitude", "jumpHeight", "energy", "handling", "potential", "boost", "speed", "toughness", "training"];
 const LOOTRUN_BEACON_COLORS = ["GREEN", "YELLOW", "BLUE", "PURPLE", "GRAY", "ORANGE", "RED", "DARK_GRAY", "WHITE", "AQUA", "PINK", "CRIMSON", "RAINBOW"];
 const ACCESSORY_SLOTS = ["Ring_1", "Ring_2", "Bracelet", "Necklace"];
 const DEBUFF_NAMES = ["Bleeding", "Blindness", "Burning", "Confused", "Contaminated", "Crystallized", "Curse", "Discombobulated", "Enkindled", "Freezing", "Marked", "Poison", "Provoked", "Resistance", "Slowness", "Trick", "Twilight", "Weakness", "Whipped", "Wind Prison"];
@@ -157,6 +158,10 @@ semanticSpecs.set("lootrun_task_name", {
 
 semanticSpecs.set("lootrun_task_type", {
     constraints: [allowedLiterals(0, LOOTRUN_BEACON_COLORS)],
+});
+
+semanticSpecs.set("mount_stat", {
+    constraints: [allowedLiterals(0, MOUNT_STATS)],
 });
 
 export function validateFunctionSemantics(
