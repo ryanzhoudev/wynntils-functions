@@ -60,6 +60,7 @@ export type PairKeyConstraint = {
 const COMPLETION_ITEM_KIND_ENUM_MEMBER = 20;
 const ARMOR_SLOTS = ["Helmet", "Chestplate", "Leggings", "Boots"];
 const BOMB_SORT_ORDERS = ["NEWEST", "OLDEST"];
+const DEBUFF_NAMES = ["Bleeding", "Blindness", "Burning", "Confused", "Contaminated", "Crystallized", "Curse", "Discombobulated", "Enkindled", "Freezing", "Marked", "Poison", "Provoked", "Resistance", "Slowness", "Trick", "Twilight", "Weakness", "Whipped", "Wind Prison"];
 const CAPPED_MOUNT_STATS = ["acceleration", "altitude", "jumpHeight", "energy", "handling", "boost", "speed", "toughness", "training"];
 
 const semanticSpecs = new Map<string, FunctionSemanticSpec>([
@@ -122,6 +123,10 @@ semanticSpecs.set("bomb_world", {
 
 semanticSpecs.set("capped_mount_stat", {
     constraints: [allowedLiterals(0, CAPPED_MOUNT_STATS)],
+});
+
+semanticSpecs.set("debuffs_in_radius_value", {
+    constraints: [allowedLiterals(1, DEBUFF_NAMES)],
 });
 
 export function validateFunctionSemantics(
