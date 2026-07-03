@@ -60,6 +60,7 @@ export type PairKeyConstraint = {
 const COMPLETION_ITEM_KIND_ENUM_MEMBER = 20;
 const ARMOR_SLOTS = ["Helmet", "Chestplate", "Leggings", "Boots"];
 const BOMB_SORT_ORDERS = ["NEWEST", "OLDEST"];
+const WYNNCRAFT_SHADERS = ["BLINK", "FADE", "FADE_2", "GRADIENT", "GRADIENT_2", "ITALIC", "ITALIC_2", "RAINBOW", "SHINE", "WARP"];
 const BACKGROUND_EDGE_STYLES = ["NONE", "PILL", "BOX", "FLAG", "RIBBON"];
 const SPELL_DIRECTIONS = ["RLR", "RRR", "RLL", "RRL", "LRL", "LLL", "LRR", "LLR"];
 const SPELL_CLASSES = ["Mage", "Dark Wizard", "Archer", "Hunter", "Warrior", "Knight", "Assassin", "Ninja", "Shaman", "Skyseer"];
@@ -206,6 +207,10 @@ semanticSpecs.set("targeted_mob_debuff_value", {
 
 semanticSpecs.set("to_background_text", {
     constraints: [allowedLiterals(3, BACKGROUND_EDGE_STYLES), allowedLiterals(4, BACKGROUND_EDGE_STYLES)],
+});
+
+semanticSpecs.set("wynncraft_shader", {
+    constraints: [allowedLiterals(0, WYNNCRAFT_SHADERS)],
 });
 
 export function validateFunctionSemantics(
