@@ -199,6 +199,10 @@ semanticSpecs.set("spell_name_from_number", {
     constraints: [allowedLiterals(1, SPELL_CLASSES)],
 });
 
+semanticSpecs.set("targeted_mob_debuff_value", {
+    constraints: [allowedLiterals(3, DEBUFF_NAMES)],
+});
+
 export function validateFunctionSemantics(
     functionCall: FunctionCall,
     metadata: FunctionMetadata,
