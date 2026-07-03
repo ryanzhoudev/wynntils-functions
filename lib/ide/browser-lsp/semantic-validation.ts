@@ -60,6 +60,7 @@ export type PairKeyConstraint = {
 const COMPLETION_ITEM_KIND_ENUM_MEMBER = 20;
 const ARMOR_SLOTS = ["Helmet", "Chestplate", "Leggings", "Boots"];
 const BOMB_SORT_ORDERS = ["NEWEST", "OLDEST"];
+const BACKGROUND_EDGE_STYLES = ["NONE", "PILL", "BOX", "FLAG", "RIBBON"];
 const SPELL_DIRECTIONS = ["RLR", "RRR", "RLL", "RRL", "LRL", "LLL", "LRR", "LLR"];
 const SPELL_CLASSES = ["Mage", "Dark Wizard", "Archer", "Hunter", "Warrior", "Knight", "Assassin", "Ninja", "Shaman", "Skyseer"];
 const PROFESSIONS = ["Woodcutting", "Mining", "Fishing", "Farming", "Alchemism", "Armouring", "Cooking", "Jeweling", "Scribing", "Tailoring", "Weaponsmithing", "Woodworking"];
@@ -201,6 +202,10 @@ semanticSpecs.set("spell_name_from_number", {
 
 semanticSpecs.set("targeted_mob_debuff_value", {
     constraints: [allowedLiterals(3, DEBUFF_NAMES)],
+});
+
+semanticSpecs.set("to_background_text", {
+    constraints: [allowedLiterals(3, BACKGROUND_EDGE_STYLES), allowedLiterals(4, BACKGROUND_EDGE_STYLES)],
 });
 
 export function validateFunctionSemantics(
