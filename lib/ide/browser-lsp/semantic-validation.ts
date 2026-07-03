@@ -24,10 +24,28 @@ export type SemanticCompletionContext = {
 };
 
 export type SemanticConstraint = {
+    descriptor?: SemanticConstraintDescriptor;
     validate?(context: SemanticValidationContext): SemanticIssue[];
     complete?(context: SemanticCompletionContext): LspCompletionItem[];
     ownsBareIdentifier?(argumentIndex: number): boolean;
     validatesArgument?(argumentIndex: number): boolean;
+};
+
+export type SemanticConstraintDescriptor =
+    | {
+          kind: "allowedLiterals";
+          argumentIndex: number;
+          values: readonly string[];
+      }
+    | {
+          kind: "variadicPairs";
+          argumentIndex: number;
+          minimumPairs: number;
+          listName: string;
+      };
+
+export type RegisteredSemanticConstraint = SemanticConstraintDescriptor & {
+    functionName: string;
 };
 
 export type FunctionSemanticSpec = {
@@ -292,11 +310,24 @@ export function hasSemanticArgumentValidation(functionName: string, argumentInde
     return Boolean(spec?.constraints.some((constraint) => constraint.validatesArgument?.(argumentIndex)));
 }
 
+export function getSemanticValidationDescriptors(): readonly RegisteredSemanticConstraint[] {
+    return Array.from(semanticSpecs.entries()).flatMap(([functionName, spec]) =>
+        spec.constraints.flatMap((constraint) =>
+            constraint.descriptor ? [{ functionName, ...constraint.descriptor }] : [],
+        ),
+    );
+}
+
 export function allowedLiterals(argumentIndex: number, values: string[]): SemanticConstraint {
     const allowedValues = new Set(values);
     const expectedValues = values.map((value) => `'${value}'`).join(", ");
 
     return {
+        descriptor: {
+            kind: "allowedLiterals",
+            argumentIndex,
+            values: Object.freeze([...values]),
+        },
         ownsBareIdentifier(activeArgumentIndex) {
             return activeArgumentIndex === argumentIndex;
         },
@@ -337,6 +368,12 @@ export function allowedLiterals(argumentIndex: number, values: string[]): Semant
 
 export function variadicPairs(options: VariadicPairOptions): SemanticConstraint {
     return {
+        descriptor: {
+            kind: "variadicPairs",
+            argumentIndex: options.startIndex,
+            minimumPairs: options.minimumPairs,
+            listName: options.listName,
+        },
         validatesArgument(argumentIndex) {
             return argumentIndex === options.startIndex;
         },
