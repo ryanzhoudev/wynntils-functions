@@ -10,7 +10,7 @@ export default defineConfig({
     test: {
         environment: "node",
         include: ["tests/**/*.test.{ts,tsx}"],
-        exclude: ["tests/e2e/**"],
+        exclude: ["tests/e2e/**", "tests/catalog/**"],
         setupFiles: ["tests/setup.ts"],
         coverage: {
             provider: "v8",

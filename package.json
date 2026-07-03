@@ -11,7 +11,7 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
-        "test:catalog": "node scripts/fetch-live-catalog.mjs && vitest run tests/catalog/live-catalog.test.ts",
+        "test:catalog": "node scripts/fetch-live-catalog.mjs && vitest run --config vitest.catalog.config.ts",
         "test:e2e": "playwright test",
         "test:e2e:chromium": "playwright test --project=chromium",
         "check": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build",

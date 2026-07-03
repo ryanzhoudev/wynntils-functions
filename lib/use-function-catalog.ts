@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FunctionCatalogResponse, FunctionEntry } from "@/lib/types";
+import { isFunctionCatalogResponse } from "@/lib/function-catalog-validation";
+import { FunctionCatalogResponse } from "@/lib/types";
 
 const CACHE_KEY = "wynntils-function-catalog:v1";
 const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 12;
@@ -25,40 +26,6 @@ type FetchCatalogOptions = {
     force?: boolean;
     signal?: AbortSignal;
 };
-
-function isFunctionEntry(value: unknown): value is FunctionEntry {
-    if (typeof value !== "object" || value === null) {
-        return false;
-    }
-
-    const candidate = value as Partial<FunctionEntry>;
-
-    return (
-        typeof candidate.id === "number" &&
-        typeof candidate.name === "string" &&
-        typeof candidate.description === "string" &&
-        Array.isArray(candidate.aliases) &&
-        candidate.aliases.every((alias) => typeof alias === "string") &&
-        typeof candidate.returnType === "string" &&
-        Array.isArray(candidate.arguments)
-    );
-}
-
-function isFunctionCatalogResponse(value: unknown): value is FunctionCatalogResponse {
-    if (typeof value !== "object" || value === null) {
-        return false;
-    }
-
-    const candidate = value as Partial<FunctionCatalogResponse>;
-
-    return (
-        Array.isArray(candidate.functions) &&
-        candidate.functions.every((entry) => isFunctionEntry(entry)) &&
-        typeof candidate.count === "number" &&
-        (typeof candidate.dataVersion === "string" || candidate.dataVersion === null) &&
-        (typeof candidate.harvestedAt === "number" || candidate.harvestedAt === null)
-    );
-}
 
 function readCachedCatalog() {
     if (typeof window === "undefined") {
