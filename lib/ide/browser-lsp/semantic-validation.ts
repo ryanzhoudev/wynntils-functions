@@ -59,6 +59,7 @@ export type PairKeyConstraint = {
 
 const COMPLETION_ITEM_KIND_ENUM_MEMBER = 20;
 const ARMOR_SLOTS = ["Helmet", "Chestplate", "Leggings", "Boots"];
+const BOMB_SORT_ORDERS = ["NEWEST", "OLDEST"];
 
 const semanticSpecs = new Map<string, FunctionSemanticSpec>([
     [
@@ -84,6 +85,10 @@ const semanticSpecs = new Map<string, FunctionSemanticSpec>([
 
 semanticSpecs.set("armor_durability", {
     constraints: [allowedLiterals(0, ARMOR_SLOTS)],
+});
+
+semanticSpecs.set("bomb_end_time", {
+    constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
 });
 
 export function validateFunctionSemantics(
