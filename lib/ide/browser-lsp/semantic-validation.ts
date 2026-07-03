@@ -60,6 +60,8 @@ export type PairKeyConstraint = {
 const COMPLETION_ITEM_KIND_ENUM_MEMBER = 20;
 const ARMOR_SLOTS = ["Helmet", "Chestplate", "Leggings", "Boots"];
 const BOMB_SORT_ORDERS = ["NEWEST", "OLDEST"];
+const SPELL_DIRECTIONS = ["RLR", "RRR", "RLL", "RRL", "LRL", "LLL", "LRR", "LLR"];
+const SPELL_CLASSES = ["Mage", "Dark Wizard", "Archer", "Hunter", "Warrior", "Knight", "Assassin", "Ninja", "Shaman", "Skyseer"];
 const PROFESSIONS = ["Woodcutting", "Mining", "Fishing", "Farming", "Alchemism", "Armouring", "Cooking", "Jeweling", "Scribing", "Tailoring", "Weaponsmithing", "Woodworking"];
 const MOUNT_STATS = ["acceleration", "altitude", "jumpHeight", "energy", "handling", "potential", "boost", "speed", "toughness", "training"];
 const LOOTRUN_BEACON_COLORS = ["GREEN", "YELLOW", "BLUE", "PURPLE", "GRAY", "ORANGE", "RED", "DARK_GRAY", "WHITE", "AQUA", "PINK", "CRIMSON", "RAINBOW"];
@@ -187,6 +189,10 @@ semanticSpecs.set("profession_xp_per_minute", {
 
 semanticSpecs.set("profession_xp_per_minute_raw", {
     constraints: [allowedLiterals(0, PROFESSIONS)],
+});
+
+semanticSpecs.set("spell_name_from_direction", {
+    constraints: [allowedLiterals(0, SPELL_DIRECTIONS), allowedLiterals(1, SPELL_CLASSES)],
 });
 
 export function validateFunctionSemantics(
