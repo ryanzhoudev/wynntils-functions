@@ -12,7 +12,9 @@
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
         "test:catalog": "node scripts/fetch-live-catalog.mjs && vitest run --config vitest.catalog.config.ts",
+        "pretest:e2e": "node scripts/fetch-live-catalog.mjs",
         "test:e2e": "playwright test",
+        "pretest:e2e:chromium": "node scripts/fetch-live-catalog.mjs",
         "test:e2e:chromium": "playwright test --project=chromium",
         "check": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build",
         "postinstall": "prisma generate"
