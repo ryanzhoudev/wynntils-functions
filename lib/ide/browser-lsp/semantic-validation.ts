@@ -177,6 +177,10 @@ semanticSpecs.set("profession_percentage", {
     constraints: [allowedLiterals(0, PROFESSIONS)],
 });
 
+semanticSpecs.set("profession_xp", {
+    constraints: [allowedLiterals(0, PROFESSIONS)],
+});
+
 export function validateFunctionSemantics(
     functionCall: FunctionCall,
     metadata: FunctionMetadata,
