@@ -36,11 +36,11 @@ function FunctionArgumentCard({
             <div className="flex flex-wrap items-center gap-2">
                 <code className="rounded bg-muted px-1.5 py-0.5 text-sm">{argument.name}</code>
                 <div className="ml-auto flex items-center gap-2">
+                    {hasIdeValidation ? <Badge variant="outline">IDE validation</Badge> : null}
                     <Badge variant="secondary">{argument.type}</Badge>
                     <Badge variant={argument.required ? "default" : "outline"}>
                         {argument.required ? "required" : "optional"}
                     </Badge>
-                    {hasIdeValidation ? <Badge variant="outline">IDE validation</Badge> : null}
                 </div>
             </div>
 

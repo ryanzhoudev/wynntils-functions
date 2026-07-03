@@ -117,14 +117,15 @@ export default function LegacyDocs() {
                                 <CardContent>
                                     {func.arguments.map((argument, argumentIndex) => (
                                         <div key={argument.id}>
-                                            - <code>{argument.name}</code> (<code>{argument.type}</code>,{" "}
+                                            - <code>{argument.name}</code>{" "}
+                                            {hasSemanticArgumentValidation(func.name, argumentIndex) ? (
+                                                <Badge variant="outline">IDE validation</Badge>
+                                            ) : null}{" "}
+                                            (<code>{argument.type}</code>,{" "}
                                             {argument.required
                                                 ? "required"
                                                 : `optional${argument.defaultValue ? `, default: ${argument.defaultValue}` : ""}`}
-                                            ){" "}
-                                            {hasSemanticArgumentValidation(func.name, argumentIndex) ? (
-                                                <Badge variant="outline">IDE validation</Badge>
-                                            ) : null}
+                                            )
                                             {argument.description ? ` -- ${argument.description}` : ""}
                                         </div>
                                     ))}
