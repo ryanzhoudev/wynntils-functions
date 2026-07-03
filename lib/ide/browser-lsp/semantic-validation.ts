@@ -115,6 +115,10 @@ semanticSpecs.set("bomb_type", {
     constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
 });
 
+semanticSpecs.set("bomb_world", {
+    constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
+});
+
 export function validateFunctionSemantics(
     functionCall: FunctionCall,
     metadata: FunctionMetadata,
