@@ -195,6 +195,10 @@ semanticSpecs.set("spell_name_from_direction", {
     constraints: [allowedLiterals(0, SPELL_DIRECTIONS), allowedLiterals(1, SPELL_CLASSES)],
 });
 
+semanticSpecs.set("spell_name_from_number", {
+    constraints: [allowedLiterals(1, SPELL_CLASSES)],
+});
+
 export function validateFunctionSemantics(
     functionCall: FunctionCall,
     metadata: FunctionMetadata,
