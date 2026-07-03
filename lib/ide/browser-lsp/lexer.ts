@@ -3,7 +3,10 @@ export enum TokenKind {
     RightBrace = "RightBrace",
     LeftParenthesis = "LeftParenthesis",
     RightParenthesis = "RightParenthesis",
+    LeftBracket = "LeftBracket",
+    RightBracket = "RightBracket",
     Semicolon = "Semicolon",
+    Comma = "Comma",
     Colon = "Colon",
     Identifier = "Identifier",
     StringLiteral = "StringLiteral",
@@ -19,7 +22,10 @@ export type StructuralToken = {
         | TokenKind.RightBrace
         | TokenKind.LeftParenthesis
         | TokenKind.RightParenthesis
+        | TokenKind.LeftBracket
+        | TokenKind.RightBracket
         | TokenKind.Semicolon
+        | TokenKind.Comma
         | TokenKind.Colon;
     offset: number;
     length: number;
@@ -39,7 +45,10 @@ const singleCharacterTokens: Record<string, StructuralToken["kind"]> = {
     "}": TokenKind.RightBrace,
     "(": TokenKind.LeftParenthesis,
     ")": TokenKind.RightParenthesis,
+    "[": TokenKind.LeftBracket,
+    "]": TokenKind.RightBracket,
     ";": TokenKind.Semicolon,
+    ",": TokenKind.Comma,
     ":": TokenKind.Colon,
 };
 

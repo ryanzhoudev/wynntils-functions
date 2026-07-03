@@ -317,14 +317,13 @@ export function ensureWynntilsLanguage(monaco: MonacoApi) {
 
 export function registerWynntilsProviders(monaco: MonacoApi, lspClient: WynntilsLspClient) {
     const completionProvider = monaco.languages.registerCompletionItemProvider(WYNNTILS_LANGUAGE_ID, {
-        triggerCharacters: ["{"],
+        triggerCharacters: ["{", "(", ";"],
         provideCompletionItems: async (
             model: MonacoEditor.ITextModel,
             position: MonacoPosition,
             context: MonacoLanguages.CompletionContext,
         ) => {
             const currentWord = model.getWordUntilPosition(position);
-            const isExpressionStart = context.triggerCharacter === "{";
             const documentText = model.getValue();
             const wordStartOffset = model.getOffsetAt({
                 lineNumber: position.lineNumber,
@@ -332,13 +331,10 @@ export function registerWynntilsProviders(monaco: MonacoApi, lspClient: Wynntils
             });
 
             if (
-                context.triggerCharacter === ";" ||
-                context.triggerCharacter === "(" ||
                 isEscapedCompletionContext(documentText, wordStartOffset) ||
                 isPlaceholderCompletionContext(documentText, wordStartOffset) ||
                 isFormatSuffixCompletionContext(documentText, wordStartOffset) ||
-                !isWynntilsExpressionCompletionContext(documentText, wordStartOffset) ||
-                (!isExpressionStart && currentWord.word.length === 0)
+                !isWynntilsExpressionCompletionContext(documentText, wordStartOffset)
             ) {
                 return { suggestions: [] };
             }

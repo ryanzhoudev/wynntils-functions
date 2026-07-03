@@ -14,6 +14,10 @@ import {
     type TypeInferenceContext,
 } from "@/lib/ide/browser-lsp/type-system";
 import { LspDiagnostic } from "@/lib/ide/types";
+import {
+    collectSemanticBareLiteralOffsets,
+    validateFunctionSemantics,
+} from "@/lib/ide/browser-lsp/semantic-validation";
 
 const VARIABLE_DECLARATION_PATTERN = /^\s*let\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;]*);/gm;
 const PLACEHOLDER_PATTERN = /[@$]\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
@@ -114,6 +118,7 @@ function reportFunctionIssues(
     const parseResult = parse(documentText);
     const callLookup = new Map<number, FunctionCall>();
     const typeInferenceContext = createTypeInferenceContext();
+    const semanticBareLiteralOffsets = collectSemanticBareLiteralOffsets(parseResult.calls, catalog);
 
     for (const functionCall of parseResult.calls) {
         callLookup.set(functionCall.startOffset, functionCall);
@@ -149,6 +154,10 @@ function reportFunctionIssues(
         }
 
         if (!metadata) {
+            if (semanticBareLiteralOffsets.has(functionCall.startOffset)) {
+                continue;
+            }
+
             diagnostics.push(
                 createDiagnostic(
                     document,
@@ -172,6 +181,24 @@ function reportFunctionIssues(
             catalog,
             typeInferenceContext,
         );
+
+        for (const issue of validateFunctionSemantics(functionCall, metadata, {
+            callLookup,
+            catalog,
+            sourceText: documentText,
+            typeInferenceContext,
+        })) {
+            diagnostics.push(
+                createDiagnostic(
+                    document,
+                    documentText,
+                    issue.offset,
+                    issue.length,
+                    DIAGNOSTIC_SEVERITY_ERROR,
+                    issue.message,
+                ),
+            );
+        }
     }
 }
 

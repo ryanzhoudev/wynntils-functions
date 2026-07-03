@@ -8,6 +8,7 @@ import { createSignatureHelp } from "@/lib/ide/browser-lsp/signature-help";
 import { createTextDocument } from "@/lib/ide/browser-lsp/text-document";
 import { FunctionCatalogResponse } from "@/lib/types";
 import { LspCompletionItem, LspHover, LspPosition, LspPublishDiagnosticsParams, LspSignatureHelp } from "@/lib/ide/types";
+import { createSemanticCompletionItems } from "@/lib/ide/browser-lsp/semantic-validation";
 
 type DiagnosticsHandler = (params: LspPublishDiagnosticsParams) => void;
 
@@ -49,16 +50,23 @@ export class WynntilsBrowserLspService {
     requestCompletion(uri: string, position: LspPosition, triggerCharacter?: string): Promise<LspCompletionItem[]> {
         const documentText = this.documents.get(uri);
 
-        if (triggerCharacter === ";" || triggerCharacter === "(") {
-            return Promise.resolve([]);
-        }
-
         const document = documentText ? createTextDocument(uri, documentText) : null;
         const callContext = document ? findActiveCallContext(document, position) : null;
+        const metadata = callContext ? this.catalog.findByName(callContext.functionName) : undefined;
+        const semanticItems = createSemanticCompletionItems(metadata, callContext?.activeParameter ?? 0);
+        const rangedSemanticItems =
+            document && callContext
+                ? this.addSemanticCompletionRanges(semanticItems, document, position, callContext.argumentStartOffset)
+                : semanticItems;
+
+        if (triggerCharacter === ";" || triggerCharacter === "(") {
+            return Promise.resolve(rangedSemanticItems);
+        }
 
         const expectedType = callContext ? this.resolveExpectedArgumentType(callContext.functionName, callContext.activeParameter) : undefined;
+        const functionItems = createFunctionCompletionItems(this.catalog, { expectedType });
 
-        return Promise.resolve(createFunctionCompletionItems(this.catalog, { expectedType }));
+        return Promise.resolve([...rangedSemanticItems, ...functionItems]);
     }
 
     requestHover(uri: string, position: LspPosition): Promise<LspHover | null> {
@@ -117,5 +125,28 @@ export class WynntilsBrowserLspService {
         }
 
         return resolveCompletionType(resolveArgumentSlot(metadata.arguments, activeParameter)?.argument);
+    }
+
+    private addSemanticCompletionRanges(
+        items: LspCompletionItem[],
+        document: ReturnType<typeof createTextDocument>,
+        position: LspPosition,
+        argumentStartOffset: number,
+    ) {
+        const cursorOffset = document.offsetAt(position);
+        const argumentPrefix = document.getText().slice(argumentStartOffset, cursorOffset);
+        const leadingWhitespaceLength = argumentPrefix.length - argumentPrefix.trimStart().length;
+        const replacementStart = document.positionAt(argumentStartOffset + leadingWhitespaceLength);
+
+        return items.map((item) => ({
+            ...item,
+            textEdit: {
+                range: {
+                    start: replacementStart,
+                    end: position,
+                },
+                newText: item.insertText ?? item.label,
+            },
+        }));
     }
 }
