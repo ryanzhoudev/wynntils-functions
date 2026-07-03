@@ -147,6 +147,10 @@ semanticSpecs.set("lootrun_beacon_vibrant", {
     constraints: [allowedLiterals(0, LOOTRUN_BEACON_COLORS)],
 });
 
+semanticSpecs.set("lootrun_task_location", {
+    constraints: [allowedLiterals(0, LOOTRUN_BEACON_COLORS)],
+});
+
 export function validateFunctionSemantics(
     functionCall: FunctionCall,
     metadata: FunctionMetadata,
