@@ -321,10 +321,16 @@ export default function WynntilsIde() {
                 setLspStatus("connecting");
                 setLspError(functionCatalog.error);
             });
+        }
+    }, [functionCatalog.data, functionCatalog.error]);
+
+    useEffect(() => {
+        if (!functionCatalog.data) {
             return;
         }
 
         const lspClient = new WynntilsLspClient(functionCatalog.data);
+        let isDisposed = false;
         lspClientRef.current = lspClient;
 
         const unsubscribeDiagnostics = lspClient.onDiagnostics((params) => {
@@ -340,6 +346,10 @@ export default function WynntilsIde() {
         void lspClient
             .connect()
             .then(() => {
+                if (isDisposed) {
+                    return;
+                }
+
                 setLspStatus("ready");
                 ensureProvidersRegistered();
 
@@ -350,11 +360,16 @@ export default function WynntilsIde() {
                 refreshSignatureHelp();
             })
             .catch((error) => {
+                if (isDisposed) {
+                    return;
+                }
+
                 setLspStatus("error");
                 setLspError(error instanceof Error ? error.message : "Failed to start browser LSP");
             });
 
         return () => {
+            isDisposed = true;
             unsubscribeDiagnostics();
 
             providerDisposablesRef.current.forEach((disposable) => disposable.dispose());
@@ -363,13 +378,7 @@ export default function WynntilsIde() {
             lspClient.dispose();
             lspClientRef.current = null;
         };
-    }, [
-        applyDiagnosticsForUri,
-        ensureProvidersRegistered,
-        functionCatalog.data,
-        functionCatalog.error,
-        refreshSignatureHelp,
-    ]);
+    }, [applyDiagnosticsForUri, ensureProvidersRegistered, functionCatalog.data, refreshSignatureHelp]);
 
     useEffect(() => {
         const requestRef = signatureHelpRequestRef;

@@ -1,52 +1,5 @@
 import { WynntilsBrowserLspService } from "@/lib/ide/browser-lsp/service";
-import { FunctionCatalogResponse } from "@/lib/types";
-import { LspPosition } from "@/lib/ide/types";
-
-type WorkerRequest =
-    | {
-          id: number;
-          method: "initialize";
-          catalog: FunctionCatalogResponse;
-      }
-    | {
-          id: number;
-          method: "updateCatalog";
-          catalog: FunctionCatalogResponse;
-      }
-    | {
-          id: number;
-          method: "syncDocument";
-          uri: string;
-          text: string;
-      }
-    | {
-          id: number;
-          method: "closeDocument";
-          uri: string;
-      }
-    | {
-          id: number;
-          method: "requestCompletion";
-          uri: string;
-          position: LspPosition;
-          triggerCharacter?: string;
-      }
-    | {
-          id: number;
-          method: "requestHover";
-          uri: string;
-          position: LspPosition;
-      }
-    | {
-          id: number;
-          method: "requestSignatureHelp";
-          uri: string;
-          position: LspPosition;
-      }
-    | {
-          id: number;
-          method: "dispose";
-      };
+import type { WorkerRequest } from "@/lib/ide/browser-lsp/protocol";
 
 let service: WynntilsBrowserLspService | null = null;
 

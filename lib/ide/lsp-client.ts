@@ -5,27 +5,21 @@ import {
     LspPublishDiagnosticsParams,
     LspSignatureHelp,
 } from "@/lib/ide/types";
+import type {
+    WorkerMessage,
+    WorkerRequestFor,
+    WorkerRequestMethod,
+    WorkerRequestParams,
+    WorkerResultByMethod,
+} from "@/lib/ide/browser-lsp/protocol";
 import { FunctionCatalogResponse } from "@/lib/types";
 
 type DiagnosticsHandler = (params: LspPublishDiagnosticsParams) => void;
 
-type WorkerResponse = {
-    type: "response";
-    id: number;
-    result?: unknown;
-    error?: string;
-};
-
-type WorkerDiagnostics = {
-    type: "diagnostics";
-    params: LspPublishDiagnosticsParams;
-};
-
-type WorkerMessage = WorkerResponse | WorkerDiagnostics;
-
 type PendingRequest = {
     resolve: (value: unknown) => void;
     reject: (error: Error) => void;
+    timeoutId: ReturnType<typeof setTimeout>;
 };
 
 type QueuedDocumentSync = {
@@ -38,6 +32,7 @@ type QueuedDocumentSync = {
 };
 
 export class WynntilsLspClient {
+    private static readonly REQUEST_TIMEOUT_MS = 30_000;
     private worker: Worker | null = null;
     private requestId = 1;
     private connectPromise: Promise<void> | null = null;
@@ -52,23 +47,30 @@ export class WynntilsLspClient {
             return this.connectPromise;
         }
 
-        this.worker = new Worker(new URL("./browser-lsp/worker.ts", import.meta.url), {
+        const worker = new Worker(new URL("./browser-lsp/worker.ts", import.meta.url), {
             type: "module",
         });
+        this.worker = worker;
 
-        this.worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
+        worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
             this.handleWorkerMessage(event.data);
         };
 
-        this.worker.onerror = (event) => {
-            const error = new Error(event.message || "Browser LSP worker failed");
-
-            this.pendingRequests.forEach((pending) => pending.reject(error));
-            this.pendingRequests.clear();
-            this.connectPromise = null;
+        worker.onerror = (event) => {
+            this.handleWorkerFailure(new Error(event.message || "Browser LSP worker failed"), worker);
         };
 
-        this.connectPromise = this.request("initialize", { catalog: this.catalog }).then(() => undefined);
+        worker.onmessageerror = () => {
+            this.handleWorkerFailure(new Error("Browser LSP worker returned an unreadable message"), worker);
+        };
+
+        this.connectPromise = this.request("initialize", { catalog: this.catalog }).catch((error) => {
+            this.handleWorkerFailure(
+                error instanceof Error ? error : new Error("Browser LSP initialization failed"),
+                worker,
+            );
+            throw error;
+        });
 
         return this.connectPromise;
     }
@@ -86,9 +88,8 @@ export class WynntilsLspClient {
             const queued = this.queuedDocumentSyncs.get(uri);
 
             if (queued) {
-                queued.resolvers.forEach(({ resolve }) => resolve());
                 queued.text = text;
-                queued.resolvers = [{ resolve, reject }];
+                queued.resolvers.push({ resolve, reject });
                 return;
             }
 
@@ -107,26 +108,30 @@ export class WynntilsLspClient {
         await this.request("closeDocument", { uri });
     }
 
-    async requestCompletion(uri: string, position: LspPosition, triggerCharacter?: string): Promise<LspCompletionItem[]> {
+    async requestCompletion(
+        uri: string,
+        position: LspPosition,
+        triggerCharacter?: string,
+    ): Promise<LspCompletionItem[]> {
         await this.connect();
 
-        return (await this.request("requestCompletion", {
+        return this.request("requestCompletion", {
             uri,
             position,
             triggerCharacter,
-        })) as LspCompletionItem[];
+        });
     }
 
     async requestHover(uri: string, position: LspPosition): Promise<LspHover | null> {
         await this.connect();
 
-        return (await this.request("requestHover", { uri, position })) as LspHover | null;
+        return this.request("requestHover", { uri, position });
     }
 
     async requestSignatureHelp(uri: string, position: LspPosition): Promise<LspSignatureHelp | null> {
         await this.connect();
 
-        return (await this.request("requestSignatureHelp", { uri, position })) as LspSignatureHelp | null;
+        return this.request("requestSignatureHelp", { uri, position });
     }
 
     onDiagnostics(handler: DiagnosticsHandler) {
@@ -143,7 +148,10 @@ export class WynntilsLspClient {
         });
         this.queuedDocumentSyncs.clear();
 
-        this.pendingRequests.forEach((pending) => pending.reject(new Error("LSP client disposed")));
+        this.pendingRequests.forEach((pending) => {
+            clearTimeout(pending.timeoutId);
+            pending.reject(new Error("LSP client disposed"));
+        });
         this.pendingRequests.clear();
         this.diagnosticsHandlers.clear();
 
@@ -155,16 +163,29 @@ export class WynntilsLspClient {
         this.connectPromise = null;
     }
 
-    private request(method: string, params?: Record<string, unknown>) {
+    private request<Method extends WorkerRequestMethod>(
+        method: Method,
+        params: WorkerRequestParams<Method>,
+    ): Promise<WorkerResultByMethod[Method]> {
         if (!this.worker) {
             return Promise.reject(new Error("Browser LSP worker is not running"));
         }
 
         const id = this.requestId++;
 
-        return new Promise<unknown>((resolve, reject) => {
-            this.pendingRequests.set(id, { resolve, reject });
-            this.worker?.postMessage({ id, method, ...params });
+        return new Promise<WorkerResultByMethod[Method]>((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+                this.pendingRequests.delete(id);
+                reject(new Error(`Browser LSP request '${method}' timed out`));
+            }, WynntilsLspClient.REQUEST_TIMEOUT_MS);
+
+            this.pendingRequests.set(id, {
+                resolve: (value) => resolve(value as WorkerResultByMethod[Method]),
+                reject,
+                timeoutId,
+            });
+            const message = { id, method, ...params } as WorkerRequestFor<Method>;
+            this.worker?.postMessage(message);
         });
     }
 
@@ -203,7 +224,9 @@ export class WynntilsLspClient {
                 }
 
                 this.queuedDocumentSyncs.delete(uri);
-                latest.resolvers.forEach(({ reject }) => reject(error instanceof Error ? error : new Error("Document sync failed")));
+                latest.resolvers.forEach(({ reject }) =>
+                    reject(error instanceof Error ? error : new Error("Document sync failed")),
+                );
             });
     }
 
@@ -220,6 +243,7 @@ export class WynntilsLspClient {
         }
 
         this.pendingRequests.delete(message.id);
+        clearTimeout(pending.timeoutId);
 
         if (message.error) {
             pending.reject(new Error(message.error));
@@ -227,5 +251,26 @@ export class WynntilsLspClient {
         }
 
         pending.resolve(message.result);
+    }
+
+    private handleWorkerFailure(error: Error, failedWorker = this.worker) {
+        if (failedWorker !== this.worker) {
+            return;
+        }
+
+        this.pendingRequests.forEach((pending) => {
+            clearTimeout(pending.timeoutId);
+            pending.reject(error);
+        });
+        this.pendingRequests.clear();
+
+        this.queuedDocumentSyncs.forEach((queued) => {
+            queued.resolvers.forEach(({ reject }) => reject(error));
+        });
+        this.queuedDocumentSyncs.clear();
+
+        this.worker?.terminate();
+        this.worker = null;
+        this.connectPromise = null;
     }
 }
