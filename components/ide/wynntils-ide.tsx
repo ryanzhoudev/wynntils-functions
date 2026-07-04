@@ -4,8 +4,8 @@ import Editor, { type Monaco as MonacoApi, OnMount } from "@monaco-editor/react"
 import { CompiledOutputPanel, type CompileStatus } from "@/components/ide/compiled-output-panel";
 import { ContextPanel } from "@/components/ide/context-panel";
 import { DiagnosticsPanel } from "@/components/ide/diagnostics-panel";
+import { IdeToolbar, type LspStatus } from "@/components/ide/ide-toolbar";
 import { useIdeWorkspace } from "@/components/ide/use-ide-workspace";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { WynntilsLspClient } from "@/lib/ide/lsp-client";
@@ -14,36 +14,30 @@ import { createIdeFileUri } from "@/lib/ide/workspace";
 import { CompileResult, IdeFile, LspDiagnostic, LspSignatureHelp } from "@/lib/ide/types";
 import { compileSupersetToWynntils } from "@/lib/ide/upstream-compile";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
-import {
-    AlertTriangle,
-    Braces,
-    FilePlus2,
-    FilePenLine,
-    FileUp,
-    Hammer,
-    LoaderCircle,
-    Save,
-    Copy,
-    Trash2,
-} from "lucide-react";
+import { Braces } from "lucide-react";
 import type { IDisposable, editor as MonacoEditor } from "monaco-editor";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const MARKER_OWNER = "wynntils-browser-lsp";
 const EDITOR_HEIGHT = "calc(100vh - 11.75rem)";
-
-function workerStatusDotClass(status: "connecting" | "ready" | "error") {
-    switch (status) {
-        case "ready":
-            return "bg-emerald-400";
-        case "error":
-            return "bg-red-400";
-        case "connecting":
-        default:
-            return "bg-amber-300";
-    }
-}
+const EDITOR_OPTIONS: MonacoEditor.IStandaloneEditorConstructionOptions = {
+    minimap: { enabled: false },
+    fontSize: 14,
+    tabSize: 4,
+    smoothScrolling: true,
+    wordWrap: "off",
+    automaticLayout: true,
+    bracketPairColorization: { enabled: true },
+    glyphMargin: true,
+    renderValidationDecorations: "on",
+    fixedOverflowWidgets: true,
+    hover: { enabled: true, delay: 120 },
+    scrollbar: { alwaysConsumeMouseWheel: false },
+    suggestOnTriggerCharacters: true,
+    quickSuggestions: { strings: true, comments: false, other: true },
+    scrollBeyondLastLine: false,
+};
 
 function mapDiagnosticSeverity(monaco: MonacoApi, severity?: number) {
     switch (severity) {
@@ -91,7 +85,7 @@ export default function WynntilsIde() {
     const [showDiagnostics, setShowDiagnostics] = useState(false);
     const [signatureHelp, setSignatureHelp] = useState<LspSignatureHelp | null>(null);
 
-    const [lspStatus, setLspStatus] = useState<"connecting" | "ready" | "error">("connecting");
+    const [lspStatus, setLspStatus] = useState<LspStatus>("connecting");
     const [lspError, setLspError] = useState<string | null>(null);
 
     const fileImportRef = useRef<HTMLInputElement>(null);
@@ -503,96 +497,25 @@ export default function WynntilsIde() {
             <main className="mx-auto flex w-full max-w-[92vw] flex-col gap-3 p-4">
                 <Card>
                     <CardHeader className="p-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <select
-                                value={activeFile?.id}
-                                onChange={(event) => setActiveFileId(event.target.value)}
-                                className="h-9 min-w-72 rounded-md border border-input bg-background px-2 text-sm"
-                            >
-                                {workspace.files.map((file) => (
-                                    <option key={file.id} value={file.id}>
-                                        {file.name}
-                                    </option>
-                                ))}
-                            </select>
-
-                            <Button variant="secondary" onClick={createNewFile}>
-                                <FilePlus2 className="size-4" />
-                                New
-                            </Button>
-                            <Button variant="outline" onClick={renameActiveFile}>
-                                <FilePenLine className="size-4" />
-                                Rename
-                            </Button>
-                            <Button variant="outline" onClick={duplicateActiveFile}>
-                                <Copy className="size-4" />
-                                Duplicate
-                            </Button>
-                            <Button variant="outline" onClick={exportActiveFile}>
-                                <Save className="size-4" />
-                                Export
-                            </Button>
-                            <Button variant="outline" onClick={() => fileImportRef.current?.click()}>
-                                <FileUp className="size-4" />
-                                Import
-                            </Button>
-                            <span title={workspace.files.length <= 1 ? "You can't delete the last file" : undefined}>
-                                <Button
-                                    variant="outline"
-                                    onClick={deleteActiveFile}
-                                    disabled={workspace.files.length <= 1}
-                                    className="text-red-300"
-                                >
-                                    <Trash2 className="size-4" />
-                                    Delete
-                                </Button>
-                            </span>
-                            <Button
-                                onClick={() => void compileActiveFile()}
-                                disabled={isCompiling || !activeFile}
-                                title="Shortcut: Ctrl/⌘ + Enter"
-                            >
-                                {isCompiling ? (
-                                    <LoaderCircle className="size-4 animate-spin" />
-                                ) : (
-                                    <Hammer className="size-4" />
-                                )}
-                                Compile
-                            </Button>
-
-                            <input
-                                ref={fileImportRef}
-                                type="file"
-                                accept=".wynntils,.txt"
-                                className="hidden"
-                                onChange={(event) => {
-                                    void importFileFromDisk(event);
-                                }}
-                            />
-                            <div className="ml-auto flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                <Badge variant="secondary">{workspace.files.length} files</Badge>
-                                <Button
-                                    variant={showDiagnostics ? "secondary" : "outline"}
-                                    size="sm"
-                                    onClick={() => setShowDiagnostics((current) => !current)}
-                                    disabled={diagnosticMarkers.length === 0}
-                                    aria-pressed={showDiagnostics}
-                                >
-                                    <AlertTriangle className="size-4" />
-                                    {diagnosticMarkers.length} diagnostics
-                                </Button>
-                                <span
-                                    className="inline-flex max-w-48 items-center gap-1.5 truncate font-mono"
-                                    title={lspError ?? `browser worker ${lspStatus}`}
-                                >
-                                    <span
-                                        className={`size-2 shrink-0 rounded-full ${workerStatusDotClass(lspStatus)}`}
-                                        aria-hidden="true"
-                                    />
-                                    <span className="truncate">browser worker</span>
-                                </span>
-                            </div>
-                        </div>
+                        <IdeToolbar
+                            workspace={workspace}
+                            activeFileId={activeFileId}
+                            importInputRef={fileImportRef}
+                            isCompiling={isCompiling}
+                            showDiagnostics={showDiagnostics}
+                            diagnosticCount={diagnosticMarkers.length}
+                            lspStatus={lspStatus}
+                            lspError={lspError}
+                            onSelectFile={setActiveFileId}
+                            onCreate={createNewFile}
+                            onRename={renameActiveFile}
+                            onDuplicate={duplicateActiveFile}
+                            onExport={exportActiveFile}
+                            onImport={importFileFromDisk}
+                            onDelete={deleteActiveFile}
+                            onCompile={() => void compileActiveFile()}
+                            onToggleDiagnostics={() => setShowDiagnostics((current) => !current)}
+                        />
                     </CardHeader>
 
                     <CardContent className="px-3 pb-3 pt-0">
@@ -610,27 +533,7 @@ export default function WynntilsIde() {
                                         setCompileResult(null);
                                         setCompileStatus(null);
                                     }}
-                                    options={{
-                                        minimap: { enabled: false },
-                                        fontSize: 14,
-                                        tabSize: 4,
-                                        smoothScrolling: true,
-                                        wordWrap: "off",
-                                        automaticLayout: true,
-                                        bracketPairColorization: { enabled: true },
-                                        glyphMargin: true,
-                                        renderValidationDecorations: "on",
-                                        fixedOverflowWidgets: true,
-                                        hover: { enabled: true, delay: 120 },
-                                        scrollbar: { alwaysConsumeMouseWheel: false },
-                                        suggestOnTriggerCharacters: true,
-                                        quickSuggestions: {
-                                            strings: true,
-                                            comments: false,
-                                            other: true,
-                                        },
-                                        scrollBeyondLastLine: false,
-                                    }}
+                                    options={EDITOR_OPTIONS}
                                     theme="vs-dark"
                                 />
                             </div>
