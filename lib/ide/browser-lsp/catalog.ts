@@ -19,10 +19,10 @@ export type FunctionMetadata = {
 };
 
 export class FunctionsCatalog {
-    private readonly functions: FunctionMetadata[];
+    private readonly functions: readonly FunctionMetadata[];
     private readonly metadataByName: Map<string, FunctionMetadata>;
 
-    constructor(functions: FunctionMetadata[]) {
+    constructor(functions: readonly FunctionMetadata[]) {
         this.functions = functions;
         this.metadataByName = new Map();
 

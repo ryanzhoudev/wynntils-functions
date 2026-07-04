@@ -1,11 +1,16 @@
-import { formatSignature, FunctionArgumentMetadata, FunctionMetadata, FunctionsCatalog } from "@/lib/ide/browser-lsp/catalog";
+import {
+    formatSignature,
+    FunctionArgumentMetadata,
+    FunctionMetadata,
+    FunctionsCatalog,
+} from "@/lib/ide/browser-lsp/catalog";
 import {
     canOmitArgument,
     isListArgument,
     isOmittableArgument,
     resolveArgumentSlot,
 } from "@/lib/ide/browser-lsp/function-arguments";
-import { FunctionCall, parse, ParsedArgument } from "@/lib/ide/browser-lsp/parser";
+import { FunctionCall, hasArgumentValue, parse } from "@/lib/ide/browser-lsp/parser";
 import { BrowserTextDocument } from "@/lib/ide/browser-lsp/text-document";
 import {
     createTypeInferenceContext,
@@ -215,19 +220,23 @@ function validateArguments(
     const expectedArguments = metadata.arguments;
     const providedArguments = functionCall.arguments;
     const expectedCount = expectedArguments.length;
-    const firstOptionalIndex = expectedArguments.findIndex((argument) => isOmittableArgument(argument) && !isListArgument(argument));
+    const firstOptionalIndex = expectedArguments.findIndex(
+        (argument) => isOmittableArgument(argument) && !isListArgument(argument),
+    );
     const hasProvidedOptionalArgument =
         firstOptionalIndex >= 0 &&
-        providedArguments.some((argument, index) => index >= firstOptionalIndex && hasValue(argument));
+        providedArguments.some((argument, index) => index >= firstOptionalIndex && hasArgumentValue(argument));
 
     for (let index = 0; index < expectedCount; index++) {
         const expectedArgument = expectedArguments[index];
         const providedArgument = providedArguments[index];
 
-        if (!hasValue(providedArgument)) {
+        if (!hasArgumentValue(providedArgument)) {
             if (
                 !canOmitArgument(expectedArgument) ||
-                (isOmittableArgument(expectedArgument) && !isListArgument(expectedArgument) && hasProvidedOptionalArgument)
+                (isOmittableArgument(expectedArgument) &&
+                    !isListArgument(expectedArgument) &&
+                    hasProvidedOptionalArgument)
             ) {
                 diagnostics.push(
                     createDiagnostic(
@@ -254,7 +263,8 @@ function validateArguments(
         }
 
         if (!isTypeCompatible(expectedArgument.type, inferredType)) {
-            const startOffset = providedArgument.startOffset >= 0 ? providedArgument.startOffset : functionCall.startOffset;
+            const startOffset =
+                providedArgument.startOffset >= 0 ? providedArgument.startOffset : functionCall.startOffset;
             const endOffset =
                 providedArgument.endOffset >= 0
                     ? providedArgument.endOffset
@@ -281,7 +291,7 @@ function validateArguments(
             continue;
         }
 
-        if (!hasValue(extraArgument)) {
+        if (!hasArgumentValue(extraArgument)) {
             continue;
         }
 
@@ -312,23 +322,7 @@ function createMissingArgumentMessage(
     return `'${functionName}' is missing ${requirement} argument ${index + 1} '${expectedArgument.name}'. Expected ${formatSignature(metadata, true, true)}.`;
 }
 
-function hasValue(argument: ParsedArgument | undefined): argument is ParsedArgument {
-    if (!argument) {
-        return false;
-    }
-
-    if (argument.tokens.length === 0) {
-        return false;
-    }
-
-    return argument.text.trim().length > 0;
-}
-
-function reportTemplateSyntaxIssues(
-    documentText: string,
-    document: BrowserTextDocument,
-    diagnostics: LspDiagnostic[],
-) {
+function reportTemplateSyntaxIssues(documentText: string, document: BrowserTextDocument, diagnostics: LspDiagnostic[]) {
     for (let index = 0; index < documentText.length; index++) {
         const character = documentText[index];
 
@@ -436,7 +430,7 @@ function isRawStringStart(documentText: string, index: number) {
 
     return (
         (prefix === "r" || prefix === "R") &&
-        documentText[index + 1] === "\"" &&
+        documentText[index + 1] === '"' &&
         (index === 0 || !/[A-Za-z0-9_]/.test(before))
     );
 }
@@ -445,7 +439,7 @@ function findStringEndOffset(documentText: string, openingQuoteOffset: number) {
     let index = openingQuoteOffset + 1;
 
     while (index < documentText.length) {
-        if (documentText[index] === "\"") {
+        if (documentText[index] === '"') {
             return index;
         }
 

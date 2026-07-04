@@ -1,5 +1,5 @@
 import type { FunctionMetadata, FunctionsCatalog } from "@/lib/ide/browser-lsp/catalog";
-import type { FunctionCall, ParsedArgument } from "@/lib/ide/browser-lsp/parser";
+import { hasArgumentValue, type FunctionCall, type ParsedArgument } from "@/lib/ide/browser-lsp/parser";
 import { TokenKind } from "@/lib/ide/browser-lsp/lexer";
 import { isTypeCompatible, type TypeInferenceContext, inferArgumentType } from "@/lib/ide/browser-lsp/type-system";
 import type { LspCompletionItem } from "@/lib/ide/types";
@@ -401,7 +401,7 @@ export function variadicPairs(options: VariadicPairOptions): SemanticConstraint 
             const minimumElements = options.minimumPairs * 2;
             const issues: SemanticIssue[] = [];
 
-            if (elements.length === 0 || elements.every((argument) => !hasValue(argument))) {
+            if (elements.length === 0 || elements.every((argument) => !hasArgumentValue(argument))) {
                 return [
                     issueForCall(
                         context.functionCall,
@@ -414,7 +414,7 @@ export function variadicPairs(options: VariadicPairOptions): SemanticConstraint 
                 const unmatchedArgument = elements.at(-1);
 
                 return [
-                    unmatchedArgument && hasValue(unmatchedArgument)
+                    unmatchedArgument && hasArgumentValue(unmatchedArgument)
                         ? issueForArgument(
                               unmatchedArgument,
                               `'${context.metadata.canonicalName}' ${options.listName} value must be followed by its paired result.`,
@@ -429,7 +429,7 @@ export function variadicPairs(options: VariadicPairOptions): SemanticConstraint 
             if (elements.length % 2 !== 0) {
                 const unmatchedArgument = elements[elements.length - 1];
                 issues.push(
-                    hasValue(unmatchedArgument)
+                    hasArgumentValue(unmatchedArgument)
                         ? issueForArgument(
                               unmatchedArgument,
                               `'${context.metadata.canonicalName}' ${options.listName} value must be followed by its paired result.`,
@@ -445,7 +445,7 @@ export function variadicPairs(options: VariadicPairOptions): SemanticConstraint 
                 const argument = elements[elementIndex];
                 const role = elementIndex % 2 === 0 ? "test value" : "result";
 
-                if (!hasValue(argument)) {
+                if (!hasArgumentValue(argument)) {
                     issues.push(
                         issueForCall(
                             context.functionCall,
@@ -496,7 +496,7 @@ function createValidationContext(
         metadata,
         sourceText: runtime.sourceText,
         inferType(argument) {
-            if (!argument || !hasValue(argument)) {
+            if (!argument || !hasArgumentValue(argument)) {
                 return undefined;
             }
 
@@ -577,10 +577,6 @@ function parseListElements(argument: ParsedArgument, sourceText: string): Parsed
             tokens,
         };
     });
-}
-
-function hasValue(argument: ParsedArgument | undefined): argument is ParsedArgument {
-    return Boolean(argument && argument.tokens.length > 0 && argument.text.trim().length > 0);
 }
 
 function issueForArgument(argument: ParsedArgument, message: string): SemanticIssue {

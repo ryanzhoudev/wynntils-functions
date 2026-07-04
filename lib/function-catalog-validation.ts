@@ -1,40 +1,56 @@
 import type { FunctionArgument, FunctionCatalogResponse, FunctionEntry } from "@/lib/types";
 import { normalizeFunctionLookupName } from "@/lib/function-names";
 
-function isFunctionArgument(value: unknown): value is FunctionArgument {
+function validateFunctionArgument(value: unknown, path: string): string[] {
     if (typeof value !== "object" || value === null) {
-        return false;
+        return [`${path} must be an object.`];
     }
 
     const candidate = value as Partial<FunctionArgument>;
+    const errors: string[] = [];
 
-    return (
-        typeof candidate.id === "number" &&
-        typeof candidate.name === "string" &&
-        (typeof candidate.description === "string" || candidate.description === null) &&
-        typeof candidate.required === "boolean" &&
-        typeof candidate.type === "string" &&
-        (typeof candidate.defaultValue === "string" || candidate.defaultValue === null)
-    );
+    if (typeof candidate.id !== "number") errors.push(`${path}.id must be a number.`);
+    if (typeof candidate.name !== "string") errors.push(`${path}.name must be a string.`);
+    if (typeof candidate.description !== "string" && candidate.description !== null) {
+        errors.push(`${path}.description must be a string or null.`);
+    }
+    if (typeof candidate.required !== "boolean") errors.push(`${path}.required must be a boolean.`);
+    if (typeof candidate.type !== "string") errors.push(`${path}.type must be a string.`);
+    if (typeof candidate.defaultValue !== "string" && candidate.defaultValue !== null) {
+        errors.push(`${path}.defaultValue must be a string or null.`);
+    }
+
+    return errors;
 }
 
-function isFunctionEntry(value: unknown): value is FunctionEntry {
+function validateFunctionEntry(value: unknown, path: string): string[] {
     if (typeof value !== "object" || value === null) {
-        return false;
+        return [`${path} must be an object.`];
     }
 
     const candidate = value as Partial<FunctionEntry>;
+    const errors: string[] = [];
 
-    return (
-        typeof candidate.id === "number" &&
-        typeof candidate.name === "string" &&
-        typeof candidate.description === "string" &&
-        Array.isArray(candidate.aliases) &&
-        candidate.aliases.every((alias) => typeof alias === "string") &&
-        typeof candidate.returnType === "string" &&
-        Array.isArray(candidate.arguments) &&
-        candidate.arguments.every(isFunctionArgument)
-    );
+    if (typeof candidate.id !== "number") errors.push(`${path}.id must be a number.`);
+    if (typeof candidate.name !== "string") errors.push(`${path}.name must be a string.`);
+    if (typeof candidate.description !== "string") errors.push(`${path}.description must be a string.`);
+    if (!Array.isArray(candidate.aliases)) {
+        errors.push(`${path}.aliases must be an array.`);
+    } else {
+        candidate.aliases.forEach((alias, index) => {
+            if (typeof alias !== "string") errors.push(`${path}.aliases[${index}] must be a string.`);
+        });
+    }
+    if (typeof candidate.returnType !== "string") errors.push(`${path}.returnType must be a string.`);
+    if (!Array.isArray(candidate.arguments)) {
+        errors.push(`${path}.arguments must be an array.`);
+    } else {
+        candidate.arguments.forEach((argument, index) => {
+            errors.push(...validateFunctionArgument(argument, `${path}.arguments[${index}]`));
+        });
+    }
+
+    return errors;
 }
 
 export function validateFunctionCatalogResponse(value: unknown): string[] {
@@ -44,15 +60,17 @@ export function validateFunctionCatalogResponse(value: unknown): string[] {
 
     const candidate = value as Partial<FunctionCatalogResponse>;
     const errors: string[] = [];
+    let functionsAreValid = false;
 
     if (!Array.isArray(candidate.functions)) {
         errors.push("Catalog functions must be an array.");
     } else {
+        const functionErrors: string[] = [];
         candidate.functions.forEach((entry, index) => {
-            if (!isFunctionEntry(entry)) {
-                errors.push(`Catalog function at index ${index} has an invalid shape.`);
-            }
+            functionErrors.push(...validateFunctionEntry(entry, `Catalog functions[${index}]`));
         });
+        errors.push(...functionErrors);
+        functionsAreValid = functionErrors.length === 0;
     }
 
     if (typeof candidate.count !== "number") {
@@ -69,10 +87,10 @@ export function validateFunctionCatalogResponse(value: unknown): string[] {
         errors.push("Catalog harvestedAt must be a number or null.");
     }
 
-    if (Array.isArray(candidate.functions) && candidate.functions.every(isFunctionEntry)) {
+    if (Array.isArray(candidate.functions) && functionsAreValid) {
         const owners = new Map<string, string>();
 
-        for (const fn of candidate.functions) {
+        for (const fn of candidate.functions as FunctionEntry[]) {
             for (const lookupName of [fn.name, ...fn.aliases]) {
                 const normalized = normalizeFunctionLookupName(lookupName);
                 const owner = owners.get(normalized);

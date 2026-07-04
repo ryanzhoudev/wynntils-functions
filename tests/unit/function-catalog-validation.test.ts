@@ -16,7 +16,7 @@ describe("function catalog payload validation", () => {
         const errors = validateFunctionCatalogResponse(catalog);
 
         expect(errors).toContain("Catalog count 6 does not match functions length 5.");
-        expect(errors.some((error) => error.includes("invalid shape"))).toBe(true);
+        expect(errors).toContain("Catalog functions[0].arguments[0].required must be a boolean.");
         expect(isFunctionCatalogResponse(null)).toBe(false);
     });
 

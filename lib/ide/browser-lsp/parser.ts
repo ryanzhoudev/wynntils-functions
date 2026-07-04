@@ -38,6 +38,10 @@ export type ParseResult = {
     errors: ParseError[];
 };
 
+export function hasArgumentValue(argument: ParsedArgument | undefined): argument is ParsedArgument {
+    return Boolean(argument && argument.tokens.length > 0 && argument.text.trim().length > 0);
+}
+
 export function parse(sourceText: string): ParseResult {
     const tokens = lex(sourceText);
     const functionCalls: FunctionCall[] = [];
@@ -250,7 +254,10 @@ function isFormatSuffixToken(token: Token) {
     return false;
 }
 
-function findContainingExpressionRange(identifierToken: ValueToken, expressionRanges: Array<{ startOffset: number; endOffset: number }>) {
+function findContainingExpressionRange(
+    identifierToken: ValueToken,
+    expressionRanges: Array<{ startOffset: number; endOffset: number }>,
+) {
     const tokenEndOffset = identifierToken.offset + identifierToken.length;
 
     return expressionRanges.find((range) => {

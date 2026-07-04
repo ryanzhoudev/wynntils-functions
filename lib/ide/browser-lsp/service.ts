@@ -6,15 +6,22 @@ import { resolveArgumentSlot, resolveCompletionType } from "@/lib/ide/browser-ls
 import { createHoverForPosition } from "@/lib/ide/browser-lsp/hover";
 import { createSignatureHelp } from "@/lib/ide/browser-lsp/signature-help";
 import { createTextDocument } from "@/lib/ide/browser-lsp/text-document";
+import type { BrowserTextDocument } from "@/lib/ide/browser-lsp/text-document";
 import { FunctionCatalogResponse } from "@/lib/types";
-import { LspCompletionItem, LspHover, LspPosition, LspPublishDiagnosticsParams, LspSignatureHelp } from "@/lib/ide/types";
+import {
+    LspCompletionItem,
+    LspHover,
+    LspPosition,
+    LspPublishDiagnosticsParams,
+    LspSignatureHelp,
+} from "@/lib/ide/types";
 import { createSemanticCompletionItems } from "@/lib/ide/browser-lsp/semantic-validation";
 
 type DiagnosticsHandler = (params: LspPublishDiagnosticsParams) => void;
 
 export class WynntilsBrowserLspService {
     private catalog: FunctionsCatalog;
-    private readonly documents = new Map<string, string>();
+    private readonly documents = new Map<string, BrowserTextDocument>();
     private readonly diagnosticsHandlers = new Set<DiagnosticsHandler>();
 
     constructor(catalogResponse: FunctionCatalogResponse) {
@@ -24,8 +31,8 @@ export class WynntilsBrowserLspService {
     updateCatalog(catalogResponse: FunctionCatalogResponse) {
         this.catalog = createCatalogFromResponse(catalogResponse);
 
-        for (const [uri, text] of this.documents) {
-            this.publishDiagnostics(uri, text);
+        for (const document of this.documents.values()) {
+            this.publishDiagnostics(document);
         }
     }
 
@@ -34,8 +41,9 @@ export class WynntilsBrowserLspService {
     }
 
     syncDocument(uri: string, text: string) {
-        this.documents.set(uri, text);
-        this.publishDiagnostics(uri, text);
+        const document = createTextDocument(uri, text);
+        this.documents.set(uri, document);
+        this.publishDiagnostics(document);
 
         return Promise.resolve();
     }
@@ -48,9 +56,7 @@ export class WynntilsBrowserLspService {
     }
 
     requestCompletion(uri: string, position: LspPosition, triggerCharacter?: string): Promise<LspCompletionItem[]> {
-        const documentText = this.documents.get(uri);
-
-        const document = documentText ? createTextDocument(uri, documentText) : null;
+        const document = this.documents.get(uri) ?? null;
         const callContext = document ? findActiveCallContext(document, position) : null;
         const metadata = callContext ? this.catalog.findByName(callContext.functionName) : undefined;
         const semanticItems = createSemanticCompletionItems(metadata, callContext?.activeParameter ?? 0);
@@ -63,32 +69,30 @@ export class WynntilsBrowserLspService {
             return Promise.resolve(rangedSemanticItems);
         }
 
-        const expectedType = callContext ? this.resolveExpectedArgumentType(callContext.functionName, callContext.activeParameter) : undefined;
+        const expectedType = callContext
+            ? this.resolveExpectedArgumentType(callContext.functionName, callContext.activeParameter)
+            : undefined;
         const functionItems = createFunctionCompletionItems(this.catalog, { expectedType });
 
         return Promise.resolve([...rangedSemanticItems, ...functionItems]);
     }
 
     requestHover(uri: string, position: LspPosition): Promise<LspHover | null> {
-        const documentText = this.documents.get(uri);
+        const document = this.documents.get(uri);
 
-        if (!documentText) {
+        if (!document) {
             return Promise.resolve(null);
         }
-
-        const document = createTextDocument(uri, documentText);
 
         return Promise.resolve(createHoverForPosition(document, position, this.catalog));
     }
 
     requestSignatureHelp(uri: string, position: LspPosition): Promise<LspSignatureHelp | null> {
-        const documentText = this.documents.get(uri);
+        const document = this.documents.get(uri);
 
-        if (!documentText) {
+        if (!document) {
             return Promise.resolve(null);
         }
-
-        const document = createTextDocument(uri, documentText);
 
         return Promise.resolve(createSignatureHelp(document, position, this.catalog));
     }
@@ -106,11 +110,10 @@ export class WynntilsBrowserLspService {
         this.diagnosticsHandlers.clear();
     }
 
-    private publishDiagnostics(uri: string, text: string) {
-        const document = createTextDocument(uri, text);
+    private publishDiagnostics(document: BrowserTextDocument) {
         const diagnostics = buildDiagnostics(document, this.catalog);
 
-        this.emitDiagnostics({ uri, diagnostics });
+        this.emitDiagnostics({ uri: document.uri, diagnostics });
     }
 
     private emitDiagnostics(params: LspPublishDiagnosticsParams) {
