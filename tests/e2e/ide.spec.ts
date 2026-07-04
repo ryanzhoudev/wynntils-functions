@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { openIde, replaceEditorText } from "./fixtures";
+import { IDE_STORAGE_KEY } from "@/lib/ide/storage";
 
 test("real worker publishes exact semantic diagnostics and marker locations", async ({ page }) => {
     await openIde(page, '{accessory_durability("Invalid")}');
@@ -53,12 +54,12 @@ test("context, compile output, files, and persistence work end to end", async ({
     await expect(page.locator("select")).toHaveValue(/.+/);
     await expect(page.locator("select option:checked")).toHaveText("second.wynntils");
     await expect(page.getByText("2 files")).toBeVisible();
-    await page.waitForFunction(() => {
-        const raw = window.localStorage.getItem("wynntils-ide-workspace:v1");
+    await page.waitForFunction((storageKey) => {
+        const raw = window.localStorage.getItem(storageKey);
         if (!raw) return false;
         const workspace = JSON.parse(raw) as { files: Array<{ name: string }>; activeFileId: string };
         return workspace.files.length === 2 && workspace.files.some((file) => file.name === "second.wynntils");
-    });
+    }, IDE_STORAGE_KEY);
 
     await page.reload();
     await expect(page.locator("select option:checked")).toHaveText("second.wynntils");

@@ -2,6 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { FunctionCatalogResponse } from "@/lib/types";
+import { IDE_STORAGE_KEY } from "@/lib/ide/storage";
 
 const catalogPath = path.resolve(process.env.WYNNTILS_CATALOG_ARTIFACT ?? ".test-artifacts/function-catalog.json");
 
@@ -18,10 +19,10 @@ export async function mockCatalog(page: Page, catalog?: FunctionCatalogResponse)
 
 export async function seedIdeWorkspace(page: Page, source: string, name = "e2e.wynntils") {
     await page.addInitScript(
-        ({ content, fileName }) => {
-            if (!window.localStorage.getItem("wynntils-ide-workspace:v1")) {
+        ({ content, fileName, storageKey }) => {
+            if (!window.localStorage.getItem(storageKey)) {
                 window.localStorage.setItem(
-                    "wynntils-ide-workspace:v1",
+                    storageKey,
                     JSON.stringify({
                         files: [{ id: "e2e-file", name: fileName, content, updatedAt: Date.now() }],
                         activeFileId: "e2e-file",
@@ -29,7 +30,7 @@ export async function seedIdeWorkspace(page: Page, source: string, name = "e2e.w
                 );
             }
         },
-        { content: source, fileName: name },
+        { content: source, fileName: name, storageKey: IDE_STORAGE_KEY },
     );
 }
 

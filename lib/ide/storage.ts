@@ -1,6 +1,7 @@
 import { IdeFile, IdeWorkspace } from "@/lib/ide/types";
+import { createIdeFile } from "@/lib/ide/workspace";
 
-const IDE_STORAGE_KEY = "wynntils-ide-workspace:v1";
+export const IDE_STORAGE_KEY = "wynntils-ide-workspace:v1";
 
 const DEFAULT_FILE_NAME = "new-function.wynntils";
 const DEFAULT_FILE_CONTENT = `let textColor = from_hex("#ffffff");
@@ -9,17 +10,8 @@ let edge = "PILL";
 
 {to_background_text("Hello Wynntils!"; @{textColor}; @{bgColor}; @{edge}; @{edge})}`;
 
-function createDefaultFile(): IdeFile {
-    return {
-        id: crypto.randomUUID(),
-        name: DEFAULT_FILE_NAME,
-        content: DEFAULT_FILE_CONTENT,
-        updatedAt: Date.now(),
-    };
-}
-
 export function createDefaultWorkspace(): IdeWorkspace {
-    const defaultFile = createDefaultFile();
+    const defaultFile = createIdeFile(DEFAULT_FILE_NAME, DEFAULT_FILE_CONTENT);
 
     return {
         files: [defaultFile],
