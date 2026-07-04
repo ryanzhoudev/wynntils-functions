@@ -8,13 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-    DEFAULT_SEARCH_SCOPE,
-    matchesQuery,
-    normalizeQueryTokens,
-    SEARCH_SCOPE_OPTIONS,
-    SearchScope,
-} from "@/lib/search";
+import { SEARCH_SCOPE_OPTIONS } from "@/lib/search";
+import { useCatalogSearch } from "@/lib/use-catalog-search";
 import { formatDateTime } from "@/lib/date-time";
 import { hasSemanticArgumentValidation } from "@/lib/ide/browser-lsp/semantic-validation";
 import { FunctionArgument, FunctionEntry } from "@/lib/types";
@@ -23,6 +18,8 @@ import { cn } from "@/lib/utils";
 import { AlertTriangle, CheckCircle2, ListRestart, RefreshCw, Search, X } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+
+const sortFunctionsByName = (first: FunctionEntry, second: FunctionEntry) => first.name.localeCompare(second.name);
 
 function FunctionArgumentCard({
     argument,
@@ -77,6 +74,7 @@ function FunctionCard({ entry, exactMatch }: { entry: FunctionEntry; exactMatch?
     return (
         <Card
             className={cn(
+                "catalog-card",
                 exactMatch &&
                     "border-emerald-400/55 bg-[linear-gradient(180deg,rgba(52,211,153,0.10),rgba(52,211,153,0.04))]",
             )}
@@ -172,58 +170,88 @@ function WarningCard({ title, description }: { title: string; description: React
     );
 }
 
+function RefreshButtonContent({
+    isRefreshing,
+    isRateLimited,
+    didSucceed,
+    idleLabel,
+}: {
+    isRefreshing: boolean;
+    isRateLimited: boolean;
+    didSucceed: boolean;
+    idleLabel: "Refresh data" | "Retry";
+}) {
+    const label = isRefreshing
+        ? idleLabel === "Retry"
+            ? "Retrying..."
+            : "Refreshing..."
+        : isRateLimited
+          ? "Rate limited"
+          : didSucceed
+            ? "Refreshed"
+            : idleLabel;
+
+    return (
+        <>
+            {isRefreshing ? (
+                <RefreshCw className="size-4 animate-spin" />
+            ) : isRateLimited ? (
+                <AlertTriangle className="size-4" />
+            ) : didSucceed ? (
+                <CheckCircle2 className="size-4" />
+            ) : (
+                <RefreshCw className="size-4" />
+            )}
+            {label}
+        </>
+    );
+}
+
 export default function FunctionCatalog() {
     const { data, error, isLoading, isRefreshing, isUsingStaleData, refreshRateLimit, refresh, cacheSavedAt } =
         useFunctionCatalog();
 
-    const [query, setQuery] = useState("");
-    const [searchScope, setSearchScope] = useState<SearchScope>(DEFAULT_SEARCH_SCOPE);
+    const {
+        query,
+        setQuery,
+        searchScope,
+        setSearchScope,
+        filteredFunctions: searchMatches,
+        activeFilterCount,
+        isDefaultSearchScope,
+        resetSearch,
+    } = useCatalogSearch(data?.functions, { sortEntries: sortFunctionsByName });
     const [refreshIndicator, setRefreshIndicator] = useState<"idle" | "success" | "error">("idle");
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    const queryTokens = useMemo(() => normalizeQueryTokens(query), [query]);
     const exactMatchByFunctionId = useMemo(() => {
         return new Map((data?.functions ?? []).map((entry) => [entry.id, getExactFunctionMatch(entry, query)]));
     }, [data?.functions, query]);
 
-    const sortedFunctions = useMemo(() => {
-        return [...(data?.functions ?? [])].sort((first, second) => first.name.localeCompare(second.name));
-    }, [data]);
-
     const filteredFunctions = useMemo(() => {
-        return sortedFunctions
-            .filter((entry) => matchesQuery(entry, searchScope, queryTokens))
-            .sort((first, second) => {
-                const firstExactMatch = exactMatchByFunctionId.get(first.id);
-                const secondExactMatch = exactMatchByFunctionId.get(second.id);
+        return [...searchMatches].sort((first, second) => {
+            const firstExactMatch = exactMatchByFunctionId.get(first.id);
+            const secondExactMatch = exactMatchByFunctionId.get(second.id);
 
-                if (firstExactMatch && !secondExactMatch) {
-                    return -1;
-                }
+            if (firstExactMatch && !secondExactMatch) {
+                return -1;
+            }
 
-                if (!firstExactMatch && secondExactMatch) {
-                    return 1;
-                }
+            if (!firstExactMatch && secondExactMatch) {
+                return 1;
+            }
 
-                if (firstExactMatch === "name" && secondExactMatch === "alias") {
-                    return -1;
-                }
+            if (firstExactMatch === "name" && secondExactMatch === "alias") {
+                return -1;
+            }
 
-                if (firstExactMatch === "alias" && secondExactMatch === "name") {
-                    return 1;
-                }
+            if (firstExactMatch === "alias" && secondExactMatch === "name") {
+                return 1;
+            }
 
-                return 0;
-            });
-    }, [exactMatchByFunctionId, queryTokens, searchScope, sortedFunctions]);
-
-    const activeFilterCount = useMemo(() => {
-        return Object.values(searchScope).filter(Boolean).length;
-    }, [searchScope]);
-
-    const isDefaultSearchScope = useMemo(() => {
-        return SEARCH_SCOPE_OPTIONS.every(({ key }) => searchScope[key] === DEFAULT_SEARCH_SCOPE[key]);
-    }, [searchScope]);
+            return 0;
+        });
+    }, [exactMatchByFunctionId, searchMatches]);
 
     const hasLoadedData = Boolean(data);
     const isRefreshRateLimited = refreshRateLimit.isLimited;
@@ -286,8 +314,6 @@ export default function FunctionCatalog() {
             <header className="mx-auto flex w-full max-w-[86rem] flex-col gap-4 px-4 py-6 md:flex-row md:items-center md:justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Wynntils Functions</h1>
-                    {/*<p className="mt-1 text-sm text-muted-foreground">*/}
-                    {/*</p>*/}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -298,22 +324,12 @@ export default function FunctionCatalog() {
                         <Link href="/ide">Open IDE</Link>
                     </Button>
                     <Button onClick={() => void handleRefresh()} disabled={isRefreshDisabled}>
-                        {isRefreshing ? (
-                            <RefreshCw className="size-4 animate-spin" />
-                        ) : isRefreshRateLimited ? (
-                            <AlertTriangle className="size-4" />
-                        ) : refreshIndicator === "success" ? (
-                            <CheckCircle2 className="size-4" />
-                        ) : (
-                            <RefreshCw className="size-4" />
-                        )}
-                        {isRefreshing
-                            ? "Refreshing..."
-                            : isRefreshRateLimited
-                              ? "Rate limited"
-                              : refreshIndicator === "success"
-                                ? "Refreshed"
-                                : "Refresh data"}
+                        <RefreshButtonContent
+                            isRefreshing={isRefreshing}
+                            isRateLimited={isRefreshRateLimited}
+                            didSucceed={refreshIndicator === "success"}
+                            idleLabel="Refresh data"
+                        />
                     </Button>
                 </div>
             </header>
@@ -375,10 +391,7 @@ export default function FunctionCatalog() {
 
                         <Button
                             variant="secondary"
-                            onClick={() => {
-                                setSearchScope(DEFAULT_SEARCH_SCOPE);
-                                setQuery("");
-                            }}
+                            onClick={resetSearch}
                             disabled={isDefaultSearchScope && query === ""}
                             className="w-full"
                         >
@@ -469,16 +482,12 @@ export default function FunctionCatalog() {
                             </CardHeader>
                             <CardContent>
                                 <Button onClick={() => void handleRefresh()} disabled={isRefreshDisabled}>
-                                    {isRefreshing ? (
-                                        <RefreshCw className="size-4 animate-spin" />
-                                    ) : isRefreshRateLimited ? (
-                                        <AlertTriangle className="size-4" />
-                                    ) : refreshIndicator === "success" ? (
-                                        <CheckCircle2 className="size-4" />
-                                    ) : (
-                                        <RefreshCw className="size-4" />
-                                    )}
-                                    {isRefreshing ? "Retrying..." : isRefreshRateLimited ? "Rate limited" : "Retry"}
+                                    <RefreshButtonContent
+                                        isRefreshing={isRefreshing}
+                                        isRateLimited={isRefreshRateLimited}
+                                        didSucceed={refreshIndicator === "success"}
+                                        idleLabel="Retry"
+                                    />
                                 </Button>
                             </CardContent>
                         </Card>

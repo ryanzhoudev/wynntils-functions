@@ -3,34 +3,25 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/legacy/card";
 import { Badge } from "@/components/ui/badge";
 import { hasSemanticArgumentValidation } from "@/lib/ide/browser-lsp/semantic-validation";
-import {
-    DEFAULT_SEARCH_SCOPE,
-    SEARCH_SCOPE_OPTIONS,
-    SearchScope,
-    matchesQuery,
-    normalizeQueryTokens,
-} from "@/lib/search";
+import { SEARCH_SCOPE_OPTIONS } from "@/lib/search";
+import { useCatalogSearch } from "@/lib/use-catalog-search";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import type { FunctionEntry } from "@/lib/types";
+
+const sortFunctionsById = (first: FunctionEntry, second: FunctionEntry) => first.id - second.id;
 
 export default function LegacyDocs() {
     const { data, error, isLoading } = useFunctionCatalog();
 
-    const [query, setQuery] = useState("");
-    const [filters, setFilters] = useState<SearchScope>(DEFAULT_SEARCH_SCOPE);
-
-    const queryTokens = useMemo(() => normalizeQueryTokens(query), [query]);
-
-    const activeFilterCount = useMemo(() => {
-        return Object.values(filters).filter(Boolean).length;
-    }, [filters]);
-
-    const functions = useMemo(() => {
-        const catalog = [...(data?.functions ?? [])].sort((a, b) => a.id - b.id);
-
-        return catalog.filter((entry) => matchesQuery(entry, filters, queryTokens));
-    }, [data?.functions, filters, queryTokens]);
+    const {
+        query,
+        setQuery,
+        searchScope: filters,
+        setSearchScope: setFilters,
+        filteredFunctions: functions,
+        activeFilterCount,
+    } = useCatalogSearch(data?.functions, { sortEntries: sortFunctionsById });
 
     return (
         <div className="min-h-screen bg-zinc-900 text-white">
@@ -102,7 +93,7 @@ export default function LegacyDocs() {
                                       .join("; ")})`;
 
                         return (
-                            <Card key={func.id} className="bg-zinc-800">
+                            <Card key={func.id} className="catalog-card bg-zinc-800">
                                 <CardTitle>
                                     <code className="ml-2 text-lg">
                                         {func.name}
@@ -125,8 +116,7 @@ export default function LegacyDocs() {
                                             {argument.required
                                                 ? "required"
                                                 : `optional${argument.defaultValue ? `, default: ${argument.defaultValue}` : ""}`}
-                                            )
-                                            {argument.description ? ` -- ${argument.description}` : ""}
+                                            ){argument.description ? ` -- ${argument.description}` : ""}
                                         </div>
                                     ))}
                                 </CardContent>

@@ -64,7 +64,13 @@ export function matchesQuery(entry: FunctionEntry, scope: SearchScope, queryToke
         return true;
     }
 
-    const searchBlob = createSearchBlob(entry, scope);
+    return matchesSearchBlob(createSearchBlob(entry, scope), queryTokens);
+}
+
+export function matchesSearchBlob(searchBlob: string, queryTokens: string[]) {
+    if (queryTokens.length === 0) {
+        return true;
+    }
 
     return queryTokens.every((token) => searchBlob.includes(token));
 }
