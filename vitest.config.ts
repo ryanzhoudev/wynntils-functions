@@ -1,12 +1,8 @@
-import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+import { vitestResolve } from "./vitest.shared";
 
 export default defineConfig({
-    resolve: {
-        alias: {
-            "@": fileURLToPath(new URL(".", import.meta.url)),
-        },
-    },
+    resolve: vitestResolve,
     test: {
         environment: "node",
         include: ["tests/**/*.test.{ts,tsx}"],

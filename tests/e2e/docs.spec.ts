@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mockCatalog } from "./fixtures";
+import { mockCatalog, readCatalogArtifact } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => window.localStorage.clear());
@@ -40,7 +40,7 @@ test("refresh replaces and persists the catalog snapshot", async ({ page }) => {
     await page.unroute("**/api/functions");
     await page.route("**/api/functions", async (route) => {
         requests++;
-        const catalog = await (await import("./fixtures")).readCatalogArtifact();
+        const catalog = await readCatalogArtifact();
         await route.fulfill({ json: catalog });
     });
 
