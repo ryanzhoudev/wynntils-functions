@@ -1,160 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+    FUNCTION_CATALOG_REFRESH_ATTEMPTS_KEY,
+    type RefreshRateLimitStatus,
+    getRefreshRateLimitStatus,
+    isCatalogCacheFresh,
+    readCachedCatalog,
+    reserveRefreshAttempt,
+    writeCachedCatalog,
+} from "@/lib/function-catalog-cache";
 import { isFunctionCatalogResponse } from "@/lib/function-catalog-validation";
 import { FunctionCatalogResponse } from "@/lib/types";
-
-const CACHE_KEY = "wynntils-function-catalog:v1";
-const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 12;
-
-const REFRESH_RATE_LIMIT_KEY = "wynntils-function-catalog:refresh-attempts:v1";
-const REFRESH_RATE_LIMIT_MAX_ATTEMPTS = 5;
-const REFRESH_RATE_LIMIT_WINDOW_MS = 1000 * 60 * 15;
-
-type CachedCatalog = {
-    savedAt: number;
-    data: FunctionCatalogResponse;
-};
-
-type RefreshRateLimitStatus = {
-    isLimited: boolean;
-    remaining: number;
-    nextAllowedAt: number | null;
-};
 
 type FetchCatalogOptions = {
     force?: boolean;
     signal?: AbortSignal;
 };
-
-function readCachedCatalog() {
-    if (typeof window === "undefined") {
-        return null;
-    }
-
-    try {
-        const cached = window.localStorage.getItem(CACHE_KEY);
-
-        if (!cached) {
-            return null;
-        }
-
-        const parsed = JSON.parse(cached) as CachedCatalog;
-
-        if (!parsed?.savedAt || !isFunctionCatalogResponse(parsed?.data)) {
-            window.localStorage.removeItem(CACHE_KEY);
-            return null;
-        }
-
-        return parsed;
-    } catch {
-        return null;
-    }
-}
-
-function writeCachedCatalog(data: FunctionCatalogResponse) {
-    if (typeof window === "undefined") {
-        return;
-    }
-
-    const payload: CachedCatalog = {
-        savedAt: Date.now(),
-        data,
-    };
-
-    try {
-        window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-    } catch {
-        // Ignore storage quota / privacy mode failures.
-    }
-}
-
-function readRefreshAttempts() {
-    if (typeof window === "undefined") {
-        return [] as number[];
-    }
-
-    try {
-        const raw = window.localStorage.getItem(REFRESH_RATE_LIMIT_KEY);
-
-        if (!raw) {
-            return [];
-        }
-
-        const parsed = JSON.parse(raw) as unknown;
-
-        if (!Array.isArray(parsed)) {
-            window.localStorage.removeItem(REFRESH_RATE_LIMIT_KEY);
-            return [];
-        }
-
-        return parsed.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
-    } catch {
-        return [];
-    }
-}
-
-function writeRefreshAttempts(attempts: number[]) {
-    if (typeof window === "undefined") {
-        return;
-    }
-
-    try {
-        window.localStorage.setItem(REFRESH_RATE_LIMIT_KEY, JSON.stringify(attempts));
-    } catch {
-        // Ignore localStorage failures.
-    }
-}
-
-function pruneRefreshAttempts(attempts: number[], now = Date.now()) {
-    return attempts.filter((timestamp) => now - timestamp < REFRESH_RATE_LIMIT_WINDOW_MS);
-}
-
-function getRefreshRateLimitStatus(now = Date.now()): RefreshRateLimitStatus {
-    const attempts = pruneRefreshAttempts(readRefreshAttempts(), now);
-    writeRefreshAttempts(attempts);
-
-    if (attempts.length < REFRESH_RATE_LIMIT_MAX_ATTEMPTS) {
-        return {
-            isLimited: false,
-            remaining: REFRESH_RATE_LIMIT_MAX_ATTEMPTS - attempts.length,
-            nextAllowedAt: null,
-        };
-    }
-
-    const oldestAttempt = attempts[0];
-
-    return {
-        isLimited: true,
-        remaining: 0,
-        nextAllowedAt: oldestAttempt + REFRESH_RATE_LIMIT_WINDOW_MS,
-    };
-}
-
-function reserveRefreshAttempt(now = Date.now()): RefreshRateLimitStatus {
-    const attempts = pruneRefreshAttempts(readRefreshAttempts(), now);
-
-    if (attempts.length >= REFRESH_RATE_LIMIT_MAX_ATTEMPTS) {
-        return {
-            isLimited: true,
-            remaining: 0,
-            nextAllowedAt: attempts[0] + REFRESH_RATE_LIMIT_WINDOW_MS,
-        };
-    }
-
-    attempts.push(now);
-    writeRefreshAttempts(attempts);
-
-    return {
-        isLimited: false,
-        remaining: REFRESH_RATE_LIMIT_MAX_ATTEMPTS - attempts.length,
-        nextAllowedAt: null,
-    };
-}
-
-function isCacheFresh(cached: CachedCatalog) {
-    return Date.now() - cached.savedAt < CACHE_MAX_AGE_MS;
-}
 
 function toErrorMessage(error: unknown) {
     if (error instanceof Error) {
@@ -165,17 +27,16 @@ function toErrorMessage(error: unknown) {
 }
 
 export function useFunctionCatalog() {
+    const inFlightRequestRef = useRef<Promise<boolean> | null>(null);
     const [data, setData] = useState<FunctionCatalogResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [cacheSavedAt, setCacheSavedAt] = useState<number | null>(null);
     const [isUsingStaleData, setIsUsingStaleData] = useState(false);
-    const [refreshRateLimit, setRefreshRateLimit] = useState<RefreshRateLimitStatus>(() =>
-        getRefreshRateLimitStatus(),
-    );
+    const [refreshRateLimit, setRefreshRateLimit] = useState<RefreshRateLimitStatus>(() => getRefreshRateLimitStatus());
 
-    const fetchCatalog = useCallback(async ({ force = false, signal }: FetchCatalogOptions = {}) => {
+    const runCatalogFetch = useCallback(async ({ force = false, signal }: FetchCatalogOptions = {}) => {
         let didSucceed = false;
 
         if (force) {
@@ -194,9 +55,10 @@ export function useFunctionCatalog() {
             setData(cached.data);
             setCacheSavedAt(cached.savedAt);
             setIsLoading(false);
-            setIsUsingStaleData(!isCacheFresh(cached));
+            const isFresh = isCatalogCacheFresh(cached);
+            setIsUsingStaleData(!isFresh);
 
-            if (isCacheFresh(cached)) {
+            if (isFresh) {
                 return true;
             }
         }
@@ -227,8 +89,8 @@ export function useFunctionCatalog() {
             setData(payload);
             setError(null);
             setIsUsingStaleData(false);
-            writeCachedCatalog(payload);
-            setCacheSavedAt(Date.now());
+            const cachedPayload = writeCachedCatalog(payload);
+            setCacheSavedAt(cachedPayload.savedAt);
             didSucceed = true;
         } catch (fetchError) {
             if (signal?.aborted) {
@@ -250,6 +112,23 @@ export function useFunctionCatalog() {
         return didSucceed;
     }, []);
 
+    const fetchCatalog = useCallback(
+        (options: FetchCatalogOptions = {}) => {
+            if (inFlightRequestRef.current) {
+                return inFlightRequestRef.current;
+            }
+
+            const request = runCatalogFetch(options).finally(() => {
+                if (inFlightRequestRef.current === request) {
+                    inFlightRequestRef.current = null;
+                }
+            });
+            inFlightRequestRef.current = request;
+            return request;
+        },
+        [runCatalogFetch],
+    );
+
     useEffect(() => {
         const controller = new AbortController();
 
@@ -269,10 +148,13 @@ export function useFunctionCatalog() {
 
         syncRateLimitStatus();
 
-        const intervalId = window.setInterval(syncRateLimitStatus, 10_000);
+        const delay = refreshRateLimit.nextChangeAt
+            ? Math.max(refreshRateLimit.nextChangeAt - Date.now() + 50, 0)
+            : null;
+        const timeoutId = delay === null ? null : window.setTimeout(syncRateLimitStatus, delay);
 
         const onStorage = (event: StorageEvent) => {
-            if (event.key === REFRESH_RATE_LIMIT_KEY) {
+            if (event.key === FUNCTION_CATALOG_REFRESH_ATTEMPTS_KEY) {
                 syncRateLimitStatus();
             }
         };
@@ -280,10 +162,12 @@ export function useFunctionCatalog() {
         window.addEventListener("storage", onStorage);
 
         return () => {
-            window.clearInterval(intervalId);
+            if (timeoutId !== null) {
+                window.clearTimeout(timeoutId);
+            }
             window.removeEventListener("storage", onStorage);
         };
-    }, []);
+    }, [refreshRateLimit.nextChangeAt]);
 
     return useMemo(
         () => ({
