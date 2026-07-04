@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createDefaultWorkspace, loadWorkspaceFromStorage, saveWorkspaceToStorage } from "@/lib/ide/storage";
+import {
+    createDefaultWorkspace,
+    IDE_STORAGE_KEY,
+    loadWorkspaceFromStorage,
+    saveWorkspaceToStorage,
+} from "@/lib/ide/storage";
 
 describe("IDE workspace storage", () => {
     beforeEach(() => {
@@ -25,11 +30,11 @@ describe("IDE workspace storage", () => {
     });
 
     it("falls back safely for malformed or stale active-file data", () => {
-        localStorage.setItem("wynntils-ide-workspace:v1", "not json");
+        localStorage.setItem(IDE_STORAGE_KEY, "not json");
         expect(loadWorkspaceFromStorage().files).toHaveLength(1);
 
         localStorage.setItem(
-            "wynntils-ide-workspace:v1",
+            IDE_STORAGE_KEY,
             JSON.stringify({
                 activeFileId: "missing",
                 files: [{ id: "one", name: "one.wynntils", content: "{}", updatedAt: 1 }],

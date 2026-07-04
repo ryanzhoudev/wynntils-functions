@@ -1,13 +1,10 @@
 import type { FunctionArgument, FunctionCatalogResponse, FunctionEntry } from "@/lib/types";
 
-let nextFunctionId = 1;
-let nextArgumentId = 1;
-
 type TestArgument = Partial<Omit<FunctionArgument, "id">> & Pick<FunctionArgument, "name" | "type">;
 
-export function testArgument(argument: TestArgument): FunctionArgument {
+function testArgument(argument: TestArgument, id: number): FunctionArgument {
     return {
-        id: nextArgumentId++,
+        id,
         name: argument.name,
         description: argument.description ?? null,
         required: argument.required ?? true,
@@ -23,19 +20,21 @@ export function testFunction(
     options: Partial<Pick<FunctionEntry, "aliases" | "description">> = {},
 ): FunctionEntry {
     return {
-        id: nextFunctionId++,
+        id: 0,
         name,
         description: options.description ?? `${name} test function`,
         aliases: options.aliases ?? [],
         returnType,
-        arguments: argumentsMetadata.map(testArgument),
+        arguments: argumentsMetadata.map((argument, index) => testArgument(argument, index + 1)),
     };
 }
 
 export function testCatalog(functions: FunctionEntry[]): FunctionCatalogResponse {
+    const normalizedFunctions = functions.map((fn, index) => ({ ...fn, id: index + 1 }));
+
     return {
-        functions,
-        count: functions.length,
+        functions: normalizedFunctions,
+        count: normalizedFunctions.length,
         dataVersion: "test",
         harvestedAt: 0,
     };
@@ -50,17 +49,13 @@ export function createRepresentativeCatalog() {
         ]),
         testFunction("from_hex", "CustomColor", [{ name: "hex", type: "String" }]),
         testFunction("parse_double", "Double", [{ name: "value", type: "String" }]),
-        testFunction(
-            "accessory_durability",
-            "CappedValue",
-            [
-                {
-                    name: "accessory",
-                    type: "String",
-                    description: "One of Ring_1, Ring_2, Bracelet, Necklace",
-                },
-            ],
-        ),
+        testFunction("accessory_durability", "CappedValue", [
+            {
+                name: "accessory",
+                type: "String",
+                description: "One of Ring_1, Ring_2, Bracelet, Necklace",
+            },
+        ]),
         testFunction(
             "switch_case",
             "Object",
