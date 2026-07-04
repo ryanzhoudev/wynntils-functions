@@ -1,4 +1,5 @@
 import { FunctionCatalogResponse, FunctionEntry } from "@/lib/types";
+import { normalizeFunctionAliases, normalizeFunctionLookupName } from "@/lib/function-names";
 import { formatArgumentLabel } from "@/lib/ide/browser-lsp/function-arguments";
 
 export type FunctionArgumentMetadata = {
@@ -26,10 +27,10 @@ export class FunctionsCatalog {
         this.metadataByName = new Map();
 
         for (const metadata of this.functions) {
-            this.metadataByName.set(normalizeLookupName(metadata.canonicalName), metadata);
+            this.metadataByName.set(normalizeFunctionLookupName(metadata.canonicalName), metadata);
 
             for (const alias of metadata.aliases) {
-                this.metadataByName.set(normalizeLookupName(alias), metadata);
+                this.metadataByName.set(normalizeFunctionLookupName(alias), metadata);
             }
         }
     }
@@ -39,7 +40,7 @@ export class FunctionsCatalog {
     }
 
     findByName(functionName: string) {
-        return this.metadataByName.get(normalizeLookupName(functionName));
+        return this.metadataByName.get(normalizeFunctionLookupName(functionName));
     }
 }
 
@@ -51,7 +52,9 @@ export function formatSignature(metadata: FunctionMetadata, includeOptionalArgum
     const argumentSource = includeOptionalArguments
         ? metadata.arguments
         : metadata.arguments.filter((argument) => argument.required);
-    const argumentNames = argumentSource.map((argument) => (includeTypes ? formatArgumentLabel(argument) : argument.name));
+    const argumentNames = argumentSource.map((argument) =>
+        includeTypes ? formatArgumentLabel(argument) : argument.name,
+    );
 
     if (argumentNames.length === 0) {
         return "(no args)";
@@ -75,7 +78,7 @@ function normalizeFunctionEntry(entry: FunctionEntry): FunctionMetadata {
         canonicalName: entry.name,
         description: entry.description ?? "",
         returnType: normalizeType(entry.returnType),
-        aliases: normalizeAliases(entry.aliases),
+        aliases: normalizeFunctionAliases(entry.aliases, { splitCommaSeparated: true }),
         arguments: entry.arguments.map((argument) => ({
             name: argument.name || "arg",
             description: argument.description,
@@ -94,19 +97,4 @@ function normalizeType(typeValue: string | null | undefined) {
     const trimmed = typeValue.trim();
 
     return trimmed.length > 0 ? trimmed : "Any";
-}
-
-function normalizeAliases(aliases: string[] | undefined) {
-    if (!Array.isArray(aliases)) {
-        return [];
-    }
-
-    return aliases
-        .flatMap((alias) => alias.split(","))
-        .map((alias) => alias.trim())
-        .filter((alias) => alias.length > 0);
-}
-
-function normalizeLookupName(name: string) {
-    return name.toLowerCase();
 }

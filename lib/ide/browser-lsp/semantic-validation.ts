@@ -3,6 +3,7 @@ import type { FunctionCall, ParsedArgument } from "@/lib/ide/browser-lsp/parser"
 import { TokenKind } from "@/lib/ide/browser-lsp/lexer";
 import { isTypeCompatible, type TypeInferenceContext, inferArgumentType } from "@/lib/ide/browser-lsp/type-system";
 import type { LspCompletionItem } from "@/lib/ide/types";
+import { normalizeFunctionLookupName } from "@/lib/function-names";
 
 export type SemanticIssue = {
     offset: number;
@@ -69,175 +70,188 @@ export type VariadicPairOptions = {
 };
 
 export type PairKeyConstraint = {
-    validate(
-        keyArgument: ParsedArgument,
-        context: SemanticValidationContext,
-        pairIndex: number,
-    ): SemanticIssue[];
+    validate(keyArgument: ParsedArgument, context: SemanticValidationContext, pairIndex: number): SemanticIssue[];
 };
 
 const COMPLETION_ITEM_KIND_ENUM_MEMBER = 20;
-const ARMOR_SLOTS = ["Helmet", "Chestplate", "Leggings", "Boots"];
-const BOMB_SORT_ORDERS = ["NEWEST", "OLDEST"];
-const WYNNCRAFT_SHADERS = ["BLINK", "FADE", "FADE_2", "GRADIENT", "GRADIENT_2", "ITALIC", "ITALIC_2", "RAINBOW", "SHINE", "WARP"];
-const BACKGROUND_EDGE_STYLES = ["NONE", "PILL", "BOX", "FLAG", "RIBBON"];
-const SPELL_DIRECTIONS = ["RLR", "RRR", "RLL", "RRL", "LRL", "LLL", "LRR", "LLR"];
-const SPELL_CLASSES = ["Mage", "Dark Wizard", "Archer", "Hunter", "Warrior", "Knight", "Assassin", "Ninja", "Shaman", "Skyseer"];
-const PROFESSIONS = ["Woodcutting", "Mining", "Fishing", "Farming", "Alchemism", "Armouring", "Cooking", "Jeweling", "Scribing", "Tailoring", "Weaponsmithing", "Woodworking"];
-const MOUNT_STATS = ["acceleration", "altitude", "jumpHeight", "energy", "handling", "potential", "boost", "speed", "toughness", "training"];
-const LOOTRUN_BEACON_COLORS = ["GREEN", "YELLOW", "BLUE", "PURPLE", "GRAY", "ORANGE", "RED", "DARK_GRAY", "WHITE", "AQUA", "PINK", "CRIMSON", "RAINBOW"];
-const ACCESSORY_SLOTS = ["Ring_1", "Ring_2", "Bracelet", "Necklace"];
-const DEBUFF_NAMES = ["Bleeding", "Blindness", "Burning", "Confused", "Contaminated", "Crystallized", "Curse", "Discombobulated", "Enkindled", "Freezing", "Marked", "Poison", "Provoked", "Resistance", "Slowness", "Trick", "Twilight", "Weakness", "Whipped", "Wind Prison"];
-const CAPPED_MOUNT_STATS = ["acceleration", "altitude", "jumpHeight", "energy", "handling", "boost", "speed", "toughness", "training"];
+const ARMOR_SLOTS = ["Helmet", "Chestplate", "Leggings", "Boots"] as const;
+const BOMB_SORT_ORDERS = ["NEWEST", "OLDEST"] as const;
+const WYNNCRAFT_SHADERS = [
+    "BLINK",
+    "FADE",
+    "FADE_2",
+    "GRADIENT",
+    "GRADIENT_2",
+    "ITALIC",
+    "ITALIC_2",
+    "RAINBOW",
+    "SHINE",
+    "WARP",
+] as const;
+const BACKGROUND_EDGE_STYLES = ["NONE", "PILL", "BOX", "FLAG", "RIBBON"] as const;
+const SPELL_DIRECTIONS = ["RLR", "RRR", "RLL", "RRL", "LRL", "LLL", "LRR", "LLR"] as const;
+const SPELL_CLASSES = [
+    "Mage",
+    "Dark Wizard",
+    "Archer",
+    "Hunter",
+    "Warrior",
+    "Knight",
+    "Assassin",
+    "Ninja",
+    "Shaman",
+    "Skyseer",
+] as const;
+const PROFESSIONS = [
+    "Woodcutting",
+    "Mining",
+    "Fishing",
+    "Farming",
+    "Alchemism",
+    "Armouring",
+    "Cooking",
+    "Jeweling",
+    "Scribing",
+    "Tailoring",
+    "Weaponsmithing",
+    "Woodworking",
+] as const;
+const MOUNT_STATS = [
+    "acceleration",
+    "altitude",
+    "jumpHeight",
+    "energy",
+    "handling",
+    "potential",
+    "boost",
+    "speed",
+    "toughness",
+    "training",
+] as const;
+const CAPPED_MOUNT_STATS = MOUNT_STATS.filter((stat) => stat !== "potential");
+const LOOTRUN_BEACON_COLORS = [
+    "GREEN",
+    "YELLOW",
+    "BLUE",
+    "PURPLE",
+    "GRAY",
+    "ORANGE",
+    "RED",
+    "DARK_GRAY",
+    "WHITE",
+    "AQUA",
+    "PINK",
+    "CRIMSON",
+    "RAINBOW",
+] as const;
+const ACCESSORY_SLOTS = ["Ring_1", "Ring_2", "Bracelet", "Necklace"] as const;
+const DEBUFF_NAMES = [
+    "Bleeding",
+    "Blindness",
+    "Burning",
+    "Confused",
+    "Contaminated",
+    "Crystallized",
+    "Curse",
+    "Discombobulated",
+    "Enkindled",
+    "Freezing",
+    "Marked",
+    "Poison",
+    "Provoked",
+    "Resistance",
+    "Slowness",
+    "Trick",
+    "Twilight",
+    "Weakness",
+    "Whipped",
+    "Wind Prison",
+] as const;
 
-const semanticSpecs = new Map<string, FunctionSemanticSpec>([
+const semanticSpecs = new Map<string, FunctionSemanticSpec>();
+
+function registerAllowedLiterals(functionNames: readonly string[], argumentIndex: number, values: readonly string[]) {
+    for (const functionName of functionNames) {
+        semanticSpecs.set(functionName, { constraints: [allowedLiterals(argumentIndex, values)] });
+    }
+}
+
+registerAllowedLiterals(["accessory_durability", "equipped_accessory_name"], 0, ACCESSORY_SLOTS);
+registerAllowedLiterals(["armor_durability", "equipped_armor_name"], 0, ARMOR_SLOTS);
+registerAllowedLiterals(
     [
-        "accessory_durability",
-        {
-            constraints: [allowedLiterals(0, ACCESSORY_SLOTS)],
-        },
+        "bomb_end_time",
+        "bomb_formatted_string",
+        "bomb_length",
+        "bomb_owner",
+        "bomb_remaining_time",
+        "bomb_start_time",
+        "bomb_type",
+        "bomb_world",
     ],
+    2,
+    BOMB_SORT_ORDERS,
+);
+registerAllowedLiterals(["capped_mount_stat", "mount_stat_max"], 0, CAPPED_MOUNT_STATS);
+registerAllowedLiterals(["debuffs_in_radius_value"], 1, DEBUFF_NAMES);
+registerAllowedLiterals(["targeted_mob_debuff_value"], 3, DEBUFF_NAMES);
+registerAllowedLiterals(
     [
-        "switch_case",
-        {
-            constraints: [
-                variadicPairs({
-                    startIndex: 2,
-                    minimumPairs: 1,
-                    listName: "cases",
-                    keyConstraint: sameTypeAsArgument(0),
-                }),
-            ],
-        },
+        "lootrun_beacon_count",
+        "lootrun_beacon_vibrant",
+        "lootrun_task_location",
+        "lootrun_task_name",
+        "lootrun_task_type",
     ],
-]);
-
-semanticSpecs.set("armor_durability", {
-    constraints: [allowedLiterals(0, ARMOR_SLOTS)],
-});
-
-semanticSpecs.set("bomb_end_time", {
-    constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
-});
-
-semanticSpecs.set("bomb_formatted_string", {
-    constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
-});
-
-semanticSpecs.set("bomb_length", {
-    constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
-});
-
-semanticSpecs.set("bomb_owner", {
-    constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
-});
-
-semanticSpecs.set("bomb_remaining_time", {
-    constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
-});
-
-semanticSpecs.set("bomb_start_time", {
-    constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
-});
-
-semanticSpecs.set("bomb_type", {
-    constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
-});
-
-semanticSpecs.set("bomb_world", {
-    constraints: [allowedLiterals(2, BOMB_SORT_ORDERS)],
-});
-
-semanticSpecs.set("capped_mount_stat", {
-    constraints: [allowedLiterals(0, CAPPED_MOUNT_STATS)],
-});
-
-semanticSpecs.set("debuffs_in_radius_value", {
-    constraints: [allowedLiterals(1, DEBUFF_NAMES)],
-});
-
-semanticSpecs.set("equipped_accessory_name", {
-    constraints: [allowedLiterals(0, ACCESSORY_SLOTS)],
-});
-
-semanticSpecs.set("equipped_armor_name", {
-    constraints: [allowedLiterals(0, ARMOR_SLOTS)],
-});
-
-semanticSpecs.set("lootrun_beacon_count", {
-    constraints: [allowedLiterals(0, LOOTRUN_BEACON_COLORS)],
-});
-
-semanticSpecs.set("lootrun_beacon_vibrant", {
-    constraints: [allowedLiterals(0, LOOTRUN_BEACON_COLORS)],
-});
-
-semanticSpecs.set("lootrun_task_location", {
-    constraints: [allowedLiterals(0, LOOTRUN_BEACON_COLORS)],
-});
-
-semanticSpecs.set("lootrun_task_name", {
-    constraints: [allowedLiterals(0, LOOTRUN_BEACON_COLORS)],
-});
-
-semanticSpecs.set("lootrun_task_type", {
-    constraints: [allowedLiterals(0, LOOTRUN_BEACON_COLORS)],
-});
-
-semanticSpecs.set("mount_stat", {
-    constraints: [allowedLiterals(0, MOUNT_STATS)],
-});
-
-semanticSpecs.set("mount_stat_max", {
-    constraints: [allowedLiterals(0, CAPPED_MOUNT_STATS)],
-});
-
-semanticSpecs.set("profession_level", {
-    constraints: [allowedLiterals(0, PROFESSIONS)],
-});
-
-semanticSpecs.set("profession_percentage", {
-    constraints: [allowedLiterals(0, PROFESSIONS)],
-});
-
-semanticSpecs.set("profession_xp", {
-    constraints: [allowedLiterals(0, PROFESSIONS)],
-});
-
-semanticSpecs.set("profession_xp_per_minute", {
-    constraints: [allowedLiterals(0, PROFESSIONS)],
-});
-
-semanticSpecs.set("profession_xp_per_minute_raw", {
-    constraints: [allowedLiterals(0, PROFESSIONS)],
-});
+    0,
+    LOOTRUN_BEACON_COLORS,
+);
+registerAllowedLiterals(["mount_stat"], 0, MOUNT_STATS);
+registerAllowedLiterals(
+    [
+        "profession_level",
+        "profession_percentage",
+        "profession_xp",
+        "profession_xp_per_minute",
+        "profession_xp_per_minute_raw",
+    ],
+    0,
+    PROFESSIONS,
+);
+registerAllowedLiterals(["spell_name_from_number"], 1, SPELL_CLASSES);
+registerAllowedLiterals(["wynncraft_shader"], 0, WYNNCRAFT_SHADERS);
 
 semanticSpecs.set("spell_name_from_direction", {
     constraints: [allowedLiterals(0, SPELL_DIRECTIONS), allowedLiterals(1, SPELL_CLASSES)],
 });
-
-semanticSpecs.set("spell_name_from_number", {
-    constraints: [allowedLiterals(1, SPELL_CLASSES)],
-});
-
-semanticSpecs.set("targeted_mob_debuff_value", {
-    constraints: [allowedLiterals(3, DEBUFF_NAMES)],
-});
-
 semanticSpecs.set("to_background_text", {
     constraints: [allowedLiterals(3, BACKGROUND_EDGE_STYLES), allowedLiterals(4, BACKGROUND_EDGE_STYLES)],
 });
-
-semanticSpecs.set("wynncraft_shader", {
-    constraints: [allowedLiterals(0, WYNNCRAFT_SHADERS)],
+semanticSpecs.set("switch_case", {
+    constraints: [
+        variadicPairs({
+            startIndex: 2,
+            minimumPairs: 1,
+            listName: "cases",
+            keyConstraint: sameTypeAsArgument(0),
+        }),
+    ],
 });
+
+const semanticValidationDescriptors = Object.freeze(
+    Array.from(semanticSpecs.entries()).flatMap(([functionName, spec]) =>
+        spec.constraints.flatMap((constraint) =>
+            constraint.descriptor ? [{ functionName, ...constraint.descriptor }] : [],
+        ),
+    ),
+);
 
 export function validateFunctionSemantics(
     functionCall: FunctionCall,
     metadata: FunctionMetadata,
     runtime: SemanticValidationRuntime,
 ): SemanticIssue[] {
-    const spec = semanticSpecs.get(normalizeName(metadata.canonicalName));
+    const spec = semanticSpecs.get(normalizeFunctionLookupName(metadata.canonicalName));
 
     if (!spec) {
         return [];
@@ -262,7 +276,7 @@ export function collectSemanticBareLiteralOffsets(
             continue;
         }
 
-        const spec = semanticSpecs.get(normalizeName(metadata.canonicalName));
+        const spec = semanticSpecs.get(normalizeFunctionLookupName(metadata.canonicalName));
 
         if (!spec) {
             continue;
@@ -292,7 +306,7 @@ export function createSemanticCompletionItems(
         return [];
     }
 
-    const spec = semanticSpecs.get(normalizeName(metadata.canonicalName));
+    const spec = semanticSpecs.get(normalizeFunctionLookupName(metadata.canonicalName));
 
     if (!spec) {
         return [];
@@ -305,20 +319,16 @@ export function createSemanticCompletionItems(
 }
 
 export function hasSemanticArgumentValidation(functionName: string, argumentIndex: number) {
-    const spec = semanticSpecs.get(normalizeName(functionName));
+    const spec = semanticSpecs.get(normalizeFunctionLookupName(functionName));
 
     return Boolean(spec?.constraints.some((constraint) => constraint.validatesArgument?.(argumentIndex)));
 }
 
 export function getSemanticValidationDescriptors(): readonly RegisteredSemanticConstraint[] {
-    return Array.from(semanticSpecs.entries()).flatMap(([functionName, spec]) =>
-        spec.constraints.flatMap((constraint) =>
-            constraint.descriptor ? [{ functionName, ...constraint.descriptor }] : [],
-        ),
-    );
+    return semanticValidationDescriptors;
 }
 
-export function allowedLiterals(argumentIndex: number, values: string[]): SemanticConstraint {
+export function allowedLiterals(argumentIndex: number, values: readonly string[]): SemanticConstraint {
     const allowedValues = new Set(values);
     const expectedValues = values.map((value) => `'${value}'`).join(", ");
 
@@ -348,7 +358,12 @@ export function allowedLiterals(argumentIndex: number, values: string[]): Semant
                 return [];
             }
 
-            return [issueForArgument(argument, `'${context.metadata.canonicalName}' argument ${argumentIndex + 1} must be one of ${expectedValues}.`)];
+            return [
+                issueForArgument(
+                    argument,
+                    `'${context.metadata.canonicalName}' argument ${argumentIndex + 1} must be one of ${expectedValues}.`,
+                ),
+            ];
         },
         complete(context) {
             if (context.activeParameter !== argumentIndex) {
@@ -380,7 +395,8 @@ export function variadicPairs(options: VariadicPairOptions): SemanticConstraint 
         validate(context) {
             const listArgument = context.functionCall.arguments[options.startIndex];
             const elements = listArgument
-                ? parseListElements(listArgument, context.sourceText) ?? context.functionCall.arguments.slice(options.startIndex)
+                ? (parseListElements(listArgument, context.sourceText) ??
+                  context.functionCall.arguments.slice(options.startIndex))
                 : [];
             const minimumElements = options.minimumPairs * 2;
             const issues: SemanticIssue[] = [];
@@ -585,8 +601,4 @@ function issueForCall(functionCall: FunctionCall, message: string): SemanticIssu
 
 function formatPairCount(count: number) {
     return count === 1 ? "case/result pair" : "case/result pairs";
-}
-
-function normalizeName(name: string) {
-    return name.trim().toLowerCase();
 }

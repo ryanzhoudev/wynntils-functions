@@ -1,14 +1,11 @@
 import prisma from "@/lib/prisma";
+import { normalizeFunctionAliases } from "@/lib/function-names";
 import { FunctionCatalogResponse } from "@/lib/types";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-function normalizeAliases(aliases: string[]) {
-    return Array.from(new Set(aliases.map((alias) => alias.trim()).filter((alias) => alias.length > 0)));
-}
 
 export async function GET() {
     try {
@@ -31,7 +28,7 @@ export async function GET() {
                 id: fn.id,
                 name: fn.name,
                 description: fn.description,
-                aliases: normalizeAliases(fn.aliases),
+                aliases: normalizeFunctionAliases(fn.aliases, { deduplicate: true }),
                 returnType: fn.returnType,
                 arguments: fn.arguments.map((arg) => ({
                     id: arg.id,

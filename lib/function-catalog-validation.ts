@@ -1,4 +1,5 @@
 import type { FunctionArgument, FunctionCatalogResponse, FunctionEntry } from "@/lib/types";
+import { normalizeFunctionLookupName } from "@/lib/function-names";
 
 function isFunctionArgument(value: unknown): value is FunctionArgument {
     if (typeof value !== "object" || value === null) {
@@ -73,7 +74,7 @@ export function validateFunctionCatalogResponse(value: unknown): string[] {
 
         for (const fn of candidate.functions) {
             for (const lookupName of [fn.name, ...fn.aliases]) {
-                const normalized = lookupName.trim().toLowerCase();
+                const normalized = normalizeFunctionLookupName(lookupName);
                 const owner = owners.get(normalized);
 
                 if (!normalized) {
