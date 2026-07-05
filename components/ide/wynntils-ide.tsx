@@ -504,6 +504,7 @@ export default function WynntilsIde() {
                             isCompiling={isCompiling}
                             showDiagnostics={showDiagnostics}
                             diagnosticCount={diagnosticMarkers.length}
+                            functionCount={lspStatus === "ready" ? (functionCatalog.data?.count ?? 0) : 0}
                             lspStatus={lspStatus}
                             lspError={lspError}
                             onSelectFile={setActiveFileId}

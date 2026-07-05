@@ -24,6 +24,7 @@ export function IdeToolbar({
     isCompiling,
     showDiagnostics,
     diagnosticCount,
+    functionCount,
     lspStatus,
     lspError,
     onSelectFile,
@@ -42,6 +43,7 @@ export function IdeToolbar({
     isCompiling: boolean;
     showDiagnostics: boolean;
     diagnosticCount: number;
+    functionCount: number;
     lspStatus: LspStatus;
     lspError: string | null;
     onSelectFile(id: string): void;
@@ -106,7 +108,9 @@ export function IdeToolbar({
                 onChange={(event) => void onImport(event)}
             />
             <div className="ml-auto flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <Badge variant="secondary">{workspace.files.length} files</Badge>
+                <Badge variant="secondary" title="Functions loaded into the browser LSP">
+                    {functionCount} functions
+                </Badge>
                 <Button
                     variant={showDiagnostics ? "secondary" : "outline"}
                     size="sm"

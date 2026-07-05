@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openIde, replaceEditorText } from "./fixtures";
+import { openIde, readCatalogArtifact, replaceEditorText } from "./fixtures";
 import { IDE_STORAGE_KEY } from "@/lib/ide/storage";
 
 test("real worker publishes exact semantic diagnostics and marker locations", async ({ page }) => {
@@ -35,8 +35,10 @@ test("semantic completions are triggered and ordered before functions", async ({
 });
 
 test("context, compile output, files, and persistence work end to end", async ({ page }) => {
+    const catalog = await readCatalogArtifact();
     const source = 'let color = from_hex("#ffffff");\n\n{accessory_durability("Ring_1")}';
     await openIde(page, "");
+    await expect(page.getByText(`${catalog.count} functions`, { exact: true })).toBeVisible();
     await replaceEditorText(page, source);
     await page.keyboard.press("ArrowLeft");
     await page.keyboard.press("ArrowLeft");
@@ -52,7 +54,6 @@ test("context, compile output, files, and persistence work end to end", async ({
     await page.getByRole("button", { name: "New", exact: true }).click();
     await expect(page.locator("select")).toHaveValue(/.+/);
     await expect(page.locator("select option:checked")).toHaveText("second.wynntils");
-    await expect(page.getByText("2 files")).toBeVisible();
     await page.waitForFunction((storageKey) => {
         const raw = window.localStorage.getItem(storageKey);
         if (!raw) return false;
@@ -62,5 +63,5 @@ test("context, compile output, files, and persistence work end to end", async ({
 
     await page.reload();
     await expect(page.locator("select option:checked")).toHaveText("second.wynntils");
-    await expect(page.getByText("2 files")).toBeVisible();
+    await expect(page.getByText(`${catalog.count} functions`, { exact: true })).toBeVisible();
 });
