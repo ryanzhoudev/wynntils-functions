@@ -35,10 +35,9 @@ test("semantic completions are triggered and ordered before functions", async ({
 });
 
 test("context, compile output, files, and persistence work end to end", async ({ page }) => {
-    await openIde(page, 'let color = from_hex("#ffffff");\n\n{accessory_durability("Ring_1")}');
-    const editor = page.getByRole("textbox", { name: "Editor content" });
-    await editor.focus();
-    await page.keyboard.press("Control+End");
+    const source = 'let color = from_hex("#ffffff");\n\n{accessory_durability("Ring_1")}';
+    await openIde(page, "");
+    await replaceEditorText(page, source);
     await page.keyboard.press("ArrowLeft");
     await page.keyboard.press("ArrowLeft");
     await expect(page.getByText(/^accessory_durability\(/)).toBeVisible();
