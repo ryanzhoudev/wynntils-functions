@@ -16,27 +16,31 @@ function normalizeConnectionString(connectionString: string) {
     }
 }
 
-const connectionString = process.env.DATABASE_URL ?? process.env.DIRECT_URL;
-
-if (!connectionString) {
-    throw new Error("Missing DATABASE_URL or DIRECT_URL for Prisma connection.");
-}
-
 declare global {
     var prisma: PrismaClient | undefined;
 }
 
-const prisma =
-    global.prisma ??
-    new PrismaClient({
+export function getPrismaClient() {
+    if (global.prisma) {
+        return global.prisma;
+    }
+
+    const connectionString = process.env.DATABASE_URL ?? process.env.DIRECT_URL;
+
+    if (!connectionString) {
+        throw new Error("Missing DATABASE_URL or DIRECT_URL for Prisma connection.");
+    }
+
+    const prisma = new PrismaClient({
         adapter: new PrismaPg({
             connectionString: normalizeConnectionString(connectionString),
         }),
         log: process.env.NODE_ENV === "development" ? ["query", "warn", "error"] : ["error"],
     });
 
-if (process.env.NODE_ENV !== "production") {
-    global.prisma = prisma;
-}
+    if (process.env.NODE_ENV !== "production") {
+        global.prisma = prisma;
+    }
 
-export default prisma;
+    return prisma;
+}

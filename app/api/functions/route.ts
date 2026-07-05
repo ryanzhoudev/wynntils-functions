@@ -1,4 +1,4 @@
-import prisma from "@/lib/prisma";
+import { getPrismaClient } from "@/lib/prisma";
 import { normalizeFunctionAliases } from "@/lib/function-names";
 import { FunctionCatalogResponse } from "@/lib/types";
 import { NextResponse } from "next/server";
@@ -9,6 +9,7 @@ export const revalidate = 0;
 
 export async function GET() {
     try {
+        const prisma = getPrismaClient();
         const [functions, dataVersion] = await Promise.all([
             prisma.wynntilsFunction.findMany({
                 include: {
