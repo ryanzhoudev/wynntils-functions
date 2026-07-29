@@ -50,6 +50,7 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
 
 test("supports color query and direct hash preload formats", async ({ page }) => {
     await page.goto("/guild-color");
+    await expect(page.getByRole("heading", { name: "Guild Color Picker" })).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Guild color", exact: true })).toHaveValue("#FFFFFF");
     await expect(
         page.getByText("Bot-compatible checks, territory previews, and nearby color comparisons."),
@@ -87,4 +88,12 @@ test("links to the guild color tool immediately before the classic UI", async ({
     const navigationLinks = page.locator("header a");
     await expect(navigationLinks.nth(0)).toHaveAttribute("href", "/guild-color");
     await expect(navigationLinks.nth(1)).toHaveAttribute("href", "/old");
+
+    const guildColorButtonHeight = await page
+        .getByRole("link", { name: "Guild color", exact: true })
+        .evaluate((element) => element.getBoundingClientRect().height);
+    const classicButtonHeight = await page
+        .getByRole("link", { name: "Open classic UI", exact: true })
+        .evaluate((element) => element.getBoundingClientRect().height);
+    expect(guildColorButtonHeight).toBe(classicButtonHeight);
 });

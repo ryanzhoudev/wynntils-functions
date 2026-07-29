@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -186,18 +186,18 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
         return [...conflicts, ...closestAllowed];
     }, [analysis]);
     const isAnalyzing = normalizedColor !== deferredNormalizedColor;
-    const activeSelection =
-        selection && selection.forColor === deferredNormalizedColor
-            ? selection
-            : analysis?.groups[0]
-              ? {
-                    forColor: deferredNormalizedColor ?? "",
-                    kind: "guild" as const,
-                    color: analysis.groups[0].color,
-                    prefix: guildGroupPrefix(analysis.groups[0]),
-                    label: guildGroupLabel(analysis.groups[0]),
-                }
-              : null;
+    const hasSelectionForCurrentColor = selection?.forColor === deferredNormalizedColor;
+    const activeSelection = hasSelectionForCurrentColor
+        ? selection
+        : analysis?.groups[0]
+          ? {
+                forColor: deferredNormalizedColor ?? "",
+                kind: "guild" as const,
+                color: analysis.groups[0].color,
+                prefix: guildGroupPrefix(analysis.groups[0]),
+                label: guildGroupLabel(analysis.groups[0]),
+            }
+          : null;
 
     useEffect(() => {
         const controller = new AbortController();
@@ -271,7 +271,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
             <header className="mx-auto flex w-full max-w-[100rem] flex-col gap-4 px-4 py-6 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3">
                     <Palette className="size-7 text-primary" aria-hidden="true" />
-                    <h1 className="text-3xl font-bold tracking-tight">Guild Color Lab</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">Guild Color Picker</h1>
                 </div>
                 <Button variant="outline" asChild>
                     <Link href="/">
@@ -425,16 +425,10 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
 
                 <div className="space-y-6">
                     <section aria-labelledby="preview-heading">
-                        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+                        <div className="mb-3">
                             <h2 id="preview-heading" className="text-xl font-semibold">
                                 Territory previews
                             </h2>
-                            {selection && selection.forColor === deferredNormalizedColor ? (
-                                <Button type="button" size="sm" variant="ghost" onClick={() => setSelection(null)}>
-                                    <RotateCcw className="size-4" aria-hidden="true" />
-                                    Return to closest
-                                </Button>
-                            ) : null}
                         </div>
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_17rem]">
                             <Card>
@@ -475,11 +469,11 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                     )}
                                 </CardContent>
                             </Card>
-                            <Card className="md:col-span-2 xl:col-span-1">
+                            <Card className="flex flex-col md:col-span-2 xl:col-span-1">
                                 <CardHeader>
                                     <CardTitle>Closest allowed</CardTitle>
                                 </CardHeader>
-                                <CardContent>
+                                <CardContent className="flex-1">
                                     {analysis ? (
                                         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                                             {GUILD_COLOR_DIRECTIONS.map((direction) => {
@@ -545,6 +539,21 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                         <p className="text-sm text-muted-foreground">Waiting for guild data…</p>
                                     )}
                                 </CardContent>
+                                <CardFooter className="mt-auto">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        className={cn("w-full", !hasSelectionForCurrentColor && "invisible")}
+                                        disabled={!hasSelectionForCurrentColor}
+                                        aria-hidden={!hasSelectionForCurrentColor}
+                                        tabIndex={hasSelectionForCurrentColor ? 0 : -1}
+                                        onClick={() => setSelection(null)}
+                                    >
+                                        <RotateCcw className="size-4" aria-hidden="true" />
+                                        Return to closest
+                                    </Button>
+                                </CardFooter>
                             </Card>
                         </div>
                     </section>

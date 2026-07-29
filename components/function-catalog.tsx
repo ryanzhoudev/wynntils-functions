@@ -317,7 +317,7 @@ export default function FunctionCatalog() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" asChild>
+                    <Button variant="outline" asChild>
                         <Link href="/guild-color">
                             <Palette className="size-4" aria-hidden="true" />
                             Guild color

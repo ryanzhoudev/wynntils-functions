@@ -2,7 +2,7 @@ import GuildColorTool from "@/components/guild-color-tool";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Guild Color Lab | Wynntils Functions",
+    title: "Guild Color Picker | Wynntils Functions",
     description:
         "Preview a Wynncraft guild color and compare it with existing guild colors using the Wynntils Bot checks.",
 };
