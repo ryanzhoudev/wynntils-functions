@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,10 +19,11 @@ import {
 } from "@/lib/guild-colors";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, ArrowLeft, CheckCircle2, Database, Palette, RotateCcw } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
-const DEFAULT_COLOR = "#4CC9F0";
+const DEFAULT_COLOR = "#FFFFFF";
 const DEFAULT_PREFIX = "TAG";
 const NEARBY_ALLOWED_COUNT = 3;
 
@@ -55,63 +56,47 @@ function TerritoryPreview({
         <div
             role="img"
             aria-label={`${label}: territory bordered in ${color} with the tag ${tag}`}
-            className={cn(
-                "relative isolate overflow-hidden rounded-lg border border-white/10 bg-[#101820]",
-                compact ? "aspect-[16/10]" : "aspect-video",
-            )}
+            className="border-solid"
+            style={{
+                borderWidth: compact ? 10 : 18,
+                borderImageSource: "url('/guild-color/border-paper.png')",
+                borderImageSlice: 32,
+                borderImageWidth: compact ? 14 : 24,
+                borderImageRepeat: "repeat",
+            }}
         >
-            <div
-                aria-hidden="true"
-                className="absolute inset-0 opacity-70"
-                style={{
-                    backgroundImage:
-                        "radial-gradient(circle at 28% 30%, #3d5147 0 8%, transparent 9%), radial-gradient(circle at 72% 68%, #324b54 0 11%, transparent 12%), linear-gradient(145deg, #172b27, #17202d 58%, #251f31)",
-                }}
-            />
-            <svg
-                aria-hidden="true"
-                className="absolute inset-0 size-full opacity-50"
-                viewBox="0 0 600 340"
-                preserveAspectRatio="none"
-            >
-                <path d="M-20 85 C90 25 150 155 255 92 S430 25 620 98" fill="none" stroke="#80948c" strokeWidth="3" />
-                <path
-                    d="M-30 255 C95 190 185 300 292 230 S470 160 630 250"
-                    fill="none"
-                    stroke="#71828d"
-                    strokeWidth="4"
+            <div className="relative isolate aspect-[305/299] overflow-hidden bg-black">
+                <Image
+                    src="/guild-color/detlas.png"
+                    alt=""
+                    fill
+                    sizes={compact ? "(max-width: 768px) 45vw, 20vw" : "(max-width: 1280px) 80vw, 24vw"}
+                    className="object-cover"
                 />
-                <path d="M165 -20 C105 95 205 165 150 360" fill="none" stroke="#4c6772" strokeWidth="5" />
-                <path d="M455 -20 C510 80 410 180 482 360" fill="none" stroke="#4e625a" strokeWidth="4" />
-                <path d="M0 170 H600 M300 0 V340" stroke="#c5d0cb" strokeDasharray="5 13" strokeWidth="1" />
-            </svg>
-            <div
-                aria-hidden="true"
-                className={cn(
-                    "absolute left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 place-items-center border-solid shadow-2xl",
-                    compact ? "size-[58%] border-2" : "size-[62%] border-4",
-                )}
-                style={{
-                    borderColor: color,
-                    backgroundColor: `${color}59`,
-                    boxShadow: `0 0 28px ${color}40`,
-                }}
-            >
-                <span
-                    className={cn("font-black tracking-wider", compact ? "text-sm" : "text-2xl sm:text-3xl")}
+                <div
+                    aria-hidden="true"
+                    className={cn(
+                        "absolute left-1/2 top-1/2 grid size-[82%] -translate-x-1/2 -translate-y-1/2 place-items-center border-solid",
+                        compact ? "border-2" : "border-[3px]",
+                    )}
                     style={{
-                        color,
-                        textShadow: "0 2px 2px #000, 1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000",
+                        borderColor: color,
+                        backgroundColor: `${color}66`,
                     }}
                 >
-                    {tag}
-                </span>
+                    <span
+                        className={cn("font-black", compact ? "text-sm" : "text-2xl sm:text-3xl")}
+                        style={{
+                            color,
+                            fontFamily: "WynnColorSavior, sans-serif",
+                            textShadow:
+                                "2px 2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, -2px -2px 0 #000, 2px 0 0 #000, 0 2px 0 #000, -2px 0 0 #000, 0 -2px 0 #000",
+                        }}
+                    >
+                        {tag}
+                    </span>
+                </div>
             </div>
-            {!compact ? (
-                <span className="absolute bottom-2 left-2 rounded bg-black/65 px-2 py-1 text-xs text-white/80">
-                    {label}
-                </span>
-            ) : null}
         </div>
     );
 }
@@ -283,15 +268,10 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <header className="mx-auto flex w-full max-w-[86rem] flex-col gap-4 px-4 py-6 md:flex-row md:items-center md:justify-between">
-                <div className="space-y-1">
-                    <div className="flex items-center gap-3">
-                        <Palette className="size-7 text-primary" aria-hidden="true" />
-                        <h1 className="text-3xl font-bold tracking-tight">Guild Color Lab</h1>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                        Bot-compatible checks, territory previews, and nearby color comparisons.
-                    </p>
+            <header className="mx-auto flex w-full max-w-[100rem] flex-col gap-4 px-4 py-6 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-3">
+                    <Palette className="size-7 text-primary" aria-hidden="true" />
+                    <h1 className="text-3xl font-bold tracking-tight">Guild Color Lab</h1>
                 </div>
                 <Button variant="outline" asChild>
                     <Link href="/">
@@ -301,14 +281,11 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                 </Button>
             </header>
 
-            <main className="mx-auto grid w-full max-w-[86rem] gap-6 px-4 pb-12 xl:grid-cols-[22rem_minmax(0,1fr)]">
+            <main className="mx-auto grid w-full max-w-[100rem] gap-6 px-4 pb-12 xl:grid-cols-[20rem_minmax(0,1fr)]">
                 <div className="space-y-6 xl:sticky xl:top-4 xl:self-start">
                     <Card>
                         <CardHeader>
                             <CardTitle>Choose a color</CardTitle>
-                            <CardDescription>
-                                Paste a hex value or use the picker. Three-digit hex is supported.
-                            </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-5">
                             <div className="space-y-2">
@@ -449,14 +426,9 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                 <div className="space-y-6">
                     <section aria-labelledby="preview-heading">
                         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-                            <div>
-                                <h2 id="preview-heading" className="text-xl font-semibold">
-                                    Territory previews
-                                </h2>
-                                <p className="text-sm text-muted-foreground">
-                                    The chosen color stays fixed on the left while comparisons change on the right.
-                                </p>
-                            </div>
+                            <h2 id="preview-heading" className="text-xl font-semibold">
+                                Territory previews
+                            </h2>
                             {selection && selection.forColor === deferredNormalizedColor ? (
                                 <Button type="button" size="sm" variant="ghost" onClick={() => setSelection(null)}>
                                     <RotateCcw className="size-4" aria-hidden="true" />
@@ -464,11 +436,13 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                 </Button>
                             ) : null}
                         </div>
-                        <div className="grid gap-4 lg:grid-cols-2">
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_17rem]">
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Chosen territory</CardTitle>
-                                    <CardDescription>{normalizedColor ?? "Invalid color"}</CardDescription>
+                                    <code className="text-sm text-muted-foreground">
+                                        {normalizedColor ?? "Invalid color"}
+                                    </code>
                                 </CardHeader>
                                 <CardContent>
                                     <TerritoryPreview
@@ -481,11 +455,11 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Comparison preview</CardTitle>
-                                    <CardDescription>
+                                    <p className="text-sm text-muted-foreground">
                                         {activeSelection
                                             ? `${activeSelection.label} · ${activeSelection.color}`
                                             : "Waiting for guild color data"}
-                                    </CardDescription>
+                                    </p>
                                 </CardHeader>
                                 <CardContent>
                                     {activeSelection ? (
@@ -495,9 +469,80 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                             label={activeSelection.label}
                                         />
                                     ) : (
-                                        <div className="grid aspect-video place-items-center rounded-lg border border-dashed border-border bg-muted/30 text-sm text-muted-foreground">
+                                        <div className="grid aspect-square place-items-center rounded-lg border border-dashed border-border bg-muted/30 text-sm text-muted-foreground">
                                             No comparison available
                                         </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                            <Card className="md:col-span-2 xl:col-span-1">
+                                <CardHeader>
+                                    <CardTitle>Closest allowed</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {analysis ? (
+                                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                                            {GUILD_COLOR_DIRECTIONS.map((direction) => {
+                                                const suggestion = suggestionsByDirection.get(
+                                                    `${direction.channel}:${direction.direction}`,
+                                                );
+                                                const isSelected =
+                                                    suggestion &&
+                                                    activeSelection?.kind === "suggestion" &&
+                                                    activeSelection.color === suggestion.color &&
+                                                    activeSelection.label.startsWith(suggestion.label);
+
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        key={`${direction.channel}-${direction.direction}`}
+                                                        onClick={() => suggestion && selectSuggestion(suggestion)}
+                                                        disabled={!suggestion}
+                                                        aria-pressed={isSelected}
+                                                        className={cn(
+                                                            "flex items-center gap-2 rounded-lg border bg-background p-2 text-left transition hover:border-primary/70 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-background",
+                                                            isSelected && "border-primary ring-1 ring-primary/40",
+                                                        )}
+                                                    >
+                                                        <span
+                                                            aria-hidden="true"
+                                                            className={cn(
+                                                                "size-9 shrink-0 rounded-md border border-white/20 shadow-inner",
+                                                                !suggestion && "bg-muted",
+                                                            )}
+                                                            style={
+                                                                suggestion
+                                                                    ? { backgroundColor: suggestion.color }
+                                                                    : undefined
+                                                            }
+                                                        />
+                                                        <span className="min-w-0">
+                                                            <span className="flex items-center gap-2">
+                                                                <Badge>{direction.label}</Badge>
+                                                                {suggestion ? (
+                                                                    <code className="truncate text-xs">
+                                                                        {suggestion.color}
+                                                                    </code>
+                                                                ) : (
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        Unavailable
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                            {suggestion ? (
+                                                                <span className="mt-1 block text-xs text-muted-foreground">
+                                                                    {suggestion.steps} step
+                                                                    {suggestion.steps === 1 ? "" : "s"} · ΔE{" "}
+                                                                    {formatDistance(suggestion.closestDistance)}
+                                                                </span>
+                                                            ) : null}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">Waiting for guild data…</p>
                                     )}
                                 </CardContent>
                             </Card>
@@ -507,13 +552,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                     <Card>
                         <CardHeader>
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="space-y-1.5">
-                                    <CardTitle>Closest guild colors</CardTitle>
-                                    <CardDescription>
-                                        Every color below ΔE {MIN_GUILD_COLOR_DELTA_E} is shown, followed by the nearest{" "}
-                                        {NEARBY_ALLOWED_COUNT} non-conflicting guild colors.
-                                    </CardDescription>
-                                </div>
+                                <CardTitle>Closest guild colors</CardTitle>
                                 {analysis ? (
                                     <Badge
                                         variant="outline"
@@ -582,84 +621,6 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                             ) : (
                                 <p className="text-sm text-muted-foreground">
                                     {loadError ? "Guild comparisons are unavailable." : "Loading closest guild colors…"}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Closest allowed directional colors</CardTitle>
-                            <CardDescription>
-                                R−, R+, G−, G+, B−, and B+ each vary one channel while holding the other two fixed.
-                                Selecting one changes only the comparison preview, never your entered color.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {analysis ? (
-                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                    {GUILD_COLOR_DIRECTIONS.map((direction) => {
-                                        const suggestion = suggestionsByDirection.get(
-                                            `${direction.channel}:${direction.direction}`,
-                                        );
-                                        const isSelected =
-                                            suggestion &&
-                                            activeSelection?.kind === "suggestion" &&
-                                            activeSelection.color === suggestion.color &&
-                                            activeSelection.label.startsWith(suggestion.label);
-
-                                        return (
-                                            <button
-                                                type="button"
-                                                key={`${direction.channel}-${direction.direction}`}
-                                                onClick={() => suggestion && selectSuggestion(suggestion)}
-                                                disabled={!suggestion}
-                                                aria-pressed={isSelected}
-                                                className={cn(
-                                                    "flex items-center gap-3 rounded-lg border bg-background p-3 text-left transition hover:border-primary/70 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-background",
-                                                    isSelected && "border-primary ring-1 ring-primary/40",
-                                                )}
-                                            >
-                                                <span
-                                                    aria-hidden="true"
-                                                    className={cn(
-                                                        "size-11 shrink-0 rounded-md border border-white/20 shadow-inner",
-                                                        !suggestion && "bg-muted",
-                                                    )}
-                                                    style={
-                                                        suggestion ? { backgroundColor: suggestion.color } : undefined
-                                                    }
-                                                />
-                                                <span className="min-w-0">
-                                                    <span className="flex items-center gap-2">
-                                                        <Badge>{direction.label}</Badge>
-                                                        {suggestion ? (
-                                                            <code className="truncate text-sm">{suggestion.color}</code>
-                                                        ) : (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                Unavailable
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                    {suggestion ? (
-                                                        <span className="mt-1 block text-xs text-muted-foreground">
-                                                            {suggestion.steps} channel step
-                                                            {suggestion.steps === 1 ? "" : "s"} · ΔE{" "}
-                                                            {formatDistance(suggestion.closestDistance)}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="mt-1 block text-xs text-muted-foreground">
-                                                            No axis-only allowed color
-                                                        </span>
-                                                    )}
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">
-                                    Suggestions appear after the guild data and a valid color are available.
                                 </p>
                             )}
                         </CardContent>

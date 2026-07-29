@@ -49,6 +49,16 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
 });
 
 test("supports color query and direct hash preload formats", async ({ page }) => {
+    await page.goto("/guild-color");
+    await expect(page.getByRole("textbox", { name: "Guild color", exact: true })).toHaveValue("#FFFFFF");
+    await expect(
+        page.getByText("Bot-compatible checks, territory previews, and nearby color comparisons."),
+    ).toHaveCount(0);
+    await expect(page.getByText("Paste a hex value or use the picker. Three-digit hex is supported.")).toHaveCount(0);
+    await expect(
+        page.getByText("The chosen color stays fixed on the left while comparisons change on the right."),
+    ).toHaveCount(0);
+
     await page.goto("/guild-color?color=00FF00");
     await expect(page.getByRole("textbox", { name: "Guild color", exact: true })).toHaveValue("#00FF00");
 
