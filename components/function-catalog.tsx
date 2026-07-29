@@ -15,7 +15,7 @@ import { hasSemanticArgumentValidation } from "@/lib/ide/browser-lsp/semantic-va
 import { FunctionArgument, FunctionEntry } from "@/lib/types";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, CheckCircle2, ListRestart, RefreshCw, Search, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ListRestart, Palette, RefreshCw, Search, X } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
@@ -317,6 +317,12 @@ export default function FunctionCatalog() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/guild-color">
+                            <Palette className="size-4" aria-hidden="true" />
+                            Guild color
+                        </Link>
+                    </Button>
                     <Button variant="outline" asChild>
                         <Link href="/old">Open classic UI</Link>
                     </Button>
