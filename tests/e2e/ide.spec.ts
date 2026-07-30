@@ -27,6 +27,7 @@ test("switch bracket pairs and the multiline regression corpus are valid", async
 test("semantic completions are triggered and ordered before functions", async ({ page }) => {
     await openIde(page, "{}");
     await replaceEditorText(page, "{accessory_durability(");
+    await page.keyboard.press("Control+Space");
 
     const widget = page.locator(".suggest-widget");
     await expect(widget).toBeVisible();
@@ -39,7 +40,7 @@ test("context, compile output, files, and persistence work end to end", async ({
     const source = 'let color = from_hex("#ffffff");\n\n{accessory_durability("Ring_1")}';
     await openIde(page, "");
     await expect(page.getByText(`${catalog.count} functions`, { exact: true })).toBeVisible();
-    await replaceEditorText(page, source);
+    await replaceEditorText(page, source, { verifyExact: true });
     await page.keyboard.press("ArrowLeft");
     await page.keyboard.press("ArrowLeft");
     await expect(page.getByText(/^accessory_durability\(/)).toBeVisible();
