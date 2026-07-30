@@ -36,7 +36,6 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
     await expect(page.getByText("Allowed? 🟥 No")).toBeVisible();
     await expect(page.getByText("2 guilds use this color").first()).toBeVisible();
     await expect(page.getByText("85 placeholder entries", { exact: false })).toBeVisible();
-    await expect(page.getByText("Red One [R1], Red Two [R2]", { exact: true })).toHaveClass(/text-sm/);
 
     await expect(page.getByText("R−", { exact: true })).toHaveClass(/bg-rose-500\/20/);
     await expect(page.getByText("G−", { exact: true })).toHaveClass(/bg-emerald-500\/20/);
@@ -46,6 +45,16 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
         .getByRole("img", { name: /Entered color .* territory bordered/ })
         .evaluate((element) => getComputedStyle(element).borderImageSource);
     expect(chosenPreviewBorder).toContain("/guild-color/border-frame.png");
+
+    const chosenPreviewTagSize = await page
+        .getByRole("img", { name: /Entered color .* territory bordered/ })
+        .locator("span")
+        .evaluate((element) => getComputedStyle(element).fontSize);
+    const closestPreviewTagSize = await page
+        .getByRole("button", { name: /2 guilds use this color: territory bordered/ })
+        .locator('[role="img"] span')
+        .evaluate((element) => getComputedStyle(element).fontSize);
+    expect(closestPreviewTagSize).toBe(chosenPreviewTagSize);
 
     const redMinusSuggestion = page.getByRole("button", { name: /R−/ });
     await expect(redMinusSuggestion).toBeVisible();

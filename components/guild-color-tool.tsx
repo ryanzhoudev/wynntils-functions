@@ -90,7 +90,7 @@ function TerritoryPreview({
                     }}
                 >
                     <span
-                        className={cn("font-black", compact ? "text-sm" : "text-2xl sm:text-3xl")}
+                        className="text-2xl font-black sm:text-3xl"
                         style={{
                             color,
                             fontFamily: "WynnColorSavior, sans-serif",
@@ -408,11 +408,6 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                         Athena response timestamp: {new Date(guildData.fetchedAt).toLocaleString()}.
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        Rechecked every {guildData.cacheSeconds / 60} minutes. This is when Athena
-                                        generated the response, not when a guild color last changed; Athena refreshes
-                                        colors approximately every hour.
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
                                         Excluded {guildData.excludedPlaceholderCount} placeholder entries using #C05F5F.
                                     </p>
                                 </>
@@ -620,7 +615,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                                 </div>
                                                 <p className="mt-2 text-sm font-medium">{guildGroupLabel(group)}</p>
                                                 {group.guilds.length > 1 ? (
-                                                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                                                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                                                         {group.guilds
                                                             .map(
                                                                 (guild) =>
