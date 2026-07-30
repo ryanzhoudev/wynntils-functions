@@ -26,6 +26,11 @@ import { useDeferredValue, useEffect, useMemo, useState, useSyncExternalStore } 
 const DEFAULT_COLOR = "#FFFFFF";
 const DEFAULT_PREFIX = "TAG";
 const NEARBY_ALLOWED_COUNT = 3;
+const DIRECTION_BADGE_STYLES: Record<DirectionalColorSuggestion["channel"], string> = {
+    r: "border-rose-400/35 bg-rose-500/20 text-rose-200",
+    g: "border-emerald-400/35 bg-emerald-500/20 text-emerald-200",
+    b: "border-sky-400/35 bg-sky-500/20 text-sky-200",
+};
 
 interface GuildColorToolProps {
     initialColor: string | null;
@@ -58,11 +63,11 @@ function TerritoryPreview({
             aria-label={`${label}: territory bordered in ${color} with the tag ${tag}`}
             className="border-solid"
             style={{
-                borderWidth: compact ? 10 : 18,
-                borderImageSource: "url('/guild-color/border-paper.png')",
-                borderImageSlice: 32,
-                borderImageWidth: compact ? 14 : 24,
-                borderImageRepeat: "repeat",
+                borderWidth: compact ? 10 : 16,
+                borderImageSource: "url('/guild-color/border-frame.png')",
+                borderImageSlice: 16,
+                borderImageWidth: compact ? 10 : 16,
+                borderImageRepeat: "stretch",
             }}
         >
             <div className="relative isolate aspect-[305/299] overflow-hidden bg-black">
@@ -506,7 +511,14 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                                         />
                                                         <span className="min-w-0">
                                                             <span className="flex items-center gap-2">
-                                                                <Badge>{direction.label}</Badge>
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={
+                                                                        DIRECTION_BADGE_STYLES[direction.channel]
+                                                                    }
+                                                                >
+                                                                    {direction.label}
+                                                                </Badge>
                                                                 {suggestion ? (
                                                                     <code className="truncate text-xs">
                                                                         {suggestion.color}
