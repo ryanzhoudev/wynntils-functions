@@ -63,6 +63,11 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
     await expect(input).toHaveValue("#FF0000");
     await expect(page.getByText("R− allowed suggestion · #CA0000", { exact: true })).toBeVisible();
 
+    await page.getByRole("textbox", { name: "Preview tag" }).fill("NEW");
+    await expect(
+        page.getByRole("img", { name: /allowed suggestion: territory bordered.*with the tag NEW/i }),
+    ).toBeVisible();
+
     await page.getByRole("button", { name: "Return to closest" }).click();
     await expect(page.getByText("2 guilds use this color · #FF0000")).toBeVisible();
 });
@@ -70,6 +75,7 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
 test("supports color query and direct hash preload formats", async ({ page }) => {
     await page.goto("/guild-color");
     await expect(page.getByRole("heading", { name: "Guild Color Picker" })).toBeVisible();
+    await expect(page.locator("#preview-heading")).toHaveText("Territory previews");
     await expect(page.getByRole("textbox", { name: "Guild color", exact: true })).toHaveValue("#FFFFFF");
     await expect(
         page.getByText("Bot-compatible checks, territory previews, and nearby color comparisons."),

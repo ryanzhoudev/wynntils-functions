@@ -36,13 +36,22 @@ interface GuildColorToolProps {
     initialColor: string | null;
 }
 
-interface PreviewSelection {
+interface GuildPreviewSelection {
     forColor: string;
-    kind: "guild" | "suggestion";
+    kind: "guild";
     color: string;
     prefix: string;
     label: string;
 }
+
+interface SuggestionPreviewSelection {
+    forColor: string;
+    kind: "suggestion";
+    color: string;
+    label: string;
+}
+
+type PreviewSelection = GuildPreviewSelection | SuggestionPreviewSelection;
 
 function TerritoryPreview({
     color,
@@ -264,7 +273,6 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
             forColor: deferredNormalizedColor,
             kind: "suggestion",
             color: suggestion.color,
-            prefix,
             label: `${suggestion.label} allowed suggestion`,
         });
     }
@@ -424,6 +432,9 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
 
                 <div className="space-y-6">
                     <section aria-labelledby="preview-heading">
+                        <h2 id="preview-heading" className="sr-only">
+                            Territory previews
+                        </h2>
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_17rem]">
                             <Card>
                                 <CardHeader>
@@ -453,7 +464,9 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                     {activeSelection ? (
                                         <TerritoryPreview
                                             color={activeSelection.color}
-                                            prefix={activeSelection.prefix}
+                                            prefix={
+                                                activeSelection.kind === "suggestion" ? prefix : activeSelection.prefix
+                                            }
                                             label={activeSelection.label}
                                         />
                                     ) : (
