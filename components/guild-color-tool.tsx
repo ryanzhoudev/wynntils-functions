@@ -18,7 +18,7 @@ import {
     normalizeGuildColorHex,
 } from "@/lib/guild-colors";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Database, Palette, RotateCcw } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, CheckCircle2, Copy, Database, Palette, RotateCcw } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -167,6 +167,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
     const [loadError, setLoadError] = useState<string | null>(null);
     const [loadAttempt, setLoadAttempt] = useState(0);
     const [selection, setSelection] = useState<PreviewSelection | null>(null);
+    const [shareStatus, setShareStatus] = useState<"idle" | "copied" | "error">("idle");
     const deferredInputColor = useDeferredValue(inputColor);
     const normalizedColor = normalizeGuildColorHex(inputColor);
     const deferredNormalizedColor = normalizeGuildColorHex(deferredInputColor);
@@ -277,6 +278,26 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
         });
     }
 
+    async function copyShareUrl() {
+        if (!normalizedColor) {
+            return;
+        }
+
+        const shareUrl = new URL(window.location.href);
+        shareUrl.search = "";
+        shareUrl.hash = "";
+        shareUrl.searchParams.set("hex", normalizedColor.slice(1));
+
+        try {
+            await navigator.clipboard.writeText(shareUrl.toString());
+            setShareStatus("copied");
+        } catch {
+            setShareStatus("error");
+        }
+
+        window.setTimeout(() => setShareStatus("idle"), 1200);
+    }
+
     const chosenPreviewColor = normalizedColor ?? "#000000";
 
     return (
@@ -297,8 +318,26 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
             <main className="mx-auto grid w-full max-w-[100rem] gap-6 px-4 pb-12 xl:grid-cols-[20rem_minmax(0,1fr)]">
                 <div className="space-y-6 xl:sticky xl:top-4 xl:self-start">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex-row items-center justify-between space-y-0">
                             <CardTitle>Choose a color</CardTitle>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={!normalizedColor}
+                                onClick={copyShareUrl}
+                            >
+                                {shareStatus === "copied" ? (
+                                    <Check className="size-4 text-emerald-300" aria-hidden="true" />
+                                ) : (
+                                    <Copy className="size-4" aria-hidden="true" />
+                                )}
+                                {shareStatus === "copied"
+                                    ? "Copied"
+                                    : shareStatus === "error"
+                                      ? "Copy failed"
+                                      : "Copy link"}
+                            </Button>
                         </CardHeader>
                         <CardContent className="space-y-5">
                             <div className="space-y-2">

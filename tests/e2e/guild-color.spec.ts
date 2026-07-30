@@ -37,6 +37,22 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
     await expect(page.getByText("2 guilds use this color").first()).toBeVisible();
     await expect(page.getByText("85 placeholder entries", { exact: false })).toBeVisible();
 
+    await page.evaluate(() => {
+        Object.defineProperty(navigator, "clipboard", {
+            configurable: true,
+            value: {
+                writeText: async (value: string) => {
+                    window.localStorage.setItem("guild-color-share-url", value);
+                },
+            },
+        });
+    });
+    await page.getByRole("button", { name: "Copy link" }).click();
+    await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
+    expect(await page.evaluate(() => window.localStorage.getItem("guild-color-share-url"))).toBe(
+        new URL("/guild-color?hex=FF0000", page.url()).toString(),
+    );
+
     await expect(page.getByText("R−", { exact: true })).toHaveClass(/bg-rose-500\/20/);
     await expect(page.getByText("G−", { exact: true })).toHaveClass(/bg-emerald-500\/20/);
     await expect(page.getByText("B−", { exact: true })).toHaveClass(/bg-sky-500\/20/);
