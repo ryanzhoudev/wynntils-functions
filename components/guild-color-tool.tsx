@@ -397,7 +397,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                             {guildData ? (
                                 <>
                                     <Badge variant="secondary">
-                                        {guildData.guilds.length.toLocaleString()} usable guild colors
+                                        {guildData.guilds.length.toLocaleString()} guild colors
                                     </Badge>
                                     <p className="text-muted-foreground">
                                         Athena response timestamp: {new Date(guildData.fetchedAt).toLocaleString()}.
@@ -405,11 +405,10 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                     <p className="text-xs text-muted-foreground">
                                         Rechecked every {guildData.cacheSeconds / 60} minutes. This is when Athena
                                         generated the response, not when a guild color last changed; Athena refreshes
-                                        its source independently.
+                                        colors approximately every hour.
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        Explicitly excluded {guildData.excludedPlaceholderCount} placeholder entries
-                                        using #C05F5F.
+                                        Excluded {guildData.excludedPlaceholderCount} placeholder entries using #C05F5F.
                                     </p>
                                 </>
                             ) : loadError ? (
@@ -425,15 +424,10 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
 
                 <div className="space-y-6">
                     <section aria-labelledby="preview-heading">
-                        <div className="mb-3">
-                            <h2 id="preview-heading" className="text-xl font-semibold">
-                                Territory previews
-                            </h2>
-                        </div>
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_17rem]">
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Chosen territory</CardTitle>
+                                    <CardTitle>Chosen color</CardTitle>
                                     <code className="text-sm text-muted-foreground">
                                         {normalizedColor ?? "Invalid color"}
                                     </code>
