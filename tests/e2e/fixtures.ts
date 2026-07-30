@@ -42,9 +42,45 @@ export async function openIde(page: Page, source: string) {
     await expect(page.locator(".monaco-editor")).toBeVisible();
 }
 
-export async function replaceEditorText(page: Page, source: string) {
+export async function replaceEditorText(
+    page: Page,
+    source: string,
+    { verifyExact = false }: { verifyExact?: boolean } = {},
+) {
     const input = page.getByRole("textbox", { name: "Editor content" });
     await input.focus();
     await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-    await page.keyboard.insertText(source);
+    await page.keyboard.press("Backspace");
+
+    const lines = source.split("\n");
+    for (const [index, line] of lines.entries()) {
+        if (line.length > 0) {
+            await page.keyboard.insertText(line);
+        }
+        if (index < lines.length - 1) {
+            await page.keyboard.press("Enter");
+        }
+    }
+
+    if (!verifyExact) {
+        return;
+    }
+
+    await expect
+        .poll(() =>
+            page.evaluate((storageKey) => {
+                const raw = window.localStorage.getItem(storageKey);
+                if (!raw) {
+                    return null;
+                }
+
+                const workspace = JSON.parse(raw) as {
+                    files: Array<{ id: string; content: string }>;
+                    activeFileId: string;
+                };
+                const content = workspace.files.find((file) => file.id === workspace.activeFileId)?.content;
+                return content?.replace(/\r\n/g, "\n") ?? null;
+            }, IDE_STORAGE_KEY),
+        )
+        .toBe(source);
 }
