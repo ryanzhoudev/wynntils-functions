@@ -3,8 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
     title: "Guild Color Picker | Wynntils Functions",
-    description:
-        "Preview a Wynncraft guild color and compare it with existing guild colors using the Wynntils Bot checks.",
+    description: "Preview a Wynntils guild color",
 };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
