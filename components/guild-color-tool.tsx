@@ -620,7 +620,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                                 </div>
                                                 <p className="mt-2 text-sm font-medium">{guildGroupLabel(group)}</p>
                                                 {group.guilds.length > 1 ? (
-                                                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                                                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
                                                         {group.guilds
                                                             .map(
                                                                 (guild) =>

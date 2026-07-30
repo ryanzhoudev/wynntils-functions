@@ -36,6 +36,7 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
     await expect(page.getByText("Allowed? 🟥 No")).toBeVisible();
     await expect(page.getByText("2 guilds use this color").first()).toBeVisible();
     await expect(page.getByText("85 placeholder entries", { exact: false })).toBeVisible();
+    await expect(page.getByText("Red One [R1], Red Two [R2]", { exact: true })).toHaveClass(/text-sm/);
 
     await expect(page.getByText("R−", { exact: true })).toHaveClass(/bg-rose-500\/20/);
     await expect(page.getByText("G−", { exact: true })).toHaveClass(/bg-emerald-500\/20/);
