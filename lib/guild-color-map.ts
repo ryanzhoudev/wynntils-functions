@@ -84,12 +84,15 @@ export interface GuildColorMapRenderFailure {
 
 export type GuildColorMapWorkerResponse = GuildColorMapRenderResponse | GuildColorMapRenderFailure;
 
-export function guildColorMapFullResolution(displayWidth: number): number {
-    if (displayWidth > (GUILD_COLOR_MAP_MEDIUM_RESOLUTION + GUILD_COLOR_MAP_LARGE_RESOLUTION) / 2) {
+export function guildColorMapFullResolution(displayWidth: number, devicePixelRatio = 1): number {
+    const pixelRatio = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
+    const physicalWidth = displayWidth * pixelRatio;
+
+    if (physicalWidth > (GUILD_COLOR_MAP_MEDIUM_RESOLUTION + GUILD_COLOR_MAP_LARGE_RESOLUTION) / 2) {
         return GUILD_COLOR_MAP_LARGE_RESOLUTION;
     }
 
-    if (displayWidth > (GUILD_COLOR_MAP_RESOLUTION + GUILD_COLOR_MAP_MEDIUM_RESOLUTION) / 2) {
+    if (physicalWidth > (GUILD_COLOR_MAP_RESOLUTION + GUILD_COLOR_MAP_MEDIUM_RESOLUTION) / 2) {
         return GUILD_COLOR_MAP_MEDIUM_RESOLUTION;
     }
 

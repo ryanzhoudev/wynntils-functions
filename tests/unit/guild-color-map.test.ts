@@ -14,6 +14,7 @@ describe("guild color map geometry", () => {
         expect(guildColorMapFullResolution(462)).toBe(600);
         expect(guildColorMapFullResolution(774)).toBe(768);
         expect(guildColorMapFullResolution(1134)).toBe(1024);
+        expect(guildColorMapFullResolution(656, 1.5)).toBe(1024);
     });
 
     it("round-trips representative sRGB colors through Lab", () => {

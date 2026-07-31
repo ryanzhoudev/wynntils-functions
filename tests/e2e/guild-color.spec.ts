@@ -118,7 +118,13 @@ test("supports color query and direct hash preload formats", async ({ page }) =>
 });
 
 test("maps allowed and guild-claimed regions across Lab lightness slices", async ({ page }) => {
-    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.addInitScript(() => {
+        Object.defineProperty(window, "devicePixelRatio", {
+            configurable: true,
+            value: 1.5,
+        });
+    });
+    await page.setViewportSize({ width: 1707, height: 960 });
     await page.goto("/guild-color/map");
 
     await expect(page.getByRole("heading", { name: "Guild Color Claim Map" })).toBeVisible();
@@ -140,7 +146,8 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     expect(pageHeight.document).toBeLessThanOrEqual(pageHeight.viewport);
     const bounds = await map.boundingBox();
     expect(bounds).not.toBeNull();
-    const fullResolution = guildColorMapFullResolution(bounds!.width);
+    const fullResolution = guildColorMapFullResolution(bounds!.width, 1.5);
+    expect(fullResolution).toBe(1024);
 
     await page.mouse.move(
         bounds!.x +

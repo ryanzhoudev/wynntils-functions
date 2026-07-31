@@ -109,17 +109,23 @@ export default function GuildColorMap() {
             return;
         }
 
-        const observer = new ResizeObserver(([entry]) => {
-            const resolution = guildColorMapFullResolution(
-                entry?.contentRect.width ?? mapContainer.clientWidth,
-            );
+        const updateResolution = (displayWidth: number) => {
+            const resolution = guildColorMapFullResolution(displayWidth, window.devicePixelRatio);
             setFullRenderResolution((currentResolution) =>
                 currentResolution === resolution ? currentResolution : resolution,
             );
+        };
+        const observer = new ResizeObserver(([entry]) => {
+            updateResolution(entry?.contentRect.width ?? mapContainer.clientWidth);
         });
+        const handleWindowResize = () => updateResolution(mapContainer.clientWidth);
         observer.observe(mapContainer);
+        window.addEventListener("resize", handleWindowResize);
 
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+            window.removeEventListener("resize", handleWindowResize);
+        };
     }, []);
 
     useEffect(() => {
