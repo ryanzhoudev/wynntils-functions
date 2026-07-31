@@ -124,7 +124,7 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
             value: 1.5,
         });
     });
-    await page.setViewportSize({ width: 1707, height: 960 });
+    await page.setViewportSize({ width: 1707, height: 850 });
     await page.goto("/guild-color/map");
 
     await expect(page.getByRole("heading", { name: "Guild Color Claim Map" })).toBeVisible();

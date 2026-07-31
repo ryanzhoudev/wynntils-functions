@@ -88,11 +88,11 @@ export function guildColorMapFullResolution(displayWidth: number, devicePixelRat
     const pixelRatio = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
     const physicalWidth = displayWidth * pixelRatio;
 
-    if (physicalWidth > (GUILD_COLOR_MAP_MEDIUM_RESOLUTION + GUILD_COLOR_MAP_LARGE_RESOLUTION) / 2) {
+    if (physicalWidth > GUILD_COLOR_MAP_MEDIUM_RESOLUTION) {
         return GUILD_COLOR_MAP_LARGE_RESOLUTION;
     }
 
-    if (physicalWidth > (GUILD_COLOR_MAP_RESOLUTION + GUILD_COLOR_MAP_MEDIUM_RESOLUTION) / 2) {
+    if (physicalWidth > GUILD_COLOR_MAP_RESOLUTION) {
         return GUILD_COLOR_MAP_MEDIUM_RESOLUTION;
     }
 

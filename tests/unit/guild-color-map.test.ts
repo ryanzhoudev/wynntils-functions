@@ -12,8 +12,10 @@ import { describe, expect, it } from "vitest";
 describe("guild color map geometry", () => {
     it("adapts completed renders to the displayed map size", () => {
         expect(guildColorMapFullResolution(462)).toBe(600);
-        expect(guildColorMapFullResolution(774)).toBe(768);
+        expect(guildColorMapFullResolution(768)).toBe(768);
+        expect(guildColorMapFullResolution(774)).toBe(1024);
         expect(guildColorMapFullResolution(1134)).toBe(1024);
+        expect(guildColorMapFullResolution(550, 1.5)).toBe(1024);
         expect(guildColorMapFullResolution(656, 1.5)).toBe(1024);
     });
 
