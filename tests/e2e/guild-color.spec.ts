@@ -130,6 +130,11 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
 
     const map = page.getByRole("img", { name: "Guild color claims at Lab lightness 53" });
     await expect(map).toBeVisible();
+    const pageHeight = await page.evaluate(() => ({
+        viewport: window.innerHeight,
+        document: document.documentElement.scrollHeight,
+    }));
+    expect(pageHeight.document).toBeLessThanOrEqual(pageHeight.viewport);
     const bounds = await map.boundingBox();
     expect(bounds).not.toBeNull();
 

@@ -251,7 +251,7 @@ export default function GuildColorMap() {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <header className="mx-auto flex w-full max-w-[100rem] flex-col gap-4 px-4 py-6 md:flex-row md:items-center md:justify-between">
+            <header className="mx-auto flex w-full max-w-[100rem] flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3">
                     <MapIcon className="size-7 text-primary" aria-hidden="true" />
                     <h1 className="text-3xl font-bold tracking-tight">Guild Color Claim Map</h1>
@@ -269,9 +269,9 @@ export default function GuildColorMap() {
                 </div>
             </header>
 
-            <main className="mx-auto grid w-full max-w-[100rem] gap-6 px-4 pb-12 xl:grid-cols-[minmax(0,1fr)_22rem]">
+            <main className="mx-auto grid w-full max-w-[100rem] items-start gap-6 px-4 pb-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
                 <Card className="min-w-0">
-                    <CardHeader className="gap-5">
+                    <CardHeader className="space-y-0 gap-3 p-4 sm:p-5">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <CardTitle>Perceptual color space</CardTitle>
                             <Badge variant="outline" role="status" aria-live="polite" data-testid="map-status">
@@ -306,8 +306,8 @@ export default function GuildColorMap() {
                             ) : null}
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="relative mx-auto aspect-square w-full max-w-[72rem] overflow-hidden rounded-xl border bg-black shadow-inner">
+                    <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
+                        <div className="relative mx-auto aspect-square w-full max-w-[72rem] overflow-hidden rounded-xl border bg-black shadow-inner xl:w-[min(100%,calc(100dvh-19rem))]">
                             <canvas
                                 ref={canvasRef}
                                 role="img"
