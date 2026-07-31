@@ -18,7 +18,17 @@ import {
     normalizeGuildColorHex,
 } from "@/lib/guild-colors";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ArrowLeft, Check, CheckCircle2, Copy, Database, Palette, RotateCcw } from "lucide-react";
+import {
+    AlertTriangle,
+    ArrowLeft,
+    Check,
+    CheckCircle2,
+    Copy,
+    Database,
+    Map as MapIcon,
+    Palette,
+    RotateCcw,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -307,12 +317,20 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                     <Palette className="size-7 text-primary" aria-hidden="true" />
                     <h1 className="text-3xl font-bold tracking-tight">Guild Color Picker</h1>
                 </div>
-                <Button variant="outline" asChild>
-                    <Link href="/">
-                        <ArrowLeft className="size-4" aria-hidden="true" />
-                        Back to functions
-                    </Link>
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" asChild>
+                        <Link href="/guild-color/map">
+                            <MapIcon className="size-4" aria-hidden="true" />
+                            Color map
+                        </Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                        <Link href="/">
+                            <ArrowLeft className="size-4" aria-hidden="true" />
+                            Back to functions
+                        </Link>
+                    </Button>
+                </div>
             </header>
 
             <main className="mx-auto grid w-full max-w-[100rem] gap-6 px-4 pb-12 xl:grid-cols-[20rem_minmax(0,1fr)]">

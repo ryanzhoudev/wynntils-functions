@@ -1,5 +1,11 @@
 import { expect, Page, test } from "@playwright/test";
 import { mockCatalog } from "./fixtures";
+import {
+    GUILD_COLOR_MAP_A_MAX,
+    GUILD_COLOR_MAP_A_MIN,
+    GUILD_COLOR_MAP_B_MAX,
+    GUILD_COLOR_MAP_B_MIN,
+} from "@/lib/guild-color-map";
 
 const guildColorResponse = {
     guilds: [
@@ -91,6 +97,7 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
 test("supports color query and direct hash preload formats", async ({ page }) => {
     await page.goto("/guild-color");
     await expect(page.getByRole("heading", { name: "Guild Color Picker" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Color map" })).toHaveAttribute("href", "/guild-color/map");
     await expect(page.locator("#preview-heading")).toHaveText("Territory previews");
     await expect(page.getByRole("textbox", { name: "Guild color", exact: true })).toHaveValue("#FFFFFF");
     await expect(
@@ -108,6 +115,36 @@ test("supports color query and direct hash preload formats", async ({ page }) =>
     await expect(page.getByRole("textbox", { name: "Guild color", exact: true })).toHaveValue("#0000FF");
 });
 
+test("maps allowed and guild-claimed regions across Lab lightness slices", async ({ page }) => {
+    await page.goto("/guild-color/map");
+
+    await expect(page.getByRole("heading", { name: "Guild Color Claim Map" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Back to picker" })).toHaveAttribute("href", "/guild-color");
+    await expect(page.getByText("3 unique colors")).toBeVisible();
+    await expect(page.getByText("4 guilds")).toBeVisible();
+    await expect(page.getByText("85 placeholder entries", { exact: false })).toBeVisible();
+
+    const lightness = page.getByRole("slider", { name: "Lightness view" });
+    await lightness.fill("53");
+    await expect(page.getByTestId("map-status")).toContainText("Showing L* 53");
+
+    const map = page.getByRole("img", { name: "Guild color claims at Lab lightness 53" });
+    await expect(map).toBeVisible();
+    const bounds = await map.boundingBox();
+    expect(bounds).not.toBeNull();
+
+    await page.mouse.move(
+        bounds!.x +
+            bounds!.width * ((75 - GUILD_COLOR_MAP_A_MIN) / (GUILD_COLOR_MAP_A_MAX - GUILD_COLOR_MAP_A_MIN)),
+        bounds!.y +
+            bounds!.height * ((GUILD_COLOR_MAP_B_MAX - 60) / (GUILD_COLOR_MAP_B_MAX - GUILD_COLOR_MAP_B_MIN)),
+    );
+    await expect(page.getByText("2 guilds share #FF0000")).toBeVisible();
+    await expect(page.getByText("Red One [R1]")).toBeVisible();
+    await expect(page.getByText("Red Two [R2]")).toBeVisible();
+    await expect(page.getByText(/Registered #FF0000 · ΔE/)).toBeVisible();
+});
+
 test("does not calculate an allowed verdict when the guild source fails", async ({ page }) => {
     await page.unroute("**/api/guild-colors");
     await page.route("**/api/guild-colors", async (route) => {
@@ -120,6 +157,10 @@ test("does not calculate an allowed verdict when the guild source fails", async 
     await page.goto("/guild-color?hex=ABC");
     await expect(page.getByText("Allowed? Not checked")).toBeVisible();
     await expect(page.getByText("No verdict was calculated.", { exact: false })).toBeVisible();
+
+    await page.goto("/guild-color/map");
+    await expect(page.getByText("Guild colors could not be loaded")).toBeVisible();
+    await expect(page.getByText("Unavailable. No claim map was calculated.")).toBeVisible();
 });
 
 test("links to the guild color tool immediately before the classic UI", async ({ page }) => {

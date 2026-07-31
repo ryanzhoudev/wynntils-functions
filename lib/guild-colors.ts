@@ -20,16 +20,21 @@ export interface GuildColorApiResponse {
     };
 }
 
-interface Rgb {
+export interface Rgb {
     r: number;
     g: number;
     b: number;
 }
 
-interface Lab {
+export interface Lab {
     L: number;
     a: number;
     b: number;
+}
+
+export interface LabToRgbResult {
+    rgb: Rgb;
+    inGamut: boolean;
 }
 
 export interface GuildColorPaletteEntry extends GuildColorRecord {
@@ -120,7 +125,7 @@ function srgbToLinear(channel: number): number {
     return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
 }
 
-function rgbToLab({ r, g, b }: Rgb): Lab {
+export function rgbToLab({ r, g, b }: Rgb): Lab {
     const red = srgbToLinear(r / 255);
     const green = srgbToLinear(g / 255);
     const blue = srgbToLinear(b / 255);
@@ -139,7 +144,7 @@ function rgbToLab({ r, g, b }: Rgb): Lab {
     };
 }
 
-function deltaE76(first: Lab, second: Lab): number {
+export function deltaE76(first: Lab, second: Lab): number {
     const lightness = first.L - second.L;
     const greenRed = first.a - second.a;
     const blueYellow = first.b - second.b;
@@ -147,7 +152,37 @@ function deltaE76(first: Lab, second: Lab): number {
     return Math.sqrt(lightness * lightness + greenRed * greenRed + blueYellow * blueYellow);
 }
 
-function rgbToHex({ r, g, b }: Rgb): string {
+function linearToSrgb(channel: number): number {
+    return channel <= 0.0031308 ? channel * 12.92 : 1.055 * channel ** (1 / 2.4) - 0.055;
+}
+
+function labTransformInverse(value: number): number {
+    const cubed = value ** 3;
+
+    return cubed > 0.008856 ? cubed : (value - 16 / 116) / 7.787;
+}
+
+export function labToRgb({ L, a, b }: Lab): LabToRgbResult {
+    const fy = (L + 16) / 116;
+    const fx = a / 500 + fy;
+    const fz = fy - b / 200;
+    const x = 0.95047 * labTransformInverse(fx);
+    const y = labTransformInverse(fy);
+    const z = 1.08883 * labTransformInverse(fz);
+    const linearRed = x * 3.2406 + y * -1.5372 + z * -0.4986;
+    const linearGreen = x * -0.9689 + y * 1.8758 + z * 0.0415;
+    const linearBlue = x * 0.0557 + y * -0.204 + z * 1.057;
+    const channels = [linearToSrgb(linearRed), linearToSrgb(linearGreen), linearToSrgb(linearBlue)];
+    const inGamut = channels.every((channel) => channel >= -0.0001 && channel <= 1.0001);
+    const [r, g, blue] = channels.map((channel) => Math.round(Math.min(1, Math.max(0, channel)) * 255));
+
+    return {
+        rgb: { r, g, b: blue },
+        inGamut,
+    };
+}
+
+export function rgbToHex({ r, g, b }: Rgb): string {
     return `#${[r, g, b]
         .map((channel) => channel.toString(16).padStart(2, "0"))
         .join("")
