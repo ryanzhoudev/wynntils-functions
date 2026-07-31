@@ -5,6 +5,8 @@ import {
     GUILD_COLOR_MAP_A_MIN,
     GUILD_COLOR_MAP_B_MAX,
     GUILD_COLOR_MAP_B_MIN,
+    GUILD_COLOR_MAP_PREVIEW_RESOLUTION,
+    GUILD_COLOR_MAP_RESOLUTION,
 } from "@/lib/guild-color-map";
 
 const guildColorResponse = {
@@ -148,6 +150,25 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     await expect(page.getByText("Red One [R1]")).toBeVisible();
     await expect(page.getByText("Red Two [R2]")).toBeVisible();
     await expect(page.getByText(/Registered #FF0000 · ΔE/)).toBeVisible();
+
+    const sliderBounds = await lightness.boundingBox();
+    expect(sliderBounds).not.toBeNull();
+    await page.mouse.move(
+        sliderBounds!.x + sliderBounds!.width * 0.53,
+        sliderBounds!.y + sliderBounds!.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+        sliderBounds!.x + sliderBounds!.width * 0.35,
+        sliderBounds!.y + sliderBounds!.height / 2,
+        { steps: 4 },
+    );
+    const draggedLightness = await lightness.inputValue();
+    const canvas = page.locator("canvas");
+    await expect(canvas).toHaveAttribute("aria-label", `Guild color claims at Lab lightness ${draggedLightness}`);
+    await expect(canvas).toHaveAttribute("width", String(GUILD_COLOR_MAP_PREVIEW_RESOLUTION));
+    await page.mouse.up();
+    await expect(canvas).toHaveAttribute("width", String(GUILD_COLOR_MAP_RESOLUTION));
 });
 
 test("does not calculate an allowed verdict when the guild source fails", async ({ page }) => {

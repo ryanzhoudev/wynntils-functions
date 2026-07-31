@@ -8,9 +8,17 @@ import {
 import { renderGuildColorMapSlice } from "@/lib/guild-color-map/renderer";
 
 const worker = self as DedicatedWorkerGlobalScope;
+let pendingRequest: GuildColorMapRenderRequest | null = null;
+let renderScheduled = false;
 
-worker.onmessage = (event: MessageEvent<GuildColorMapRenderRequest>) => {
-    const request = event.data;
+function renderLatestRequest() {
+    renderScheduled = false;
+    const request = pendingRequest;
+    pendingRequest = null;
+
+    if (!request) {
+        return;
+    }
 
     try {
         const response = renderGuildColorMapSlice(request);
@@ -27,6 +35,17 @@ worker.onmessage = (event: MessageEvent<GuildColorMapRenderRequest>) => {
         };
         worker.postMessage(response);
     }
+}
+
+worker.onmessage = (event: MessageEvent<GuildColorMapRenderRequest>) => {
+    pendingRequest = event.data;
+
+    if (renderScheduled) {
+        return;
+    }
+
+    renderScheduled = true;
+    setTimeout(renderLatestRequest, 0);
 };
 
 export {};

@@ -9,6 +9,7 @@ import {
     GUILD_COLOR_MAP_DEFAULT_LIGHTNESS,
     GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH,
     GUILD_COLOR_MAP_FLAG_IN_GAMUT,
+    GUILD_COLOR_MAP_PREVIEW_RESOLUTION,
     GUILD_COLOR_MAP_RESOLUTION,
     GuildColorMapGroup,
     GuildColorMapRenderResponse,
@@ -71,12 +72,13 @@ export default function GuildColorMap() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const workerRef = useRef<Worker | null>(null);
     const latestRequestId = useRef(0);
+    const latestRenderedRequestId = useRef(0);
     const [lightness, setLightness] = useState(GUILD_COLOR_MAP_DEFAULT_LIGHTNESS);
+    const [isAdjustingLightness, setIsAdjustingLightness] = useState(false);
     const [guildData, setGuildData] = useState<GuildColorApiResponse | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [loadAttempt, setLoadAttempt] = useState(0);
     const [renderError, setRenderError] = useState<string | null>(null);
-    const [isRendering, setIsRendering] = useState(false);
     const [renderedMap, setRenderedMap] = useState<GuildColorMapRenderResponse | null>(null);
     const [sample, setSample] = useState<MapSample | null>(null);
     const groups = useMemo(
@@ -141,24 +143,24 @@ export default function GuildColorMap() {
         worker.onmessage = (event: MessageEvent<GuildColorMapWorkerResponse>) => {
             const response = event.data;
 
-            if (response.requestId !== latestRequestId.current) {
+            if (response.requestId < latestRenderedRequestId.current) {
                 return;
             }
-
-            setIsRendering(false);
 
             if (response.type === "error") {
-                setRenderError(response.message);
+                if (response.requestId === latestRequestId.current) {
+                    setRenderError(response.message);
+                }
                 return;
             }
 
+            latestRenderedRequestId.current = response.requestId;
             setRenderError(null);
             setRenderedMap(response);
             setSample(null);
         };
 
         worker.onerror = (event) => {
-            setIsRendering(false);
             setRenderError(event.message || "The color map worker failed.");
         };
 
@@ -173,23 +175,20 @@ export default function GuildColorMap() {
             return;
         }
 
-        const timeoutId = window.setTimeout(() => {
-            const requestId = latestRequestId.current + 1;
-            latestRequestId.current = requestId;
-            setIsRendering(true);
-            setRenderError(null);
-            workerRef.current?.postMessage({
-                type: "render",
-                requestId,
-                lightness,
-                width: GUILD_COLOR_MAP_RESOLUTION,
-                height: GUILD_COLOR_MAP_RESOLUTION,
-                groups: workerGroups,
-            });
-        }, 75);
-
-        return () => window.clearTimeout(timeoutId);
-    }, [guildData, lightness, workerGroups]);
+        const requestId = latestRequestId.current + 1;
+        const resolution = isAdjustingLightness
+            ? GUILD_COLOR_MAP_PREVIEW_RESOLUTION
+            : GUILD_COLOR_MAP_RESOLUTION;
+        latestRequestId.current = requestId;
+        workerRef.current.postMessage({
+            type: "render",
+            requestId,
+            lightness,
+            width: resolution,
+            height: resolution,
+            groups: workerGroups,
+        });
+    }, [guildData, isAdjustingLightness, lightness, workerGroups]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -239,15 +238,29 @@ export default function GuildColorMap() {
         });
     }
 
+    const renderedMapIsPreview = Boolean(
+        renderedMap && renderedMap.width === GUILD_COLOR_MAP_PREVIEW_RESOLUTION,
+    );
+    const requestedResolution = isAdjustingLightness
+        ? GUILD_COLOR_MAP_PREVIEW_RESOLUTION
+        : GUILD_COLOR_MAP_RESOLUTION;
+    const isRendering = Boolean(
+        guildData &&
+        (!renderedMap ||
+            renderedMap.lightness !== lightness ||
+            renderedMap.width !== requestedResolution),
+    );
     const statusText = loadError
         ? "Guild data unavailable"
         : !guildData
           ? "Loading guild colors"
           : renderError
             ? "Map rendering failed"
-            : isRendering || !renderedMap
+            : !renderedMap
               ? `Rendering L* ${lightness}`
-              : `Showing L* ${renderedMap.lightness} · ${renderedMap.renderTimeMs.toFixed(0)} ms`;
+              : isRendering
+                ? `Showing L* ${renderedMap.lightness} · updating to L* ${lightness}`
+                : `${renderedMapIsPreview ? "Previewing" : "Showing"} L* ${renderedMap.lightness} · ${renderedMap.renderTimeMs.toFixed(0)} ms`;
 
     return (
         <div className="min-h-screen bg-background text-foreground">
@@ -287,7 +300,11 @@ export default function GuildColorMap() {
                                 max="100"
                                 step="1"
                                 value={lightness}
-                                onChange={(event) => setLightness(Number(event.target.value))}
+                                onChange={(event) => setLightness(Number(event.currentTarget.value))}
+                                onPointerDown={() => setIsAdjustingLightness(true)}
+                                onPointerUp={() => setIsAdjustingLightness(false)}
+                                onPointerCancel={() => setIsAdjustingLightness(false)}
+                                onLostPointerCapture={() => setIsAdjustingLightness(false)}
                                 className="h-2 w-full cursor-pointer accent-primary"
                             />
                             <output htmlFor="map-lightness" className="w-16 font-mono text-sm font-semibold">
