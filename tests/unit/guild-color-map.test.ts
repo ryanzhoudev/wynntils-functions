@@ -2,6 +2,7 @@ import {
     classifyGuildColorMapPoint,
     createGuildColorMapGroups,
     GUILD_COLOR_MAP_FLAG_CLAIMED,
+    guildColorMapFullResolution,
     labToMapPosition,
 } from "@/lib/guild-color-map";
 import { renderGuildColorMapSlice } from "@/lib/guild-color-map/renderer";
@@ -9,6 +10,12 @@ import { createGuildColorPalette, labToRgb, rgbToLab } from "@/lib/guild-colors"
 import { describe, expect, it } from "vitest";
 
 describe("guild color map geometry", () => {
+    it("adapts completed renders to the displayed map size", () => {
+        expect(guildColorMapFullResolution(462)).toBe(600);
+        expect(guildColorMapFullResolution(774)).toBe(768);
+        expect(guildColorMapFullResolution(1134)).toBe(1024);
+    });
+
     it("round-trips representative sRGB colors through Lab", () => {
         for (const rgb of [
             { r: 255, g: 255, b: 255 },

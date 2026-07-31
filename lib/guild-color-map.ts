@@ -17,6 +17,8 @@ export const GUILD_COLOR_MAP_B_MAX = 100;
 export const GUILD_COLOR_MAP_DEFAULT_LIGHTNESS = 75;
 export const GUILD_COLOR_MAP_PREVIEW_RESOLUTION = 360;
 export const GUILD_COLOR_MAP_RESOLUTION = 600;
+export const GUILD_COLOR_MAP_MEDIUM_RESOLUTION = 768;
+export const GUILD_COLOR_MAP_LARGE_RESOLUTION = 1024;
 
 export const GUILD_COLOR_MAP_FLAG_IN_GAMUT = 1;
 export const GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH = 2;
@@ -81,6 +83,18 @@ export interface GuildColorMapRenderFailure {
 }
 
 export type GuildColorMapWorkerResponse = GuildColorMapRenderResponse | GuildColorMapRenderFailure;
+
+export function guildColorMapFullResolution(displayWidth: number): number {
+    if (displayWidth > (GUILD_COLOR_MAP_MEDIUM_RESOLUTION + GUILD_COLOR_MAP_LARGE_RESOLUTION) / 2) {
+        return GUILD_COLOR_MAP_LARGE_RESOLUTION;
+    }
+
+    if (displayWidth > (GUILD_COLOR_MAP_RESOLUTION + GUILD_COLOR_MAP_MEDIUM_RESOLUTION) / 2) {
+        return GUILD_COLOR_MAP_MEDIUM_RESOLUTION;
+    }
+
+    return GUILD_COLOR_MAP_RESOLUTION;
+}
 
 export function createGuildColorMapGroups(palette: GuildColorPaletteEntry[]): GuildColorMapGroup[] {
     const grouped = new Map<string, GuildColorMapGroup>();

@@ -11,6 +11,7 @@ import {
     GUILD_COLOR_MAP_FLAG_IN_GAMUT,
     GUILD_COLOR_MAP_PREVIEW_RESOLUTION,
     GUILD_COLOR_MAP_RESOLUTION,
+    guildColorMapFullResolution,
     GuildColorMapGroup,
     GuildColorMapRenderResponse,
     GuildColorMapWorkerResponse,
@@ -70,11 +71,13 @@ function LegendItem({
 
 export default function GuildColorMap() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const mapContainerRef = useRef<HTMLDivElement>(null);
     const workerRef = useRef<Worker | null>(null);
     const latestRequestId = useRef(0);
     const latestRenderedRequestId = useRef(0);
     const [lightness, setLightness] = useState(GUILD_COLOR_MAP_DEFAULT_LIGHTNESS);
     const [isAdjustingLightness, setIsAdjustingLightness] = useState(false);
+    const [fullRenderResolution, setFullRenderResolution] = useState(GUILD_COLOR_MAP_RESOLUTION);
     const [guildData, setGuildData] = useState<GuildColorApiResponse | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [loadAttempt, setLoadAttempt] = useState(0);
@@ -98,6 +101,26 @@ export default function GuildColorMap() {
         renderedMap && renderedMap.statistics.inGamut > 0
             ? (renderedMap.statistics.allowed / renderedMap.statistics.inGamut) * 100
             : null;
+
+    useEffect(() => {
+        const mapContainer = mapContainerRef.current;
+
+        if (!mapContainer) {
+            return;
+        }
+
+        const observer = new ResizeObserver(([entry]) => {
+            const resolution = guildColorMapFullResolution(
+                entry?.contentRect.width ?? mapContainer.clientWidth,
+            );
+            setFullRenderResolution((currentResolution) =>
+                currentResolution === resolution ? currentResolution : resolution,
+            );
+        });
+        observer.observe(mapContainer);
+
+        return () => observer.disconnect();
+    }, []);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -178,7 +201,7 @@ export default function GuildColorMap() {
         const requestId = latestRequestId.current + 1;
         const resolution = isAdjustingLightness
             ? GUILD_COLOR_MAP_PREVIEW_RESOLUTION
-            : GUILD_COLOR_MAP_RESOLUTION;
+            : fullRenderResolution;
         latestRequestId.current = requestId;
         workerRef.current.postMessage({
             type: "render",
@@ -188,7 +211,7 @@ export default function GuildColorMap() {
             height: resolution,
             groups: workerGroups,
         });
-    }, [guildData, isAdjustingLightness, lightness, workerGroups]);
+    }, [fullRenderResolution, guildData, isAdjustingLightness, lightness, workerGroups]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -243,7 +266,7 @@ export default function GuildColorMap() {
     );
     const requestedResolution = isAdjustingLightness
         ? GUILD_COLOR_MAP_PREVIEW_RESOLUTION
-        : GUILD_COLOR_MAP_RESOLUTION;
+        : fullRenderResolution;
     const isRendering = Boolean(
         guildData &&
         (!renderedMap ||
@@ -257,10 +280,10 @@ export default function GuildColorMap() {
           : renderError
             ? "Map rendering failed"
             : !renderedMap
-              ? `Rendering L* ${lightness}`
+              ? `Rendering L* ${lightness} · ${requestedResolution}px`
               : isRendering
-                ? `Showing L* ${renderedMap.lightness} · updating to L* ${lightness}`
-                : `${renderedMapIsPreview ? "Previewing" : "Showing"} L* ${renderedMap.lightness} · ${renderedMap.renderTimeMs.toFixed(0)} ms`;
+                ? `Showing L* ${renderedMap.lightness} · ${renderedMap.width}px · updating to L* ${lightness} · ${requestedResolution}px`
+                : `${renderedMapIsPreview ? "Previewing" : "Showing"} L* ${renderedMap.lightness} · ${renderedMap.width}px · ${renderedMap.renderTimeMs.toFixed(0)} ms`;
 
     return (
         <div className="min-h-screen bg-background text-foreground">
@@ -324,7 +347,10 @@ export default function GuildColorMap() {
                         </div>
                     </CardHeader>
                     <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
-                        <div className="relative mx-auto aspect-square w-full max-w-[72rem] overflow-hidden rounded-xl border bg-black shadow-inner xl:w-[min(100%,calc(100dvh-19rem))]">
+                        <div
+                            ref={mapContainerRef}
+                            className="relative mx-auto aspect-square w-full max-w-[72rem] overflow-hidden rounded-xl border bg-black shadow-inner xl:w-[min(100%,calc(100dvh-19rem))]"
+                        >
                             <canvas
                                 ref={canvasRef}
                                 role="img"

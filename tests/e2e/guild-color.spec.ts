@@ -6,7 +6,7 @@ import {
     GUILD_COLOR_MAP_B_MAX,
     GUILD_COLOR_MAP_B_MIN,
     GUILD_COLOR_MAP_PREVIEW_RESOLUTION,
-    GUILD_COLOR_MAP_RESOLUTION,
+    guildColorMapFullResolution,
 } from "@/lib/guild-color-map";
 
 const guildColorResponse = {
@@ -118,6 +118,7 @@ test("supports color query and direct hash preload formats", async ({ page }) =>
 });
 
 test("maps allowed and guild-claimed regions across Lab lightness slices", async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto("/guild-color/map");
 
     await expect(page.getByRole("heading", { name: "Guild Color Claim Map" })).toBeVisible();
@@ -139,6 +140,7 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     expect(pageHeight.document).toBeLessThanOrEqual(pageHeight.viewport);
     const bounds = await map.boundingBox();
     expect(bounds).not.toBeNull();
+    const fullResolution = guildColorMapFullResolution(bounds!.width);
 
     await page.mouse.move(
         bounds!.x +
@@ -168,7 +170,7 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     await expect(canvas).toHaveAttribute("aria-label", `Guild color claims at Lab lightness ${draggedLightness}`);
     await expect(canvas).toHaveAttribute("width", String(GUILD_COLOR_MAP_PREVIEW_RESOLUTION));
     await page.mouse.up();
-    await expect(canvas).toHaveAttribute("width", String(GUILD_COLOR_MAP_RESOLUTION));
+    await expect(canvas).toHaveAttribute("width", String(fullResolution));
 });
 
 test("does not calculate an allowed verdict when the guild source fails", async ({ page }) => {
