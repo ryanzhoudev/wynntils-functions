@@ -65,7 +65,7 @@ describe("semantic registry", () => {
 
     it("describes every registered constraint for generated tests and docs badges", () => {
         expect(new Set(descriptors.map((descriptor) => descriptor.functionName)).size).toBe(32);
-        expect(literalDescriptors).toHaveLength(33);
+        expect(literalDescriptors).toHaveLength(34);
         expect(descriptors).toContainEqual({
             functionName: "switch_case",
             kind: "variadicPairs",

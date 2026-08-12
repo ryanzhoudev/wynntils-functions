@@ -116,19 +116,18 @@ const PROFESSIONS = [
     "Weaponsmithing",
     "Woodworking",
 ] as const;
+const MOUNT_TYPES = ["first", "horse", "wyvern", "adasaur"] as const;
 const MOUNT_STATS = [
     "acceleration",
     "altitude",
     "jumpHeight",
     "energy",
     "handling",
-    "potential",
     "boost",
     "speed",
     "toughness",
     "training",
 ] as const;
-const CAPPED_MOUNT_STATS = MOUNT_STATS.filter((stat) => stat !== "potential");
 const LOOTRUN_BEACON_COLORS = [
     "GREEN",
     "YELLOW",
@@ -192,7 +191,6 @@ registerAllowedLiterals(
     2,
     BOMB_SORT_ORDERS,
 );
-registerAllowedLiterals(["capped_mount_stat", "mount_stat_max"], 0, CAPPED_MOUNT_STATS);
 registerAllowedLiterals(["debuffs_in_radius_value"], 1, DEBUFF_NAMES);
 registerAllowedLiterals(["targeted_mob_debuff_value"], 3, DEBUFF_NAMES);
 registerAllowedLiterals(
@@ -206,7 +204,7 @@ registerAllowedLiterals(
     0,
     LOOTRUN_BEACON_COLORS,
 );
-registerAllowedLiterals(["mount_stat"], 0, MOUNT_STATS);
+registerAllowedLiterals(["mount_name", "mount_potential"], 0, MOUNT_TYPES);
 registerAllowedLiterals(
     [
         "profession_level",
@@ -223,6 +221,9 @@ registerAllowedLiterals(["wynncraft_shader"], 0, WYNNCRAFT_SHADERS);
 
 semanticSpecs.set("spell_name_from_direction", {
     constraints: [allowedLiterals(0, SPELL_DIRECTIONS), allowedLiterals(1, SPELL_CLASSES)],
+});
+semanticSpecs.set("capped_mount_stat", {
+    constraints: [allowedLiterals(0, MOUNT_TYPES), allowedLiterals(1, MOUNT_STATS)],
 });
 semanticSpecs.set("to_background_text", {
     constraints: [allowedLiterals(3, BACKGROUND_EDGE_STYLES), allowedLiterals(4, BACKGROUND_EDGE_STYLES)],
