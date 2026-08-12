@@ -198,6 +198,7 @@ export function isTypeCompatible(expectedType: string, actualType: string) {
         normalizedExpected === "any" ||
         normalizedExpected === "object" ||
         normalizedExpected === "" ||
+        normalizedActual === "any" ||
         normalizedActual === "object"
     ) {
         return true;

@@ -124,6 +124,7 @@ describe("catalog, argument resolution, and type inference", () => {
 
         expect(inferArgumentType(outer.arguments[0], lookup, catalog)).toBe("String");
         expect(isTypeCompatible("Number", "Integer")).toBe(true);
+        expect(isTypeCompatible("Number", "Any")).toBe(true);
         expect(isTypeCompatible("Boolean", "String")).toBe(false);
         expect(createTypeInferenceContext().argumentTypes.size).toBe(0);
     });

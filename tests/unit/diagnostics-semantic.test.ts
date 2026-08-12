@@ -164,12 +164,14 @@ describe("semantic registry", () => {
                 { name: "values", type: "List", description: `${descriptor.elementType} values` },
             ]),
             testFunction("styled_text", "StyledText", [{ name: "value", type: "String" }]),
+            testFunction("dynamic_value", "Any"),
         ]);
         const valid = validValues[descriptor.elementType];
         const invalid = invalidValues[descriptor.elementType];
 
         expect(diagnostics(`{${descriptor.functionName}(${valid}; ${valid})}`, response)).toEqual([]);
         expect(diagnostics(`{${descriptor.functionName}([${valid}, ${valid}])}`, response)).toEqual([]);
+        expect(diagnostics(`{${descriptor.functionName}(dynamic_value)}`, response)).toEqual([]);
 
         const variadicResult = diagnostics(`{${descriptor.functionName}(${valid}; ${invalid})}`, response);
         const listResult = diagnostics(`{${descriptor.functionName}([${valid}, ${invalid}])}`, response);
