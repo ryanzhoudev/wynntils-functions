@@ -18,7 +18,9 @@ describe("live function catalog contract", () => {
         const failures: string[] = [];
 
         for (const descriptor of getSemanticValidationDescriptors()) {
-            const fn = catalog.functions.find((entry) => entry.name.toLowerCase() === descriptor.functionName.toLowerCase());
+            const fn = catalog.functions.find(
+                (entry) => entry.name.toLowerCase() === descriptor.functionName.toLowerCase(),
+            );
 
             if (!fn) {
                 failures.push(`Missing overridden function '${descriptor.functionName}'.`);
@@ -47,6 +49,15 @@ describe("live function catalog contract", () => {
                         );
                     }
                 }
+            }
+
+            if (
+                descriptor.kind === "listElements" &&
+                !argument.description?.toLowerCase().includes(descriptor.elementType.toLowerCase())
+            ) {
+                failures.push(
+                    `'${descriptor.functionName}' argument ${descriptor.argumentIndex + 1} description no longer identifies ${descriptor.elementType} elements.`,
+                );
             }
         }
 

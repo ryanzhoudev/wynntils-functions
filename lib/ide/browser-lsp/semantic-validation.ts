@@ -43,6 +43,11 @@ export type SemanticConstraintDescriptor =
           argumentIndex: number;
           minimumPairs: number;
           listName: string;
+      }
+    | {
+          kind: "listElements";
+          argumentIndex: number;
+          elementType: string;
       };
 
 export type RegisteredSemanticConstraint = SemanticConstraintDescriptor & {
@@ -175,6 +180,12 @@ function registerAllowedLiterals(functionNames: readonly string[], argumentIndex
     }
 }
 
+function registerListElements(functionNames: readonly string[], elementType: string) {
+    for (const functionName of functionNames) {
+        semanticSpecs.set(functionName, { constraints: [listElements(0, elementType)] });
+    }
+}
+
 registerAllowedLiterals(["accessory_durability", "equipped_accessory_name"], 0, ACCESSORY_SLOTS);
 registerAllowedLiterals(["armor_durability", "equipped_armor_name"], 0, ARMOR_SLOTS);
 registerAllowedLiterals(
@@ -218,6 +229,10 @@ registerAllowedLiterals(
 );
 registerAllowedLiterals(["spell_name_from_number"], 1, SPELL_CLASSES);
 registerAllowedLiterals(["wynncraft_shader"], 0, WYNNCRAFT_SHADERS);
+registerListElements(["add", "max", "min", "multiply"], "Number");
+registerListElements(["and", "or"], "Boolean");
+registerListElements(["concat"], "String");
+registerListElements(["concat_styled_text"], "StyledText");
 
 semanticSpecs.set("spell_name_from_direction", {
     constraints: [allowedLiterals(0, SPELL_DIRECTIONS), allowedLiterals(1, SPELL_CLASSES)],
@@ -462,6 +477,50 @@ export function variadicPairs(options: VariadicPairOptions): SemanticConstraint 
             }
 
             return issues;
+        },
+    };
+}
+
+export function listElements(argumentIndex: number, elementType: string): SemanticConstraint {
+    return {
+        descriptor: {
+            kind: "listElements",
+            argumentIndex,
+            elementType,
+        },
+        validatesArgument(activeArgumentIndex) {
+            return activeArgumentIndex === argumentIndex;
+        },
+        validate(context) {
+            const listArgument = context.functionCall.arguments[argumentIndex];
+
+            if (!listArgument) {
+                return [];
+            }
+
+            const elements =
+                parseListElements(listArgument, context.sourceText) ??
+                context.functionCall.arguments.slice(argumentIndex);
+            const argumentName = context.metadata.arguments[argumentIndex]?.name ?? "values";
+
+            return elements.flatMap((element, elementIndex) => {
+                if (!hasArgumentValue(element)) {
+                    return [];
+                }
+
+                const actualType = context.inferType(element);
+
+                if (!actualType || isTypeCompatible(elementType, actualType)) {
+                    return [];
+                }
+
+                return [
+                    issueForArgument(
+                        element,
+                        `'${context.metadata.canonicalName}' list argument ${argumentIndex + 1} '${argumentName}' expects ${elementType} elements; element ${elementIndex + 1} received ${actualType}.`,
+                    ),
+                ];
+            });
         },
     };
 }

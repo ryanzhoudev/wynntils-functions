@@ -10,7 +10,10 @@ import { createTextDocument } from "@/lib/ide/browser-lsp/text-document";
 import { testCatalog, testFunction, createRepresentativeCatalog } from "@/tests/fixtures/catalog";
 
 function diagnostics(source: string, catalogResponse = createRepresentativeCatalog()) {
-    return buildDiagnostics(createTextDocument("test://diagnostics", source), createCatalogFromResponse(catalogResponse));
+    return buildDiagnostics(
+        createTextDocument("test://diagnostics", source),
+        createCatalogFromResponse(catalogResponse),
+    );
 }
 
 function catalogForDescriptor(functionName: string, argumentIndex: number, description: string, argumentCount: number) {
@@ -48,9 +51,12 @@ describe("generic diagnostics", () => {
 describe("semantic registry", () => {
     const descriptors = getSemanticValidationDescriptors();
     const literalDescriptors = descriptors.filter((descriptor) => descriptor.kind === "allowedLiterals");
+    const listDescriptors = descriptors.filter((descriptor) => descriptor.kind === "listElements");
 
     function validArgumentsFor(descriptor: (typeof literalDescriptors)[number], targetValue: string) {
-        const siblingDescriptors = literalDescriptors.filter((candidate) => candidate.functionName === descriptor.functionName);
+        const siblingDescriptors = literalDescriptors.filter(
+            (candidate) => candidate.functionName === descriptor.functionName,
+        );
         const argumentCount = Math.max(...siblingDescriptors.map((candidate) => candidate.argumentIndex)) + 1;
 
         return Array.from({ length: argumentCount }, (_, argumentIndex) => {
@@ -64,8 +70,9 @@ describe("semantic registry", () => {
     }
 
     it("describes every registered constraint for generated tests and docs badges", () => {
-        expect(new Set(descriptors.map((descriptor) => descriptor.functionName)).size).toBe(32);
+        expect(new Set(descriptors.map((descriptor) => descriptor.functionName)).size).toBe(40);
         expect(literalDescriptors).toHaveLength(34);
+        expect(listDescriptors).toHaveLength(8);
         expect(descriptors).toContainEqual({
             functionName: "switch_case",
             kind: "variadicPairs",
@@ -117,6 +124,41 @@ describe("semantic registry", () => {
 
         expect(items.map((item) => item.label)).toEqual(descriptor.values);
         expect(items.every((item) => item.sortText?.startsWith("00_"))).toBe(true);
+    });
+
+    it.each(listDescriptors)("validates every $elementType element passed to $functionName", (descriptor) => {
+        const validValues: Record<string, string> = {
+            Boolean: "true",
+            Number: "1",
+            String: '"value"',
+            StyledText: 'styled_text("value")',
+        };
+        const invalidValues: Record<string, string> = {
+            Boolean: "1",
+            Number: '"value"',
+            String: "true",
+            StyledText: '"value"',
+        };
+        const response = testCatalog([
+            testFunction(descriptor.functionName, "Object", [
+                { name: "values", type: "List", description: `${descriptor.elementType} values` },
+            ]),
+            testFunction("styled_text", "StyledText", [{ name: "value", type: "String" }]),
+        ]);
+        const valid = validValues[descriptor.elementType];
+        const invalid = invalidValues[descriptor.elementType];
+
+        expect(diagnostics(`{${descriptor.functionName}(${valid}; ${valid})}`, response)).toEqual([]);
+        expect(diagnostics(`{${descriptor.functionName}([${valid}, ${valid}])}`, response)).toEqual([]);
+
+        const variadicResult = diagnostics(`{${descriptor.functionName}(${valid}; ${invalid})}`, response);
+        const listResult = diagnostics(`{${descriptor.functionName}([${valid}, ${invalid}])}`, response);
+
+        expect(variadicResult).toHaveLength(1);
+        expect(variadicResult[0].message).toContain(`expects ${descriptor.elementType} elements`);
+        expect(listResult).toHaveLength(1);
+        expect(listResult[0].message).toContain(`expects ${descriptor.elementType} elements`);
+        expect(hasSemanticArgumentValidation(descriptor.functionName, descriptor.argumentIndex)).toBe(true);
     });
 
     it("validates switch pairs, aliases, empty slots, type mismatches, and unknown values", () => {
