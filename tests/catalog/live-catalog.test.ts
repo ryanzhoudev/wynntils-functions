@@ -34,10 +34,15 @@ describe("live function catalog contract", () => {
                 continue;
             }
 
-            const expectedType = descriptor.kind === "allowedLiterals" ? "String" : "List";
-            if (argument.type !== expectedType) {
+            const expectedTypes =
+                descriptor.kind === "allowedLiterals"
+                    ? ["String"]
+                    : descriptor.kind === "allowedNumbers" || descriptor.kind === "numberRange"
+                      ? ["Double", "Float", "Integer", "Long", "Number"]
+                      : ["List"];
+            if (!expectedTypes.includes(argument.type)) {
                 failures.push(
-                    `'${descriptor.functionName}' argument ${descriptor.argumentIndex + 1} changed from ${expectedType} to ${argument.type}.`,
+                    `'${descriptor.functionName}' argument ${descriptor.argumentIndex + 1} changed from ${expectedTypes.join(" or ")} to ${argument.type}.`,
                 );
             }
 
@@ -58,6 +63,26 @@ describe("live function catalog contract", () => {
                 failures.push(
                     `'${descriptor.functionName}' argument ${descriptor.argumentIndex + 1} description no longer identifies ${descriptor.elementType} elements.`,
                 );
+            }
+
+            if (descriptor.kind === "allowedNumbers") {
+                for (const value of descriptor.values) {
+                    if (!argument.description?.includes(String(value))) {
+                        failures.push(
+                            `'${descriptor.functionName}' argument ${descriptor.argumentIndex + 1} description no longer contains '${value}'.`,
+                        );
+                    }
+                }
+            }
+
+            if (descriptor.kind === "numberRange") {
+                for (const bound of [descriptor.minimum, descriptor.maximum]) {
+                    if (bound !== undefined && !argument.description?.includes(String(bound))) {
+                        failures.push(
+                            `'${descriptor.functionName}' argument ${descriptor.argumentIndex + 1} description no longer contains bound '${bound}'.`,
+                        );
+                    }
+                }
             }
         }
 

@@ -52,6 +52,8 @@ describe("semantic registry", () => {
     const descriptors = getSemanticValidationDescriptors();
     const literalDescriptors = descriptors.filter((descriptor) => descriptor.kind === "allowedLiterals");
     const listDescriptors = descriptors.filter((descriptor) => descriptor.kind === "listElements");
+    const allowedNumberDescriptors = descriptors.filter((descriptor) => descriptor.kind === "allowedNumbers");
+    const numberRangeDescriptors = descriptors.filter((descriptor) => descriptor.kind === "numberRange");
 
     function validArgumentsFor(descriptor: (typeof literalDescriptors)[number], targetValue: string) {
         const siblingDescriptors = literalDescriptors.filter(
@@ -69,10 +71,28 @@ describe("semantic registry", () => {
         });
     }
 
+    function numericArguments(argumentIndex: number, targetValue: number | string) {
+        return Array.from({ length: argumentIndex + 1 }, (_, index) =>
+            index === argumentIndex ? String(targetValue) : "0",
+        );
+    }
+
+    function catalogForNumericDescriptor(functionName: string, argumentIndex: number, description: string) {
+        const args = Array.from({ length: argumentIndex + 1 }, (_, index) => ({
+            name: `arg${index + 1}`,
+            type: "Number",
+            description: index === argumentIndex ? description : "test argument",
+        }));
+
+        return testCatalog([testFunction(functionName, "Object", args)]);
+    }
+
     it("describes every registered constraint for generated tests and docs badges", () => {
-        expect(new Set(descriptors.map((descriptor) => descriptor.functionName)).size).toBe(40);
+        expect(new Set(descriptors.map((descriptor) => descriptor.functionName)).size).toBe(49);
         expect(literalDescriptors).toHaveLength(34);
         expect(listDescriptors).toHaveLength(8);
+        expect(allowedNumberDescriptors).toHaveLength(3);
+        expect(numberRangeDescriptors).toHaveLength(11);
         expect(descriptors).toContainEqual({
             functionName: "switch_case",
             kind: "variadicPairs",
@@ -160,6 +180,73 @@ describe("semantic registry", () => {
         expect(listResult[0].message).toContain(`expects ${descriptor.elementType} elements`);
         expect(hasSemanticArgumentValidation(descriptor.functionName, descriptor.argumentIndex)).toBe(true);
     });
+
+    it.each(allowedNumberDescriptors)(
+        "validates and completes numeric choices for $functionName argument $argumentIndex",
+        (descriptor) => {
+            const response = catalogForNumericDescriptor(
+                descriptor.functionName,
+                descriptor.argumentIndex,
+                descriptor.values.join(", "),
+            );
+
+            for (const value of descriptor.values) {
+                const source = `{${descriptor.functionName}(${numericArguments(descriptor.argumentIndex, value).join("; ")})}`;
+                expect(diagnostics(source, response), `${descriptor.functionName}: ${value}`).toEqual([]);
+            }
+
+            const invalid = Math.max(...descriptor.values) + 1;
+            const invalidSource = `{${descriptor.functionName}(${numericArguments(descriptor.argumentIndex, invalid).join("; ")})}`;
+            const result = diagnostics(invalidSource, response);
+            const metadata = createCatalogFromResponse(response).findByName(descriptor.functionName)!;
+            const items = createSemanticCompletionItems(metadata, descriptor.argumentIndex);
+
+            expect(result).toHaveLength(1);
+            expect(result[0].message).toContain("must be one of");
+            expect(items.map((item) => item.label)).toEqual(descriptor.values.map(String));
+            expect(hasSemanticArgumentValidation(descriptor.functionName, descriptor.argumentIndex)).toBe(true);
+        },
+    );
+
+    it.each(numberRangeDescriptors)(
+        "validates the documented range for $functionName argument $argumentIndex",
+        (descriptor) => {
+            const description = [descriptor.minimum, descriptor.maximum]
+                .filter((value) => value !== undefined)
+                .join(", ");
+            const response = catalogForNumericDescriptor(
+                descriptor.functionName,
+                descriptor.argumentIndex,
+                description,
+            );
+            const validValues = [
+                ...new Set([descriptor.minimum, descriptor.maximum].filter((value) => value !== undefined)),
+            ];
+            const invalidValues = [
+                descriptor.minimum === undefined ? undefined : descriptor.minimum - 1,
+                descriptor.maximum === undefined ? undefined : descriptor.maximum + 1,
+            ].filter((value) => value !== undefined);
+
+            for (const value of validValues) {
+                const source = `{${descriptor.functionName}(${numericArguments(descriptor.argumentIndex, value).join("; ")})}`;
+                expect(diagnostics(source, response), `${descriptor.functionName}: ${value}`).toEqual([]);
+            }
+
+            for (const value of invalidValues) {
+                const source = `{${descriptor.functionName}(${numericArguments(descriptor.argumentIndex, value).join("; ")})}`;
+                const result = diagnostics(source, response);
+
+                expect(result).toHaveLength(1);
+                expect(result[0].message).toMatch(/must be (?:between|at least|at most)/);
+            }
+
+            const dynamicArguments = numericArguments(descriptor.argumentIndex, "@{dynamic}");
+            expect(
+                diagnostics(`{${descriptor.functionName}(${dynamicArguments.join("; ")})}\nlet dynamic = 0;`, response),
+            ).toEqual([]);
+            expect(hasSemanticArgumentValidation(descriptor.functionName, descriptor.argumentIndex)).toBe(true);
+        },
+    );
 
     it("validates switch pairs, aliases, empty slots, type mismatches, and unknown values", () => {
         expect(diagnostics('{switch(1; "default"; [1, "one", 2, "two"])}')).toEqual([]);

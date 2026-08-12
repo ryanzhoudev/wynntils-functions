@@ -48,6 +48,17 @@ export type SemanticConstraintDescriptor =
           kind: "listElements";
           argumentIndex: number;
           elementType: string;
+      }
+    | {
+          kind: "allowedNumbers";
+          argumentIndex: number;
+          values: readonly number[];
+      }
+    | {
+          kind: "numberRange";
+          argumentIndex: number;
+          minimum?: number;
+          maximum?: number;
       };
 
 export type RegisteredSemanticConstraint = SemanticConstraintDescriptor & {
@@ -186,6 +197,23 @@ function registerListElements(functionNames: readonly string[], elementType: str
     }
 }
 
+function registerAllowedNumbers(functionNames: readonly string[], argumentIndex: number, values: readonly number[]) {
+    for (const functionName of functionNames) {
+        semanticSpecs.set(functionName, { constraints: [allowedNumbers(argumentIndex, values)] });
+    }
+}
+
+function registerNumberRange(
+    functionNames: readonly string[],
+    argumentIndex: number,
+    minimum?: number,
+    maximum?: number,
+) {
+    for (const functionName of functionNames) {
+        semanticSpecs.set(functionName, { constraints: [numberRange(argumentIndex, minimum, maximum)] });
+    }
+}
+
 registerAllowedLiterals(["accessory_durability", "equipped_accessory_name"], 0, ACCESSORY_SLOTS);
 registerAllowedLiterals(["armor_durability", "equipped_armor_name"], 0, ARMOR_SLOTS);
 registerAllowedLiterals(
@@ -227,18 +255,30 @@ registerAllowedLiterals(
     0,
     PROFESSIONS,
 );
-registerAllowedLiterals(["spell_name_from_number"], 1, SPELL_CLASSES);
 registerAllowedLiterals(["wynncraft_shader"], 0, WYNNCRAFT_SHADERS);
 registerListElements(["add", "max", "min", "multiply"], "Number");
 registerListElements(["and", "or"], "Boolean");
 registerListElements(["concat"], "String");
 registerListElements(["concat_styled_text"], "StyledText");
+registerAllowedNumbers(["chests_opened_this_session"], 0, [1, 2, 3, 4]);
+registerAllowedNumbers(["gradient_shader"], 0, [1, 2]);
+registerNumberRange(["brightness_shift", "hue_shift", "saturation_shift"], 1, -1, 1);
+registerNumberRange(["mirror_image_clone", "ophanim_orb"], 0, 0);
 
 semanticSpecs.set("spell_name_from_direction", {
     constraints: [allowedLiterals(0, SPELL_DIRECTIONS), allowedLiterals(1, SPELL_CLASSES)],
 });
+semanticSpecs.set("spell_name_from_number", {
+    constraints: [allowedNumbers(0, [1, 2, 3, 4]), allowedLiterals(1, SPELL_CLASSES)],
+});
 semanticSpecs.set("capped_mount_stat", {
     constraints: [allowedLiterals(0, MOUNT_TYPES), allowedLiterals(1, MOUNT_STATS)],
+});
+semanticSpecs.set("from_rgb", {
+    constraints: [numberRange(0, 0, 255), numberRange(1, 0, 255), numberRange(2, 0, 255)],
+});
+semanticSpecs.set("from_rgb_percent", {
+    constraints: [numberRange(0, 0, 1), numberRange(1, 0, 1), numberRange(2, 0, 1)],
 });
 semanticSpecs.set("to_background_text", {
     constraints: [allowedLiterals(3, BACKGROUND_EDGE_STYLES), allowedLiterals(4, BACKGROUND_EDGE_STYLES)],
@@ -393,6 +433,96 @@ export function allowedLiterals(argumentIndex: number, values: readonly string[]
                 insertText: value,
                 sortText: `00_${String(index).padStart(3, "0")}_${value}`,
             }));
+        },
+    };
+}
+
+export function allowedNumbers(argumentIndex: number, values: readonly number[]): SemanticConstraint {
+    const allowedValues = new Set(values);
+    const expectedValues = values.join(", ");
+
+    return {
+        descriptor: {
+            kind: "allowedNumbers",
+            argumentIndex,
+            values: Object.freeze([...values]),
+        },
+        validatesArgument(activeArgumentIndex) {
+            return activeArgumentIndex === argumentIndex;
+        },
+        validate(context) {
+            const argument = context.functionCall.arguments[argumentIndex];
+
+            if (!argument) {
+                return [];
+            }
+
+            const value = staticNumberValue(argument);
+
+            if (value === undefined || allowedValues.has(value)) {
+                return [];
+            }
+
+            return [
+                issueForArgument(
+                    argument,
+                    `'${context.metadata.canonicalName}' argument ${argumentIndex + 1} must be one of ${expectedValues}.`,
+                ),
+            ];
+        },
+        complete(context) {
+            if (context.activeParameter !== argumentIndex) {
+                return [];
+            }
+
+            return values.map((value, index) => ({
+                label: String(value),
+                kind: COMPLETION_ITEM_KIND_ENUM_MEMBER,
+                detail: `${context.metadata.canonicalName} allowed value`,
+                insertText: String(value),
+                sortText: `00_${String(index).padStart(3, "0")}_${value}`,
+            }));
+        },
+    };
+}
+
+export function numberRange(argumentIndex: number, minimum?: number, maximum?: number): SemanticConstraint {
+    if (minimum === undefined && maximum === undefined) {
+        throw new Error("A numeric range requires at least one bound.");
+    }
+
+    return {
+        descriptor: {
+            kind: "numberRange",
+            argumentIndex,
+            minimum,
+            maximum,
+        },
+        validatesArgument(activeArgumentIndex) {
+            return activeArgumentIndex === argumentIndex;
+        },
+        validate(context) {
+            const argument = context.functionCall.arguments[argumentIndex];
+
+            if (!argument) {
+                return [];
+            }
+
+            const value = staticNumberValue(argument);
+
+            if (
+                value === undefined ||
+                ((minimum === undefined || value >= minimum) && (maximum === undefined || value <= maximum))
+            ) {
+                return [];
+            }
+
+            return [
+                issueForArgument(
+                    argument,
+                    `'${context.metadata.canonicalName}' argument ${argumentIndex + 1} must be ${formatNumberRange(minimum, maximum)}.`,
+                ),
+            ];
         },
     };
 }
@@ -584,6 +714,16 @@ function createValidationContext(
     };
 }
 
+function staticNumberValue(argument: ParsedArgument | undefined): number | undefined {
+    if (!argument || argument.tokens.length !== 1 || argument.tokens[0].kind !== TokenKind.Number) {
+        return undefined;
+    }
+
+    const value = Number(argument.tokens[0].value);
+
+    return Number.isFinite(value) ? value : undefined;
+}
+
 function parseListElements(argument: ParsedArgument, sourceText: string): ParsedArgument[] | null {
     if (
         argument.tokens[0]?.kind !== TokenKind.LeftBracket ||
@@ -657,4 +797,12 @@ function issueForCall(functionCall: FunctionCall, message: string): SemanticIssu
 
 function formatPairCount(count: number) {
     return count === 1 ? "case/result pair" : "case/result pairs";
+}
+
+function formatNumberRange(minimum?: number, maximum?: number) {
+    if (minimum !== undefined && maximum !== undefined) {
+        return `between ${minimum} and ${maximum}`;
+    }
+
+    return minimum !== undefined ? `at least ${minimum}` : `at most ${maximum}`;
 }
