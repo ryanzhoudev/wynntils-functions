@@ -6,6 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import InlineColorPicker from "@/components/inline-color-picker";
+import GuildStatsLink from "@/components/guild-stats-link";
 import {
     analyzeGuildColor,
     createGuildColorPalette,
@@ -454,6 +455,16 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                                 </Badge>
                                             ) : null}
                                         </p>
+                                        {closestGroup ? (
+                                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                                                {closestGroup.guilds.map((guild) => (
+                                                    <GuildStatsLink
+                                                        key={`${guild.name}-${guild.prefix}`}
+                                                        guild={guild}
+                                                    />
+                                                ))}
+                                            </div>
+                                        ) : null}
                                         <p className="mt-2 text-xs text-muted-foreground">
                                             Brightness {liveVerdict.brightness.toFixed(1)} / {MIN_GUILD_COLOR_BRIGHTNESS}{" "}
                                             minimum
@@ -667,44 +678,46 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                             activeSelection?.kind === "guild" && activeSelection.color === group.color;
 
                                         return (
-                                            <button
-                                                type="button"
+                                            <div
                                                 key={group.color}
-                                                onClick={() => selectGuildGroup(group)}
-                                                aria-pressed={isSelected}
                                                 className={cn(
-                                                    "rounded-lg border bg-background p-3 text-left transition hover:border-primary/70 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                                    "overflow-hidden rounded-lg border bg-background transition",
                                                     isSelected && "border-primary ring-1 ring-primary/40",
                                                     isConflict && "border-red-400/40",
                                                 )}
                                             >
-                                                <TerritoryPreview
-                                                    compact
-                                                    color={group.color}
-                                                    prefix={guildGroupPrefix(group)}
-                                                    label={guildGroupLabel(group)}
-                                                />
-                                                <div className="mt-3 flex items-center justify-between gap-2">
-                                                    <code className="text-sm font-semibold">{group.color}</code>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={isConflict ? "border-red-400/40 text-red-200" : ""}
-                                                    >
-                                                        ΔE {formatDistance(group.distance)}
-                                                    </Badge>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => selectGuildGroup(group)}
+                                                    aria-pressed={isSelected}
+                                                    className="block w-full p-3 text-left transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                                                >
+                                                    <TerritoryPreview
+                                                        compact
+                                                        color={group.color}
+                                                        prefix={guildGroupPrefix(group)}
+                                                        label={guildGroupLabel(group)}
+                                                    />
+                                                    <div className="mt-3 flex items-center justify-between gap-2">
+                                                        <code className="text-sm font-semibold">{group.color}</code>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={isConflict ? "border-red-400/40 text-red-200" : ""}
+                                                        >
+                                                            ΔE {formatDistance(group.distance)}
+                                                        </Badge>
+                                                    </div>
+                                                    <p className="mt-2 text-sm font-medium">{guildGroupLabel(group)}</p>
+                                                </button>
+                                                <div className="flex flex-wrap gap-x-3 gap-y-1 border-t px-3 py-2 text-xs">
+                                                    {group.guilds.map((guild) => (
+                                                        <GuildStatsLink
+                                                            key={`${guild.name}-${guild.prefix}`}
+                                                            guild={guild}
+                                                        />
+                                                    ))}
                                                 </div>
-                                                <p className="mt-2 text-sm font-medium">{guildGroupLabel(group)}</p>
-                                                {group.guilds.length > 1 ? (
-                                                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                                                        {group.guilds
-                                                            .map(
-                                                                (guild) =>
-                                                                    `${guild.name} [${guild.prefix.toUpperCase()}]`,
-                                                            )
-                                                            .join(", ")}
-                                                    </p>
-                                                ) : null}
-                                            </button>
+                                            </div>
                                         );
                                     })}
                                 </div>

@@ -3,6 +3,7 @@ import {
     createGuildColorPalette,
     findDirectionalColorSuggestions,
     GUILD_COLOR_PLACEHOLDER,
+    guildStatsUrl,
     guildColorBrightness,
     hsvToRgb,
     MIN_GUILD_COLOR_BRIGHTNESS,
@@ -41,6 +42,12 @@ describe("guild color normalization and Athena parsing", () => {
 
     it("rejects an unexpected Athena response instead of failing open", () => {
         expect(() => parseAthenaGuildColors({ guilds: [] })).toThrow("unexpected guild-list shape");
+    });
+
+    it("builds encoded Wynncraft guild profile links", () => {
+        expect(guildStatsUrl("Red One / Ω")).toBe(
+            "https://wynncraft.com/stats/guild/Red%20One%20%2F%20%CE%A9",
+        );
     });
 });
 

@@ -1,6 +1,7 @@
 export const MIN_GUILD_COLOR_BRIGHTNESS = 60;
 export const MIN_GUILD_COLOR_DELTA_E = 20;
 export const GUILD_COLOR_PLACEHOLDER = "#C05F5F";
+export const WYNNCRAFT_GUILD_STATS_BASE_URL = "https://wynncraft.com/stats/guild";
 
 export interface GuildColorRecord {
     name: string;
@@ -193,6 +194,10 @@ export function rgbToHex({ r, g, b }: Rgb): string {
         .map((channel) => channel.toString(16).padStart(2, "0"))
         .join("")
         .toUpperCase()}`;
+}
+
+export function guildStatsUrl(guildName: string): string {
+    return `${WYNNCRAFT_GUILD_STATS_BASE_URL}/${encodeURIComponent(guildName)}`;
 }
 
 export function rgbToHsv({ r, g, b }: Rgb): Hsv {

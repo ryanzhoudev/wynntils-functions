@@ -67,6 +67,15 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
     await expect(page.getByText("2 guilds use this color").first()).toBeVisible();
     await expect(page.getByText("85 placeholder entries", { exact: false })).toBeVisible();
 
+    const redOneLinks = page.getByRole("link", { name: /Red One \[R1\].*opens in a new tab/ });
+    await expect(redOneLinks).toHaveCount(2);
+    await expect(redOneLinks.first()).toHaveAttribute(
+        "href",
+        "https://wynncraft.com/stats/guild/Red%20One",
+    );
+    await expect(redOneLinks.first()).toHaveAttribute("target", "_blank");
+    await expect(redOneLinks.first()).toHaveAttribute("rel", "noopener noreferrer");
+
     await page.evaluate(() => {
         Object.defineProperty(navigator, "clipboard", {
             configurable: true,
@@ -180,6 +189,10 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     await expect(page.getByText("2 guilds share #FF0000")).toBeVisible();
     await expect(page.getByText("Red One [R1]")).toBeVisible();
     await expect(page.getByText("Red Two [R2]")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Red One \[R1\].*opens in a new tab/ })).toHaveAttribute(
+        "href",
+        "https://wynncraft.com/stats/guild/Red%20One",
+    );
     await expect(page.getByText(/Registered #FF0000 · ΔE/)).toBeVisible();
 
     const sliderBounds = await lightness.boundingBox();

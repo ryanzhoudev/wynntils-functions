@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import GuildStatsLink from "@/components/guild-stats-link";
 import {
     createGuildColorMapGroups,
     GUILD_COLOR_MAP_DEFAULT_LIGHTNESS,
@@ -462,12 +463,12 @@ export default function GuildColorMap() {
                                             <p className="mt-1 text-xs text-muted-foreground">
                                                 Registered {sampleGroup.color} · ΔE {sampleDistance?.toFixed(2)}
                                             </p>
-                                            <ul className="mt-3 space-y-1 text-sm">
-                                                {sampleGroup.guilds.map((guild) => (
-                                                    <li key={`${guild.name}-${guild.prefix}`}>
-                                                        {guild.name} [{guild.prefix.toUpperCase()}]
-                                                    </li>
-                                                ))}
+                                                <ul className="mt-3 space-y-1 text-sm">
+                                                    {sampleGroup.guilds.map((guild) => (
+                                                        <li key={`${guild.name}-${guild.prefix}`}>
+                                                            <GuildStatsLink guild={guild} />
+                                                        </li>
+                                                    ))}
                                             </ul>
                                         </div>
                                     ) : sampleInGamut ? (
