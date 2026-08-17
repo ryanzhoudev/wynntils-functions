@@ -9,26 +9,22 @@ import GuildStatsLink from "@/components/guild-stats-link";
 import {
     classifyGuildColorMapPoint,
     createGuildColorMapGroups,
-    GUILD_COLOR_MAP_A_MAX,
-    GUILD_COLOR_MAP_A_MIN,
-    GUILD_COLOR_MAP_B_MAX,
-    GUILD_COLOR_MAP_B_MIN,
     GUILD_COLOR_MAP_DEFAULT_LIGHTNESS,
     GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH,
     GUILD_COLOR_MAP_FLAG_IN_GAMUT,
     GUILD_COLOR_MAP_PREVIEW_RESOLUTION,
     GUILD_COLOR_MAP_RESOLUTION,
     guildColorMapFullResolution,
-    GuildColorMapGroup,
-    GuildColorMapRenderResponse,
-    GuildColorMapWorkerResponse,
+    type GuildColorMapGroup,
+    type GuildColorMapRenderResponse,
+    type GuildColorMapWorkerResponse,
     labToMapPosition,
     readGuildColorMapPoint,
 } from "@/lib/guild-color-map";
 import {
     createGuildColorPalette,
     deltaE76,
-    GuildColorApiResponse,
+    type GuildColorApiResponse,
     hexToRgb,
     MIN_GUILD_COLOR_DELTA_E,
     normalizeGuildColorHex,
@@ -41,15 +37,13 @@ import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 interface MapSample {
-    x: number;
-    y: number;
     ownerIndex: number;
     flags: number;
     point: ReturnType<typeof readGuildColorMapPoint>;
 }
 
 interface GuildColorMapProps {
-    initialColor: string | null;
+    initialColor?: string | null;
 }
 
 function roundLightness(lightness: number): number {
@@ -66,7 +60,12 @@ function replaceTargetQuery(color: string | null) {
         url.searchParams.delete("hex");
     }
 
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+    if (nextUrl !== currentUrl) {
+        window.history.replaceState(window.history.state, "", nextUrl);
+    }
 }
 
 function parseApiError(payload: unknown): string {
@@ -86,13 +85,7 @@ function guildGroupLabel(group: GuildColorMapGroup): string {
     return `${group.guilds.length} guilds share ${group.color}`;
 }
 
-function LegendItem({
-    className,
-    label,
-}: {
-    className: string;
-    label: string;
-}) {
+function LegendItem({ className, label }: { className: string; label: string }) {
     return (
         <span className="flex items-center gap-2 text-xs text-muted-foreground">
             <span aria-hidden="true" className={cn("size-3 rounded-sm border", className)} />
@@ -104,9 +97,7 @@ function LegendItem({
 export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
     const normalizedInitialColor = normalizeGuildColorHex(initialColor ?? "");
     const initialRgb = normalizedInitialColor ? hexToRgb(normalizedInitialColor) : null;
-    const initialLightness = initialRgb
-        ? roundLightness(rgbToLab(initialRgb).L)
-        : GUILD_COLOR_MAP_DEFAULT_LIGHTNESS;
+    const initialLightness = initialRgb ? roundLightness(rgbToLab(initialRgb).L) : GUILD_COLOR_MAP_DEFAULT_LIGHTNESS;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const workerRef = useRef<Worker | null>(null);
@@ -130,61 +121,35 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
         () => createGuildColorMapGroups(createGuildColorPalette(guildData?.guilds ?? [])),
         [guildData],
     );
-    const workerGroups = useMemo(
-        () => groups.map(({ color, lab }) => ({ color, lab })),
-        [groups],
-    );
+    const workerGroups = useMemo(() => groups.map(({ color, lab }) => ({ color, lab })), [groups]);
     const target = useMemo(() => {
         const rgb = targetColor ? hexToRgb(targetColor) : null;
 
         return rgb ? { rgb, lab: rgbToLab(rgb) } : null;
     }, [targetColor]);
-    const targetRgb = target?.rgb ?? null;
-    const targetLab = target?.lab ?? null;
     const targetSample = useMemo(() => {
-        if (!renderedMap || !targetRgb || !targetLab || Math.abs(renderedMap.lightness - lightness) > 0.001) {
+        if (!renderedMap || !target || Math.abs(renderedMap.lightness - lightness) > 0.001) {
             return null;
         }
 
-        const position = labToMapPosition(targetLab, renderedMap.width, renderedMap.height);
-        const x = Math.min(renderedMap.width - 1, Math.max(0, Math.round(position.x)));
-        const y = Math.min(renderedMap.height - 1, Math.max(0, Math.round(position.y)));
-        const point = { lab: targetLab, rgb: targetRgb, inGamut: true };
+        const point = { ...target, inGamut: true };
         const classification = classifyGuildColorMapPoint(point, workerGroups);
 
         return {
-            x,
-            y,
             ownerIndex: classification.claimed ? classification.closestGroupIndex : -1,
             flags:
-                GUILD_COLOR_MAP_FLAG_IN_GAMUT |
-                (classification.brightEnough ? GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH : 0),
+                GUILD_COLOR_MAP_FLAG_IN_GAMUT | (classification.brightEnough ? GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH : 0),
             point,
         } satisfies MapSample;
-    }, [lightness, renderedMap, targetLab, targetRgb, workerGroups]);
+    }, [lightness, renderedMap, target, workerGroups]);
     const activeSample = sample ?? targetSample;
     const sampleGroup =
-        activeSample?.ownerIndex !== undefined && activeSample.ownerIndex >= 0
-            ? groups[activeSample.ownerIndex]
-            : null;
+        activeSample?.ownerIndex !== undefined && activeSample.ownerIndex >= 0 ? groups[activeSample.ownerIndex] : null;
     const sampleInGamut = Boolean(activeSample && (activeSample.flags & GUILD_COLOR_MAP_FLAG_IN_GAMUT) !== 0);
-    const sampleBrightEnough = Boolean(
-        activeSample && (activeSample.flags & GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH) !== 0,
-    );
+    const sampleBrightEnough = Boolean(activeSample && (activeSample.flags & GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH) !== 0);
     const sampleAllowed = sampleInGamut && sampleBrightEnough && !sampleGroup;
     const sampleDistance = activeSample && sampleGroup ? deltaE76(activeSample.point.lab, sampleGroup.lab) : null;
-    const targetMarkerPosition = targetLab
-        ? {
-              left:
-                  ((targetLab.a - GUILD_COLOR_MAP_A_MIN) /
-                      (GUILD_COLOR_MAP_A_MAX - GUILD_COLOR_MAP_A_MIN)) *
-                  100,
-              top:
-                  ((GUILD_COLOR_MAP_B_MAX - targetLab.b) /
-                      (GUILD_COLOR_MAP_B_MAX - GUILD_COLOR_MAP_B_MIN)) *
-                  100,
-          }
-        : null;
+    const targetMarkerPosition = target ? labToMapPosition(target.lab, 101, 101) : null;
     const allowedPercentage =
         renderedMap && renderedMap.statistics.inGamut > 0
             ? (renderedMap.statistics.allowed / renderedMap.statistics.inGamut) * 100
@@ -293,9 +258,7 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
         }
 
         const requestId = latestRequestId.current + 1;
-        const resolution = isAdjustingLightness
-            ? GUILD_COLOR_MAP_PREVIEW_RESOLUTION
-            : fullRenderResolution;
+        const resolution = isAdjustingLightness ? GUILD_COLOR_MAP_PREVIEW_RESOLUTION : fullRenderResolution;
         latestRequestId.current = requestId;
         workerRef.current.postMessage({
             type: "render",
@@ -347,8 +310,6 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
         const index = y * renderedMap.width + x;
 
         setSample({
-            x,
-            y,
             ownerIndex: renderedMap.owners[index],
             flags: renderedMap.flags[index],
             point: readGuildColorMapPoint(x, y, renderedMap.width, renderedMap.height, renderedMap.lightness),
@@ -358,15 +319,9 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
     function jumpToColor(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const normalizedColor = normalizeGuildColorHex(jumpInput);
+        const rgb = normalizedColor ? hexToRgb(normalizedColor) : null;
 
-        if (!normalizedColor) {
-            setJumpError("Use a three- or six-digit hexadecimal color.");
-            return;
-        }
-
-        const rgb = hexToRgb(normalizedColor);
-
-        if (!rgb) {
+        if (!normalizedColor || !rgb) {
             setJumpError("Use a three- or six-digit hexadecimal color.");
             return;
         }
@@ -387,17 +342,10 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
         replaceTargetQuery(null);
     }
 
-    const renderedMapIsPreview = Boolean(
-        renderedMap && renderedMap.width === GUILD_COLOR_MAP_PREVIEW_RESOLUTION,
-    );
-    const requestedResolution = isAdjustingLightness
-        ? GUILD_COLOR_MAP_PREVIEW_RESOLUTION
-        : fullRenderResolution;
+    const renderedMapIsPreview = Boolean(renderedMap && renderedMap.width === GUILD_COLOR_MAP_PREVIEW_RESOLUTION);
+    const requestedResolution = isAdjustingLightness ? GUILD_COLOR_MAP_PREVIEW_RESOLUTION : fullRenderResolution;
     const isRendering = Boolean(
-        guildData &&
-        (!renderedMap ||
-            renderedMap.lightness !== lightness ||
-            renderedMap.width !== requestedResolution),
+        guildData && (!renderedMap || renderedMap.lightness !== lightness || renderedMap.width !== requestedResolution),
     );
     const statusText = loadError
         ? "Guild data unavailable"
@@ -486,10 +434,16 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
                             </output>
                         </div>
                         <div className="flex flex-wrap gap-x-5 gap-y-2">
-                            <LegendItem className="border-white/30 bg-gradient-to-br from-sky-300 to-fuchsia-400" label="Allowed" />
+                            <LegendItem
+                                className="border-white/30 bg-gradient-to-br from-sky-300 to-fuchsia-400"
+                                label="Allowed"
+                            />
                             <LegendItem className="border-white/70 bg-slate-800" label="Guild claim" />
                             <LegendItem className="border-slate-500 bg-slate-950" label="Too dark" />
-                            <LegendItem className="border-slate-600 bg-[repeating-conic-gradient(#18181b_0_25%,#27272a_0_50%)] bg-[length:6px_6px]" label="Outside RGB" />
+                            <LegendItem
+                                className="border-slate-600 bg-[repeating-conic-gradient(#18181b_0_25%,#27272a_0_50%)] bg-[length:6px_6px]"
+                                label="Outside RGB"
+                            />
                             {allowedPercentage !== null ? (
                                 <Badge variant="secondary" data-testid="map-coverage">
                                     {allowedPercentage.toFixed(1)}% allowed in this slice
@@ -516,8 +470,8 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
                                     aria-label={`Selected color ${targetColor}`}
                                     className="pointer-events-none absolute size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_2px_rgb(0_0_0),0_0_10px_3px_rgb(255_255_255/0.8)]"
                                     style={{
-                                        left: `${targetMarkerPosition.left}%`,
-                                        top: `${targetMarkerPosition.top}%`,
+                                        left: `${targetMarkerPosition.x}%`,
+                                        top: `${targetMarkerPosition.y}%`,
                                     }}
                                 />
                             ) : null}
@@ -621,12 +575,12 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
                                             <p className="mt-1 text-xs text-muted-foreground">
                                                 Registered {sampleGroup.color} · ΔE {sampleDistance?.toFixed(2)}
                                             </p>
-                                                <ul className="mt-3 space-y-1 text-sm">
-                                                    {sampleGroup.guilds.map((guild) => (
-                                                        <li key={`${guild.name}-${guild.prefix}`}>
-                                                            <GuildStatsLink guild={guild} />
-                                                        </li>
-                                                    ))}
+                                            <ul className="mt-3 space-y-1 text-sm">
+                                                {sampleGroup.guilds.map((guild) => (
+                                                    <li key={`${guild.name}-${guild.prefix}`}>
+                                                        <GuildStatsLink guild={guild} />
+                                                    </li>
+                                                ))}
                                             </ul>
                                         </div>
                                     ) : sampleInGamut ? (

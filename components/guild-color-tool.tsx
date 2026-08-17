@@ -10,12 +10,12 @@ import GuildStatsLink from "@/components/guild-stats-link";
 import {
     analyzeGuildColor,
     createGuildColorPalette,
-    DirectionalColorSuggestion,
+    type DirectionalColorSuggestion,
     evaluateGuildColor,
     findDirectionalColorSuggestions,
     GUILD_COLOR_DIRECTIONS,
-    GuildColorApiResponse,
-    GuildColorGroup,
+    type GuildColorApiResponse,
+    type GuildColorGroup,
     MIN_GUILD_COLOR_BRIGHTNESS,
     MIN_GUILD_COLOR_DELTA_E,
     normalizeGuildColorHex,
@@ -472,8 +472,8 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                             </div>
                                         ) : null}
                                         <p className="mt-2 text-xs text-muted-foreground">
-                                            Brightness {liveVerdict.brightness.toFixed(1)} / {MIN_GUILD_COLOR_BRIGHTNESS}{" "}
-                                            minimum
+                                            Brightness {liveVerdict.brightness.toFixed(1)} /{" "}
+                                            {MIN_GUILD_COLOR_BRIGHTNESS} minimum
                                             {" · "}ΔE {formatDistance(liveVerdict.closestDistance)} /{" "}
                                             {MIN_GUILD_COLOR_DELTA_E} minimum
                                         </p>
@@ -708,7 +708,9 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                                         <code className="text-sm font-semibold">{group.color}</code>
                                                         <Badge
                                                             variant="outline"
-                                                            className={isConflict ? "border-red-400/40 text-red-200" : ""}
+                                                            className={
+                                                                isConflict ? "border-red-400/40 text-red-200" : ""
+                                                            }
                                                         >
                                                             ΔE {formatDistance(group.distance)}
                                                         </Badge>

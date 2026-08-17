@@ -1,4 +1,4 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { mockCatalog } from "./fixtures";
 import {
     GUILD_COLOR_MAP_A_MAX,
@@ -69,10 +69,7 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
 
     const redOneLinks = page.getByRole("link", { name: /Red One \[R1\].*opens in a new tab/ });
     await expect(redOneLinks).toHaveCount(2);
-    await expect(redOneLinks.first()).toHaveAttribute(
-        "href",
-        "https://wynncraft.com/stats/guild/Red%20One",
-    );
+    await expect(redOneLinks.first()).toHaveAttribute("href", "https://wynncraft.com/stats/guild/Red%20One");
     await expect(redOneLinks.first()).toHaveAttribute("target", "_blank");
     await expect(redOneLinks.first()).toHaveAttribute("rel", "noopener noreferrer");
 
@@ -130,10 +127,7 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
 test("supports color query and direct hash preload formats", async ({ page }) => {
     await page.goto("/guild-color");
     await expect(page.getByRole("heading", { name: "Guild Color Picker" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Color map" })).toHaveAttribute(
-        "href",
-        "/guild-color/map?hex=FFFFFF",
-    );
+    await expect(page.getByRole("link", { name: "Color map" })).toHaveAttribute("href", "/guild-color/map?hex=FFFFFF");
     await expect(page.locator("#preview-heading")).toHaveText("Territory previews");
     await expect(page.getByRole("textbox", { name: "Guild color", exact: true })).toHaveValue("#FFFFFF");
     await expect(
@@ -184,10 +178,8 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     expect(fullResolution).toBe(1024);
 
     await page.mouse.move(
-        bounds!.x +
-            bounds!.width * ((75 - GUILD_COLOR_MAP_A_MIN) / (GUILD_COLOR_MAP_A_MAX - GUILD_COLOR_MAP_A_MIN)),
-        bounds!.y +
-            bounds!.height * ((GUILD_COLOR_MAP_B_MAX - 60) / (GUILD_COLOR_MAP_B_MAX - GUILD_COLOR_MAP_B_MIN)),
+        bounds!.x + bounds!.width * ((75 - GUILD_COLOR_MAP_A_MIN) / (GUILD_COLOR_MAP_A_MAX - GUILD_COLOR_MAP_A_MIN)),
+        bounds!.y + bounds!.height * ((GUILD_COLOR_MAP_B_MAX - 60) / (GUILD_COLOR_MAP_B_MAX - GUILD_COLOR_MAP_B_MIN)),
     );
     await expect(page.getByText("2 guilds share #FF0000")).toBeVisible();
     await expect(page.getByText("Red One [R1]")).toBeVisible();
@@ -200,16 +192,11 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
 
     const sliderBounds = await lightness.boundingBox();
     expect(sliderBounds).not.toBeNull();
-    await page.mouse.move(
-        sliderBounds!.x + sliderBounds!.width * 0.53,
-        sliderBounds!.y + sliderBounds!.height / 2,
-    );
+    await page.mouse.move(sliderBounds!.x + sliderBounds!.width * 0.53, sliderBounds!.y + sliderBounds!.height / 2);
     await page.mouse.down();
-    await page.mouse.move(
-        sliderBounds!.x + sliderBounds!.width * 0.35,
-        sliderBounds!.y + sliderBounds!.height / 2,
-        { steps: 4 },
-    );
+    await page.mouse.move(sliderBounds!.x + sliderBounds!.width * 0.35, sliderBounds!.y + sliderBounds!.height / 2, {
+        steps: 4,
+    });
     const draggedLightness = await lightness.inputValue();
     const canvas = page.locator("canvas");
     await expect(canvas).toHaveAttribute("aria-label", `Guild color claims at Lab lightness ${draggedLightness}`);
@@ -225,10 +212,7 @@ test("jumps directly to a hex on the perceptual color map", async ({ page }) => 
     await expect(jumpInput).toHaveValue("#00FF00");
     await expect(page.getByRole("img", { name: "Selected color #00FF00" })).toBeVisible();
     await expect(page.getByText("#00FF00", { exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Back to picker" })).toHaveAttribute(
-        "href",
-        "/guild-color?hex=00FF00",
-    );
+    await expect(page.getByRole("link", { name: "Back to picker" })).toHaveAttribute("href", "/guild-color?hex=00FF00");
 
     await jumpInput.fill("not-a-color");
     await page.getByRole("button", { name: "Jump" }).click();

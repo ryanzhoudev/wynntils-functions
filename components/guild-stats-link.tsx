@@ -1,4 +1,4 @@
-import { guildStatsUrl, GuildColorRecord } from "@/lib/guild-colors";
+import { guildStatsUrl, type GuildColorRecord } from "@/lib/guild-colors";
 import { cn } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
 

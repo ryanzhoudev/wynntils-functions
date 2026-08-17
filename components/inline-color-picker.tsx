@@ -1,7 +1,7 @@
 "use client";
 
 import { hexToRgb, hsvToRgb, rgbToHex, rgbToHsv } from "@/lib/guild-colors";
-import { KeyboardEvent, PointerEvent, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, useRef, useState } from "react";
 
 interface InlineColorPickerProps {
     value: string;
