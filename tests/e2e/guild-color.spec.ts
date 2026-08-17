@@ -36,6 +36,28 @@ test.beforeEach(async ({ page }) => {
     await mockGuildColors(page);
 });
 
+test("updates the verdict while dragging the inline color picker", async ({ page }) => {
+    await page.goto("/guild-color?hex=FFFFFF");
+
+    const input = page.getByRole("textbox", { name: "Guild color", exact: true });
+    const plane = page.getByRole("slider", { name: "Saturation and brightness" });
+    await expect(page.locator('input[type="color"]')).toHaveCount(0);
+    await expect(plane).toBeVisible();
+    await expect(page.getByText(/Allowed\? (?:🟩 Yes|🟥 No)/)).toBeVisible();
+
+    const bounds = await plane.boundingBox();
+    expect(bounds).not.toBeNull();
+    await page.mouse.move(bounds!.x + 4, bounds!.y + 4);
+    await page.mouse.down();
+    await page.mouse.move(bounds!.x + bounds!.width * 0.72, bounds!.y + bounds!.height * 0.28, {
+        steps: 5,
+    });
+
+    await expect(input).not.toHaveValue("#FFFFFF");
+    await expect(page.getByText(/Allowed\? (?:🟩 Yes|🟥 No)/)).toBeVisible();
+    await page.mouse.up();
+});
+
 test("preloads colors, previews every blocker, and keeps suggestions separate from the input", async ({ page }) => {
     await page.goto("/guild-color?hex=FF0000");
 

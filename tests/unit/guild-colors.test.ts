@@ -4,9 +4,11 @@ import {
     findDirectionalColorSuggestions,
     GUILD_COLOR_PLACEHOLDER,
     guildColorBrightness,
+    hsvToRgb,
     MIN_GUILD_COLOR_BRIGHTNESS,
     normalizeGuildColorHex,
     parseAthenaGuildColors,
+    rgbToHsv,
 } from "@/lib/guild-colors";
 import { describe, expect, it } from "vitest";
 
@@ -39,6 +41,24 @@ describe("guild color normalization and Athena parsing", () => {
 
     it("rejects an unexpected Athena response instead of failing open", () => {
         expect(() => parseAthenaGuildColors({ guilds: [] })).toThrow("unexpected guild-list shape");
+    });
+});
+
+describe("inline color picker conversions", () => {
+    it("round-trips representative RGB colors through HSV", () => {
+        for (const rgb of [
+            { r: 255, g: 255, b: 255 },
+            { r: 255, g: 0, b: 0 },
+            { r: 12, g: 144, b: 210 },
+            { r: 0, g: 0, b: 0 },
+        ]) {
+            expect(hsvToRgb(rgbToHsv(rgb))).toEqual(rgb);
+        }
+    });
+
+    it("clamps saturation and brightness when converting HSV", () => {
+        expect(hsvToRgb({ h: 0, s: 2, v: 2 })).toEqual({ r: 255, g: 0, b: 0 });
+        expect(hsvToRgb({ h: 120, s: -1, v: -1 })).toEqual({ r: 0, g: 0, b: 0 });
     });
 });
 

@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import InlineColorPicker from "@/components/inline-color-picker";
 import {
     analyzeGuildColor,
     createGuildColorPalette,
     DirectionalColorSuggestion,
+    evaluateGuildColor,
     findDirectionalColorSuggestions,
     GUILD_COLOR_DIRECTIONS,
     GuildColorApiResponse,
@@ -182,6 +184,10 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
     const normalizedColor = normalizeGuildColorHex(inputColor);
     const deferredNormalizedColor = normalizeGuildColorHex(deferredInputColor);
     const palette = useMemo(() => createGuildColorPalette(guildData?.guilds ?? []), [guildData]);
+    const liveVerdict = useMemo(
+        () => (guildData && normalizedColor ? evaluateGuildColor(normalizedColor, palette) : null),
+        [guildData, normalizedColor, palette],
+    );
     const analysis = useMemo(
         () => (guildData && deferredNormalizedColor ? analyzeGuildColor(deferredNormalizedColor, palette) : null),
         [deferredNormalizedColor, guildData, palette],
@@ -210,17 +216,18 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
 
         return [...conflicts, ...closestAllowed];
     }, [analysis]);
+    const closestGroup = analysis?.groups[0] ?? null;
     const isAnalyzing = normalizedColor !== deferredNormalizedColor;
     const hasSelectionForCurrentColor = selection?.forColor === deferredNormalizedColor;
     const activeSelection = hasSelectionForCurrentColor
         ? selection
-        : analysis?.groups[0]
+        : closestGroup
           ? {
                 forColor: deferredNormalizedColor ?? "",
                 kind: "guild" as const,
-                color: analysis.groups[0].color,
-                prefix: guildGroupPrefix(analysis.groups[0]),
-                label: guildGroupLabel(analysis.groups[0]),
+                color: closestGroup.color,
+                prefix: guildGroupPrefix(closestGroup),
+                label: guildGroupLabel(closestGroup),
             }
           : null;
 
@@ -361,13 +368,6 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                             <div className="space-y-2">
                                 <Label htmlFor="guild-color">Guild color</Label>
                                 <div className="flex gap-2">
-                                    <input
-                                        type="color"
-                                        aria-label="Open guild color picker"
-                                        value={normalizedColor ?? "#000000"}
-                                        onChange={(event) => setInputColorOverride(event.target.value.toUpperCase())}
-                                        className="h-9 w-12 cursor-pointer rounded-md border border-input bg-background p-1"
-                                    />
                                     <Input
                                         id="guild-color"
                                         value={inputColor}
@@ -381,6 +381,11 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                     <p className="text-xs text-red-300">Use a three- or six-digit hexadecimal color.</p>
                                 ) : null}
                             </div>
+
+                            <InlineColorPicker
+                                value={normalizedColor ?? chosenPreviewColor}
+                                onChange={setInputColorOverride}
+                            />
 
                             <div className="space-y-2">
                                 <Label htmlFor="guild-prefix">Preview tag</Label>
@@ -396,10 +401,10 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                             <div
                                 className={cn(
                                     "rounded-lg border p-4",
-                                    analysis?.allowed
+                                    liveVerdict?.allowed
                                         ? "border-emerald-400/40 bg-emerald-400/10"
                                         : "border-red-400/40 bg-red-400/10",
-                                    (!analysis || isAnalyzing) && "border-border bg-muted/40",
+                                    !liveVerdict && "border-border bg-muted/40",
                                 )}
                             >
                                 {!normalizedColor ? (
@@ -426,28 +431,33 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                             Retry
                                         </Button>
                                     </>
-                                ) : !analysis || isAnalyzing ? (
+                                ) : !liveVerdict ? (
                                     <p className="font-semibold">Checking color…</p>
                                 ) : (
                                     <>
                                         <div className="flex items-center gap-2 font-semibold">
-                                            {analysis.allowed ? (
+                                            {liveVerdict.allowed ? (
                                                 <CheckCircle2 className="size-4 text-emerald-300" aria-hidden="true" />
                                             ) : (
                                                 <AlertTriangle className="size-4 text-red-300" aria-hidden="true" />
                                             )}
-                                            Allowed? {analysis.allowed ? "🟩 Yes" : "🟥 No"}
+                                            Allowed? {liveVerdict.allowed ? "🟩 Yes" : "🟥 No"}
                                         </div>
                                         <p className="mt-2 text-sm">
                                             <strong>Closest:</strong>{" "}
-                                            {analysis.groups[0]
-                                                ? `${guildGroupLabel(analysis.groups[0])} (${analysis.groups[0].color}, ΔE ${formatDistance(analysis.groups[0].distance)})`
+                                            {closestGroup
+                                                ? `${guildGroupLabel(closestGroup)} (${closestGroup.color}, ΔE ${formatDistance(closestGroup.distance)})`
                                                 : "Unknown"}
+                                            {isAnalyzing ? (
+                                                <Badge variant="outline" className="ml-2 align-middle text-[0.65rem]">
+                                                    Updating nearby
+                                                </Badge>
+                                            ) : null}
                                         </p>
                                         <p className="mt-2 text-xs text-muted-foreground">
-                                            Brightness {analysis.brightness.toFixed(1)} / {MIN_GUILD_COLOR_BRIGHTNESS}{" "}
+                                            Brightness {liveVerdict.brightness.toFixed(1)} / {MIN_GUILD_COLOR_BRIGHTNESS}{" "}
                                             minimum
-                                            {" · "}ΔE {formatDistance(analysis.closestDistance)} /{" "}
+                                            {" · "}ΔE {formatDistance(liveVerdict.closestDistance)} /{" "}
                                             {MIN_GUILD_COLOR_DELTA_E} minimum
                                         </p>
                                     </>
