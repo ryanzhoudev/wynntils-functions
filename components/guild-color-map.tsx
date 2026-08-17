@@ -3,10 +3,16 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import GuildStatsLink from "@/components/guild-stats-link";
 import {
+    classifyGuildColorMapPoint,
     createGuildColorMapGroups,
+    GUILD_COLOR_MAP_A_MAX,
+    GUILD_COLOR_MAP_A_MIN,
+    GUILD_COLOR_MAP_B_MAX,
+    GUILD_COLOR_MAP_B_MIN,
     GUILD_COLOR_MAP_DEFAULT_LIGHTNESS,
     GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH,
     GUILD_COLOR_MAP_FLAG_IN_GAMUT,
@@ -16,19 +22,23 @@ import {
     GuildColorMapGroup,
     GuildColorMapRenderResponse,
     GuildColorMapWorkerResponse,
+    labToMapPosition,
     readGuildColorMapPoint,
 } from "@/lib/guild-color-map";
 import {
     createGuildColorPalette,
     deltaE76,
     GuildColorApiResponse,
+    hexToRgb,
     MIN_GUILD_COLOR_DELTA_E,
+    normalizeGuildColorHex,
+    rgbToLab,
     rgbToHex,
 } from "@/lib/guild-colors";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, Database, Map as MapIcon, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 interface MapSample {
     x: number;
@@ -36,6 +46,27 @@ interface MapSample {
     ownerIndex: number;
     flags: number;
     point: ReturnType<typeof readGuildColorMapPoint>;
+}
+
+interface GuildColorMapProps {
+    initialColor: string | null;
+}
+
+function roundLightness(lightness: number): number {
+    return Math.round(lightness * 10) / 10;
+}
+
+function replaceTargetQuery(color: string | null) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("color");
+
+    if (color) {
+        url.searchParams.set("hex", color.slice(1));
+    } else {
+        url.searchParams.delete("hex");
+    }
+
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 function parseApiError(payload: unknown): string {
@@ -70,13 +101,18 @@ function LegendItem({
     );
 }
 
-export default function GuildColorMap() {
+export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
+    const normalizedInitialColor = normalizeGuildColorHex(initialColor ?? "");
+    const initialRgb = normalizedInitialColor ? hexToRgb(normalizedInitialColor) : null;
+    const initialLightness = initialRgb
+        ? roundLightness(rgbToLab(initialRgb).L)
+        : GUILD_COLOR_MAP_DEFAULT_LIGHTNESS;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const workerRef = useRef<Worker | null>(null);
     const latestRequestId = useRef(0);
     const latestRenderedRequestId = useRef(0);
-    const [lightness, setLightness] = useState(GUILD_COLOR_MAP_DEFAULT_LIGHTNESS);
+    const [lightness, setLightness] = useState(initialLightness);
     const [isAdjustingLightness, setIsAdjustingLightness] = useState(false);
     const [fullRenderResolution, setFullRenderResolution] = useState(GUILD_COLOR_MAP_RESOLUTION);
     const [guildData, setGuildData] = useState<GuildColorApiResponse | null>(null);
@@ -85,6 +121,11 @@ export default function GuildColorMap() {
     const [renderError, setRenderError] = useState<string | null>(null);
     const [renderedMap, setRenderedMap] = useState<GuildColorMapRenderResponse | null>(null);
     const [sample, setSample] = useState<MapSample | null>(null);
+    const [jumpInput, setJumpInput] = useState(normalizedInitialColor ?? initialColor ?? "");
+    const [targetColor, setTargetColor] = useState<string | null>(normalizedInitialColor);
+    const [jumpError, setJumpError] = useState<string | null>(
+        initialColor && !normalizedInitialColor ? "Use a three- or six-digit hexadecimal color." : null,
+    );
     const groups = useMemo(
         () => createGuildColorMapGroups(createGuildColorPalette(guildData?.guilds ?? [])),
         [guildData],
@@ -93,11 +134,57 @@ export default function GuildColorMap() {
         () => groups.map(({ color, lab }) => ({ color, lab })),
         [groups],
     );
-    const sampleGroup = sample?.ownerIndex !== undefined && sample.ownerIndex >= 0 ? groups[sample.ownerIndex] : null;
-    const sampleInGamut = Boolean(sample && (sample.flags & GUILD_COLOR_MAP_FLAG_IN_GAMUT) !== 0);
-    const sampleBrightEnough = Boolean(sample && (sample.flags & GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH) !== 0);
+    const target = useMemo(() => {
+        const rgb = targetColor ? hexToRgb(targetColor) : null;
+
+        return rgb ? { rgb, lab: rgbToLab(rgb) } : null;
+    }, [targetColor]);
+    const targetRgb = target?.rgb ?? null;
+    const targetLab = target?.lab ?? null;
+    const targetSample = useMemo(() => {
+        if (!renderedMap || !targetRgb || !targetLab || Math.abs(renderedMap.lightness - lightness) > 0.001) {
+            return null;
+        }
+
+        const position = labToMapPosition(targetLab, renderedMap.width, renderedMap.height);
+        const x = Math.min(renderedMap.width - 1, Math.max(0, Math.round(position.x)));
+        const y = Math.min(renderedMap.height - 1, Math.max(0, Math.round(position.y)));
+        const point = { lab: targetLab, rgb: targetRgb, inGamut: true };
+        const classification = classifyGuildColorMapPoint(point, workerGroups);
+
+        return {
+            x,
+            y,
+            ownerIndex: classification.claimed ? classification.closestGroupIndex : -1,
+            flags:
+                GUILD_COLOR_MAP_FLAG_IN_GAMUT |
+                (classification.brightEnough ? GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH : 0),
+            point,
+        } satisfies MapSample;
+    }, [lightness, renderedMap, targetLab, targetRgb, workerGroups]);
+    const activeSample = sample ?? targetSample;
+    const sampleGroup =
+        activeSample?.ownerIndex !== undefined && activeSample.ownerIndex >= 0
+            ? groups[activeSample.ownerIndex]
+            : null;
+    const sampleInGamut = Boolean(activeSample && (activeSample.flags & GUILD_COLOR_MAP_FLAG_IN_GAMUT) !== 0);
+    const sampleBrightEnough = Boolean(
+        activeSample && (activeSample.flags & GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH) !== 0,
+    );
     const sampleAllowed = sampleInGamut && sampleBrightEnough && !sampleGroup;
-    const sampleDistance = sample && sampleGroup ? deltaE76(sample.point.lab, sampleGroup.lab) : null;
+    const sampleDistance = activeSample && sampleGroup ? deltaE76(activeSample.point.lab, sampleGroup.lab) : null;
+    const targetMarkerPosition = targetLab
+        ? {
+              left:
+                  ((targetLab.a - GUILD_COLOR_MAP_A_MIN) /
+                      (GUILD_COLOR_MAP_A_MAX - GUILD_COLOR_MAP_A_MIN)) *
+                  100,
+              top:
+                  ((GUILD_COLOR_MAP_B_MAX - targetLab.b) /
+                      (GUILD_COLOR_MAP_B_MAX - GUILD_COLOR_MAP_B_MIN)) *
+                  100,
+          }
+        : null;
     const allowedPercentage =
         renderedMap && renderedMap.statistics.inGamut > 0
             ? (renderedMap.statistics.allowed / renderedMap.statistics.inGamut) * 100
@@ -268,6 +355,38 @@ export default function GuildColorMap() {
         });
     }
 
+    function jumpToColor(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        const normalizedColor = normalizeGuildColorHex(jumpInput);
+
+        if (!normalizedColor) {
+            setJumpError("Use a three- or six-digit hexadecimal color.");
+            return;
+        }
+
+        const rgb = hexToRgb(normalizedColor);
+
+        if (!rgb) {
+            setJumpError("Use a three- or six-digit hexadecimal color.");
+            return;
+        }
+
+        setJumpInput(normalizedColor);
+        setTargetColor(normalizedColor);
+        setLightness(roundLightness(rgbToLab(rgb).L));
+        setSample(null);
+        setJumpError(null);
+        replaceTargetQuery(normalizedColor);
+    }
+
+    function changeLightness(nextLightness: number) {
+        setLightness(nextLightness);
+        setTargetColor(null);
+        setSample(null);
+        setJumpError(null);
+        replaceTargetQuery(null);
+    }
+
     const renderedMapIsPreview = Boolean(
         renderedMap && renderedMap.width === GUILD_COLOR_MAP_PREVIEW_RESOLUTION,
     );
@@ -301,7 +420,7 @@ export default function GuildColorMap() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <Button variant="outline" asChild>
-                        <Link href="/guild-color">
+                        <Link href={targetColor ? `/guild-color?hex=${targetColor.slice(1)}` : "/guild-color"}>
                             <ArrowLeft className="size-4" aria-hidden="true" />
                             Back to picker
                         </Link>
@@ -317,10 +436,35 @@ export default function GuildColorMap() {
                     <CardHeader className="space-y-0 gap-3 p-4 sm:p-5">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <CardTitle>Perceptual color space</CardTitle>
-                            <Badge variant="outline" role="status" aria-live="polite" data-testid="map-status">
-                                {statusText}
-                            </Badge>
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <form className="flex items-center gap-2" onSubmit={jumpToColor}>
+                                    <Label htmlFor="map-hex" className="sr-only">
+                                        Jump to hex
+                                    </Label>
+                                    <Input
+                                        id="map-hex"
+                                        value={jumpInput}
+                                        onChange={(event) => setJumpInput(event.currentTarget.value)}
+                                        placeholder="#AABBCC"
+                                        spellCheck={false}
+                                        aria-invalid={Boolean(jumpError)}
+                                        aria-describedby={jumpError ? "map-hex-error" : undefined}
+                                        className="h-8 w-28 font-mono uppercase"
+                                    />
+                                    <Button type="submit" size="sm" variant="outline">
+                                        Jump
+                                    </Button>
+                                </form>
+                                <Badge variant="outline" role="status" aria-live="polite" data-testid="map-status">
+                                    {statusText}
+                                </Badge>
+                            </div>
                         </div>
+                        {jumpError ? (
+                            <p id="map-hex-error" role="alert" className="text-xs text-red-300">
+                                {jumpError}
+                            </p>
+                        ) : null}
                         <div className="grid gap-3 md:grid-cols-[auto_minmax(12rem,1fr)_auto] md:items-center">
                             <Label htmlFor="map-lightness">Lightness view</Label>
                             <input
@@ -328,16 +472,16 @@ export default function GuildColorMap() {
                                 type="range"
                                 min="0"
                                 max="100"
-                                step="1"
+                                step="0.1"
                                 value={lightness}
-                                onChange={(event) => setLightness(Number(event.currentTarget.value))}
+                                onChange={(event) => changeLightness(Number(event.currentTarget.value))}
                                 onPointerDown={() => setIsAdjustingLightness(true)}
                                 onPointerUp={() => setIsAdjustingLightness(false)}
                                 onPointerCancel={() => setIsAdjustingLightness(false)}
                                 onLostPointerCapture={() => setIsAdjustingLightness(false)}
                                 className="h-2 w-full cursor-pointer accent-primary"
                             />
-                            <output htmlFor="map-lightness" className="w-16 font-mono text-sm font-semibold">
+                            <output htmlFor="map-lightness" className="w-20 font-mono text-sm font-semibold">
                                 L* {lightness}
                             </output>
                         </div>
@@ -366,6 +510,17 @@ export default function GuildColorMap() {
                                 onPointerMove={(event) => inspectMap(event.clientX, event.clientY)}
                                 onPointerDown={(event) => inspectMap(event.clientX, event.clientY)}
                             />
+                            {targetColor && targetMarkerPosition && targetSample ? (
+                                <span
+                                    role="img"
+                                    aria-label={`Selected color ${targetColor}`}
+                                    className="pointer-events-none absolute size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_2px_rgb(0_0_0),0_0_10px_3px_rgb(255_255_255/0.8)]"
+                                    style={{
+                                        left: `${targetMarkerPosition.left}%`,
+                                        top: `${targetMarkerPosition.top}%`,
+                                    }}
+                                />
+                            ) : null}
                             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 rounded bg-black/65 px-2 py-1 text-xs font-semibold">
                                 Green −a*
                             </span>
@@ -416,25 +571,28 @@ export default function GuildColorMap() {
                             <CardTitle>Point details</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {sample ? (
+                            {activeSample ? (
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-3">
                                         <span
                                             aria-hidden="true"
                                             className="size-12 shrink-0 rounded-lg border border-white/20 shadow-inner"
                                             style={{
-                                                backgroundColor: sample.point.inGamut
-                                                    ? rgbToHex(sample.point.rgb)
+                                                backgroundColor: activeSample.point.inGamut
+                                                    ? rgbToHex(activeSample.point.rgb)
                                                     : undefined,
                                             }}
                                         />
                                         <div>
                                             <code className="font-semibold">
-                                                {sample.point.inGamut ? rgbToHex(sample.point.rgb) : "Outside RGB"}
+                                                {activeSample.point.inGamut
+                                                    ? rgbToHex(activeSample.point.rgb)
+                                                    : "Outside RGB"}
                                             </code>
                                             <p className="mt-1 text-xs text-muted-foreground">
-                                                L* {sample.point.lab.L.toFixed(1)} · a* {sample.point.lab.a.toFixed(1)} ·
-                                                b* {sample.point.lab.b.toFixed(1)}
+                                                L* {activeSample.point.lab.L.toFixed(1)} · a*{" "}
+                                                {activeSample.point.lab.a.toFixed(1)} · b*{" "}
+                                                {activeSample.point.lab.b.toFixed(1)}
                                             </p>
                                         </div>
                                     </div>

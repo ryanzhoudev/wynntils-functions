@@ -327,7 +327,13 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <Button variant="outline" asChild>
-                        <Link href="/guild-color/map">
+                        <Link
+                            href={
+                                normalizedColor
+                                    ? `/guild-color/map?hex=${normalizedColor.slice(1)}`
+                                    : "/guild-color/map"
+                            }
+                        >
                             <MapIcon className="size-4" aria-hidden="true" />
                             Color map
                         </Link>

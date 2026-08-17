@@ -6,6 +6,19 @@ export const metadata: Metadata = {
     description: "Explore allowed and guild-claimed Wynntils colors in perceptual color space",
 };
 
-export default function GuildColorMapPage() {
-    return <GuildColorMap />;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function firstValue(value: string | string[] | undefined): string | null {
+    if (Array.isArray(value)) {
+        return value[0] ?? null;
+    }
+
+    return value ?? null;
+}
+
+export default async function GuildColorMapPage({ searchParams }: { searchParams: SearchParams }) {
+    const params = await searchParams;
+    const initialColor = firstValue(params.hex) ?? firstValue(params.color);
+
+    return <GuildColorMap initialColor={initialColor} />;
 }

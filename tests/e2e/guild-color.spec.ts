@@ -130,7 +130,10 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
 test("supports color query and direct hash preload formats", async ({ page }) => {
     await page.goto("/guild-color");
     await expect(page.getByRole("heading", { name: "Guild Color Picker" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Color map" })).toHaveAttribute("href", "/guild-color/map");
+    await expect(page.getByRole("link", { name: "Color map" })).toHaveAttribute(
+        "href",
+        "/guild-color/map?hex=FFFFFF",
+    );
     await expect(page.locator("#preview-heading")).toHaveText("Territory previews");
     await expect(page.getByRole("textbox", { name: "Guild color", exact: true })).toHaveValue("#FFFFFF");
     await expect(
@@ -213,6 +216,38 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     await expect(canvas).toHaveAttribute("width", String(GUILD_COLOR_MAP_PREVIEW_RESOLUTION));
     await page.mouse.up();
     await expect(canvas).toHaveAttribute("width", String(fullResolution));
+});
+
+test("jumps directly to a hex on the perceptual color map", async ({ page }) => {
+    await page.goto("/guild-color/map?hex=00FF00");
+
+    const jumpInput = page.getByRole("textbox", { name: "Jump to hex" });
+    await expect(jumpInput).toHaveValue("#00FF00");
+    await expect(page.getByRole("img", { name: "Selected color #00FF00" })).toBeVisible();
+    await expect(page.getByText("#00FF00", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Back to picker" })).toHaveAttribute(
+        "href",
+        "/guild-color?hex=00FF00",
+    );
+
+    await jumpInput.fill("not-a-color");
+    await page.getByRole("button", { name: "Jump" }).click();
+    await expect(page.getByText("Use a three- or six-digit hexadecimal color.")).toBeVisible();
+    await expect(page).toHaveURL(/hex=00FF00/);
+    await expect(page.getByRole("img", { name: "Selected color #00FF00" })).toBeVisible();
+
+    await jumpInput.fill("#0000FF");
+    await page.getByRole("button", { name: "Jump" }).click();
+    await expect(page).toHaveURL(/hex=0000FF/);
+    await expect(page.getByRole("img", { name: "Selected color #0000FF" })).toBeVisible();
+
+    await page.getByRole("slider", { name: "Lightness view" }).fill("50");
+    await expect(page.getByRole("img", { name: /Selected color/ })).toHaveCount(0);
+    await expect(page).not.toHaveURL(/hex=/);
+
+    await page.goto("/guild-color/map?color=FF0000");
+    await expect(page.getByRole("textbox", { name: "Jump to hex" })).toHaveValue("#FF0000");
+    await expect(page.getByRole("img", { name: "Selected color #FF0000" })).toBeVisible();
 });
 
 test("does not calculate an allowed verdict when the guild source fails", async ({ page }) => {
