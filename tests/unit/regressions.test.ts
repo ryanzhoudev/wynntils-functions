@@ -4,7 +4,7 @@ import { buildDiagnostics } from "@/lib/ide/browser-lsp/diagnostics";
 import { createTextDocument } from "@/lib/ide/browser-lsp/text-document";
 import { testCatalog, testFunction } from "@/tests/fixtures/catalog";
 
-const regressionCorpus = `Teleport Scrolls: {tp_scroll_charges} {if(eq(tp_scroll_timer; -1); ""; concat("("; tp_scroll_timer; ")"))}
+const regressionCorpus = `Teleport Scrolls: {tp_scroll_charges} {if(eq(tp_scroll_timer; -1); ""; concat("("; str(tp_scroll_timer); ")"))}
 
 {switch(1; "asdf default"; [1, "asdf1", 2, "asdf2"])}
 
@@ -72,13 +72,17 @@ function createRegressionCatalog() {
         "current_distortion",
         "ticks_since_specific_spell",
         "to_fancy_text",
-        "str",
+        "string",
     ];
     const functions = genericNames.map((name) => {
         if (name === "with_resource_font") return genericFunction(name, ["with_font"]);
         if (name === "styled_text") return genericFunction(name, ["st"]);
         if (name === "integer") return genericFunction(name, ["int"]);
         if (name === "from_hex") return genericFunction(name, [], "CustomColor");
+        if (name === "tp_scroll_timer") return testFunction(name, "Integer", []);
+        if (name === "string") {
+            return testFunction(name, "String", [{ name: "value", type: "Number" }], { aliases: ["str"] });
+        }
         return genericFunction(name);
     });
 
@@ -114,5 +118,14 @@ describe("regression corpus", () => {
         const result = buildDiagnostics(document, createCatalogFromResponse(createRegressionCatalog()));
 
         expect(result).toEqual([]);
+    });
+
+    it("requires number results to be converted before string concatenation", () => {
+        const source = `{concat("("; tp_scroll_timer; ")")}`;
+        const document = createTextDocument("test://concat-number", source);
+        const result = buildDiagnostics(document, createCatalogFromResponse(createRegressionCatalog()));
+
+        expect(result).toHaveLength(1);
+        expect(result[0].message).toContain("expects String elements; element 2 received Integer");
     });
 });

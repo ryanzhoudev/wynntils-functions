@@ -47,9 +47,12 @@ export async function replaceEditorText(
     source: string,
     { verifyExact = false }: { verifyExact?: boolean } = {},
 ) {
-    const input = page.getByRole("textbox", { name: "Editor content" });
-    await input.focus();
-    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+    const editor = page.locator(".monaco-editor");
+    await editor.click({ position: { x: 120, y: 30 } });
+    await expect(editor).toHaveClass(/focused/);
+    // Playwright's WebKit project uses macOS shortcuts even when the test host is Windows.
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Meta+A");
     await page.keyboard.press("Backspace");
 
     const lines = source.split("\n");
