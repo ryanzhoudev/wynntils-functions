@@ -1,6 +1,7 @@
 export const MIN_GUILD_COLOR_BRIGHTNESS = 60;
 export const MIN_GUILD_COLOR_DELTA_E = 20;
 export const GUILD_COLOR_PLACEHOLDER = "#C05F5F";
+export const WYNNCRAFT_GUILD_STATS_BASE_URL = "https://wynncraft.com/stats/guild";
 
 export interface GuildColorRecord {
     name: string;
@@ -35,6 +36,12 @@ export interface Lab {
 export interface LabToRgbResult {
     rgb: Rgb;
     inGamut: boolean;
+}
+
+export interface Hsv {
+    h: number;
+    s: number;
+    v: number;
 }
 
 export interface GuildColorPaletteEntry extends GuildColorRecord {
@@ -189,6 +196,64 @@ export function rgbToHex({ r, g, b }: Rgb): string {
         .toUpperCase()}`;
 }
 
+export function guildStatsUrl(guildName: string): string {
+    return `${WYNNCRAFT_GUILD_STATS_BASE_URL}/${encodeURIComponent(guildName)}`;
+}
+
+export function rgbToHsv({ r, g, b }: Rgb): Hsv {
+    const red = r / 255;
+    const green = g / 255;
+    const blue = b / 255;
+    const maximum = Math.max(red, green, blue);
+    const minimum = Math.min(red, green, blue);
+    const delta = maximum - minimum;
+    let hue = 0;
+
+    if (delta > 0) {
+        if (maximum === red) {
+            hue = 60 * (((green - blue) / delta) % 6);
+        } else if (maximum === green) {
+            hue = 60 * ((blue - red) / delta + 2);
+        } else {
+            hue = 60 * ((red - green) / delta + 4);
+        }
+    }
+
+    return {
+        h: hue < 0 ? hue + 360 : hue,
+        s: maximum === 0 ? 0 : delta / maximum,
+        v: maximum,
+    };
+}
+
+export function hsvToRgb({ h, s, v }: Hsv): Rgb {
+    const hue = ((h % 360) + 360) % 360;
+    const saturation = Math.min(1, Math.max(0, s));
+    const value = Math.min(1, Math.max(0, v));
+    const chroma = value * saturation;
+    const secondary = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+    const offset = value - chroma;
+    let channels: [number, number, number];
+
+    if (hue < 60) {
+        channels = [chroma, secondary, 0];
+    } else if (hue < 120) {
+        channels = [secondary, chroma, 0];
+    } else if (hue < 180) {
+        channels = [0, chroma, secondary];
+    } else if (hue < 240) {
+        channels = [0, secondary, chroma];
+    } else if (hue < 300) {
+        channels = [secondary, 0, chroma];
+    } else {
+        channels = [chroma, 0, secondary];
+    }
+
+    const [red, green, blue] = channels.map((channel) => Math.round((channel + offset) * 255));
+
+    return { r: red, g: green, b: blue };
+}
+
 function readString(value: unknown): string | null {
     return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
@@ -266,6 +331,16 @@ function evaluateRgb(rgb: Rgb, palette: GuildColorPaletteEntry[]): GuildColorVer
         brightness,
         closestDistance,
     };
+}
+
+export function evaluateGuildColor(hex: string, palette: GuildColorPaletteEntry[]): GuildColorVerdict {
+    const rgb = hexToRgb(hex);
+
+    if (!rgb) {
+        throw new Error("A normalized six-digit hex color is required.");
+    }
+
+    return evaluateRgb(rgb, palette);
 }
 
 export function analyzeGuildColor(hex: string, palette: GuildColorPaletteEntry[]): GuildColorAnalysis {

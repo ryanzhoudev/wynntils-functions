@@ -3,10 +3,13 @@ import {
     createGuildColorPalette,
     findDirectionalColorSuggestions,
     GUILD_COLOR_PLACEHOLDER,
+    guildStatsUrl,
     guildColorBrightness,
+    hsvToRgb,
     MIN_GUILD_COLOR_BRIGHTNESS,
     normalizeGuildColorHex,
     parseAthenaGuildColors,
+    rgbToHsv,
 } from "@/lib/guild-colors";
 import { describe, expect, it } from "vitest";
 
@@ -39,6 +42,30 @@ describe("guild color normalization and Athena parsing", () => {
 
     it("rejects an unexpected Athena response instead of failing open", () => {
         expect(() => parseAthenaGuildColors({ guilds: [] })).toThrow("unexpected guild-list shape");
+    });
+
+    it("builds encoded Wynncraft guild profile links", () => {
+        expect(guildStatsUrl("Red One / Ω")).toBe(
+            "https://wynncraft.com/stats/guild/Red%20One%20%2F%20%CE%A9",
+        );
+    });
+});
+
+describe("inline color picker conversions", () => {
+    it("round-trips representative RGB colors through HSV", () => {
+        for (const rgb of [
+            { r: 255, g: 255, b: 255 },
+            { r: 255, g: 0, b: 0 },
+            { r: 12, g: 144, b: 210 },
+            { r: 0, g: 0, b: 0 },
+        ]) {
+            expect(hsvToRgb(rgbToHsv(rgb))).toEqual(rgb);
+        }
+    });
+
+    it("clamps saturation and brightness when converting HSV", () => {
+        expect(hsvToRgb({ h: 0, s: 2, v: 2 })).toEqual({ r: 255, g: 0, b: 0 });
+        expect(hsvToRgb({ h: 120, s: -1, v: -1 })).toEqual({ r: 0, g: 0, b: 0 });
     });
 });
 

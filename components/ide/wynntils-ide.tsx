@@ -32,7 +32,7 @@ const EDITOR_OPTIONS: MonacoEditor.IStandaloneEditorConstructionOptions = {
     glyphMargin: true,
     renderValidationDecorations: "on",
     fixedOverflowWidgets: true,
-    hover: { enabled: true, delay: 120 },
+    hover: { enabled: "on", delay: 120 },
     scrollbar: { alwaysConsumeMouseWheel: false },
     suggestOnTriggerCharacters: true,
     quickSuggestions: { strings: true, comments: false, other: true },

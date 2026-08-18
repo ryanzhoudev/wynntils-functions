@@ -2,6 +2,12 @@ import { expect, test } from "@playwright/test";
 import { openIde, readCatalogArtifact, replaceEditorText } from "./fixtures";
 import { IDE_STORAGE_KEY } from "@/lib/ide/storage";
 
+const validRegressionCorpus = `Teleport Scrolls: {tp_scroll_charges} {if(eq(tp_scroll_timer; -1); ""; concat("("; str(tp_scroll_timer); ")"))}
+
+{switch(1; "asdf default"; [1, "asdf1", 2, "asdf2"])}
+
+{accessory_durability("Ring_1")}`;
+
 test("real worker publishes exact semantic diagnostics and marker locations", async ({ page }) => {
     await openIde(page, '{accessory_durability("Invalid")}');
 
@@ -13,15 +19,13 @@ test("real worker publishes exact semantic diagnostics and marker locations", as
 });
 
 test("switch bracket pairs and the multiline regression corpus are valid", async ({ page }) => {
-    await openIde(
-        page,
-        `Teleport Scrolls: {tp_scroll_charges} {if(eq(tp_scroll_timer; -1); ""; concat("("; tp_scroll_timer; ")"))}
+    await openIde(page, `${validRegressionCorpus}\n\n{accessory_durability("Invalid")}`);
 
-{switch(1; "asdf default"; [1, "asdf1", 2, "asdf2"])}
+    const diagnostics = page.getByRole("button", { name: /diagnostics/ });
+    await expect(diagnostics).toContainText("1 diagnostics");
 
-{accessory_durability("Ring_1")}`,
-    );
-    await expect(page.getByRole("button", { name: /diagnostics/ })).toContainText("0 diagnostics");
+    await replaceEditorText(page, validRegressionCorpus, { verifyExact: true });
+    await expect(diagnostics).toContainText("0 diagnostics");
 });
 
 test("semantic completions are triggered and ordered before functions", async ({ page }) => {
