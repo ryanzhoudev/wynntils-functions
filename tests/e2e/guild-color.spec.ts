@@ -106,18 +106,25 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
     await expect(redOneLinks.first()).toHaveAttribute("href", "https://wynncraft.com/stats/guild/Red%20One");
     await expect(redOneLinks.first()).toHaveAttribute("target", "_blank");
     await expect(redOneLinks.first()).toHaveAttribute("rel", "noopener noreferrer");
-    await expect(page.getByText("2 territories · S32 12,340 SR · S31 8,210 SR", { exact: true })).toHaveCount(2);
-    await expect(page.getByText("0 territories · S32 0 SR · S31 15,000 SR", { exact: true })).toHaveCount(2);
-    await expect(page.getByText("— territories · S32 — SR · S31 — SR", { exact: true })).toHaveCount(1);
-    const mixedRatingLine = page.getByText("2 territories · S32 12,340 SR · S31 8,210 SR", { exact: true }).first();
-    await expect(mixedRatingLine.getByText("12,340 SR", { exact: true })).not.toHaveClass(/text-rose/);
-    await expect(mixedRatingLine.getByText("8,210 SR", { exact: true })).toHaveClass(/text-rose/);
-    await expect(
-        page
-            .getByText("— territories · S32 — SR · S31 — SR", { exact: true })
-            .getByText("— SR", { exact: true })
-            .first(),
-    ).not.toHaveClass(/text-rose/);
+    const redOneStats = redOneLinks.locator("..");
+    await expect(redOneStats.getByText("Previous S31", { exact: true })).toHaveCount(2);
+    await expect(redOneStats.getByText("Territories", { exact: true })).toHaveCount(2);
+    await expect(redOneStats.getByText("Current S32", { exact: true })).toHaveCount(2);
+    await expect(redOneStats.getByText("2", { exact: true })).toHaveCount(2);
+    await expect(redOneStats.getByText("12,340 SR", { exact: true })).toHaveCount(2);
+    await expect(redOneStats.getByText("8,210 SR", { exact: true })).toHaveCount(2);
+    await expect(redOneStats.first().getByText("12,340 SR", { exact: true })).not.toHaveClass(/text-rose/);
+    await expect(redOneStats.first().getByText("8,210 SR", { exact: true })).toHaveClass(/text-rose/);
+
+    const redTwoStats = page.getByRole("link", { name: /Red Two \[R2\].*opens in a new tab/ }).locator("..");
+    await expect(redTwoStats.getByText("15,000 SR", { exact: true })).toHaveCount(2);
+    await expect(redTwoStats.getByText("0 SR", { exact: true })).toHaveCount(2);
+
+    const unavailableStats = page
+        .getByRole("link", { name: /Blue Guild \[BLU\].*opens in a new tab/ })
+        .locator("..");
+    await expect(unavailableStats.getByText("—", { exact: true })).toBeVisible();
+    await expect(unavailableStats.getByText("— SR", { exact: true }).first()).not.toHaveClass(/text-rose/);
 
     await page.evaluate(() => {
         Object.defineProperty(navigator, "clipboard", {
@@ -230,12 +237,18 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     await expect(page.getByText("2 guilds share #FF0000")).toBeVisible();
     await expect(page.getByText("Red One [R1]")).toBeVisible();
     await expect(page.getByText("Red Two [R2]")).toBeVisible();
-    await expect(page.getByText("2 territories · S32 12,340 SR · S31 8,210 SR", { exact: true })).toBeVisible();
-    await expect(page.getByText("0 territories · S32 0 SR · S31 15,000 SR", { exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Red One \[R1\].*opens in a new tab/ })).toHaveAttribute(
+    const inspectedRedOne = page.getByRole("link", { name: /Red One \[R1\].*opens in a new tab/ });
+    await expect(inspectedRedOne.locator("..").getByText("Previous S31", { exact: true })).toBeVisible();
+    await expect(inspectedRedOne.locator("..").getByText("2", { exact: true })).toBeVisible();
+    await expect(inspectedRedOne.locator("..").getByText("Current S32", { exact: true })).toBeVisible();
+    await expect(inspectedRedOne.locator("..").getByText("12,340 SR", { exact: true })).toBeVisible();
+    await expect(inspectedRedOne).toHaveAttribute(
         "href",
         "https://wynncraft.com/stats/guild/Red%20One",
     );
+    const inspectedRedTwo = page.getByRole("link", { name: /Red Two \[R2\].*opens in a new tab/ });
+    await expect(inspectedRedTwo.locator("..").getByText("0", { exact: true })).toBeVisible();
+    await expect(inspectedRedTwo.locator("..").getByText("0 SR", { exact: true })).toBeVisible();
     await expect(page.getByText(/Registered #FF0000 · ΔE/)).toBeVisible();
 
     const sliderBounds = await lightness.boundingBox();

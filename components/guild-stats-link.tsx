@@ -16,7 +16,7 @@ function formatStat(value: number | null | undefined): string {
 
 function seasonRatingClassName(value: number | null | undefined): string {
     return cn(
-        "tabular-nums",
+        "font-medium tabular-nums text-foreground/75",
         value != null && value < SEASON_RATING_HIGHLIGHT_THRESHOLD && "text-rose-300/80",
     );
 }
@@ -25,9 +25,40 @@ export default function GuildStatsLink({ guild, seasons, className }: GuildStats
     const territoryCount = guild.stats?.currentTerritories;
     const currentSeasonRating = guild.stats?.currentSeasonRating;
     const previousSeasonRating = guild.stats?.previousSeasonRating;
+    const metrics = [
+        ...(seasons?.previousSeason
+            ? [
+                  {
+                      key: "previous-season",
+                      label: "Previous",
+                      seasonId: seasons.previousSeason.id,
+                      value: `${formatStat(previousSeasonRating)} SR`,
+                      valueClassName: seasonRatingClassName(previousSeasonRating),
+                  },
+              ]
+            : []),
+        {
+            key: "territories",
+            label: territoryCount === 1 ? "Territory" : "Territories",
+            seasonId: null,
+            value: formatStat(territoryCount),
+            valueClassName: "font-medium tabular-nums text-foreground/75",
+        },
+        ...(seasons?.currentSeason
+            ? [
+                  {
+                      key: "current-season",
+                      label: "Current",
+                      seasonId: seasons.currentSeason.id,
+                      value: `${formatStat(currentSeasonRating)} SR`,
+                      valueClassName: seasonRatingClassName(currentSeasonRating),
+                  },
+              ]
+            : []),
+    ];
 
     return (
-        <span className={cn("inline-flex min-w-0 flex-col items-start gap-0.5", className)}>
+        <span className={cn("inline-flex w-full min-w-0 max-w-sm flex-col items-start gap-1", className)}>
             <a
                 href={guildStatsUrl(guild.name)}
                 target="_blank"
@@ -38,27 +69,31 @@ export default function GuildStatsLink({ guild, seasons, className }: GuildStats
                 <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
                 <span className="sr-only">(opens in a new tab)</span>
             </a>
-            <span className="text-xs leading-snug text-muted-foreground">
-                <span className="font-medium tabular-nums text-foreground/75">{formatStat(territoryCount)}</span>{" "}
-                {territoryCount === 1 ? "territory" : "territories"}
-                {seasons?.currentSeason ? (
-                    <>
-                        {" · "}
-                        <span className="font-semibold text-foreground/80">S{seasons.currentSeason.id}</span>{" "}
-                        <span className={seasonRatingClassName(currentSeasonRating)}>
-                            {formatStat(currentSeasonRating)} SR
+            <span
+                className="grid w-full border-t border-border/60 pt-1.5 text-xs leading-snug text-muted-foreground"
+                style={{ gridTemplateColumns: `repeat(${metrics.length}, minmax(0, 1fr))` }}
+            >
+                {metrics.map((metric, index) => (
+                    <span
+                        key={metric.key}
+                        className={cn(
+                            "min-w-0",
+                            index > 0 && "border-l border-border/60 pl-2",
+                            index < metrics.length - 1 && "pr-2",
+                        )}
+                    >
+                        <span className="block truncate text-[0.625rem] font-medium leading-tight text-muted-foreground/75">
+                            {metric.label}
+                            {metric.seasonId ? (
+                                <>
+                                    {" "}
+                                    <span className="font-semibold text-foreground/75">S{metric.seasonId}</span>
+                                </>
+                            ) : null}
                         </span>
-                    </>
-                ) : null}
-                {seasons?.previousSeason ? (
-                    <>
-                        {" · "}
-                        <span className="font-semibold text-foreground/80">S{seasons.previousSeason.id}</span>{" "}
-                        <span className={seasonRatingClassName(previousSeasonRating)}>
-                            {formatStat(previousSeasonRating)} SR
-                        </span>
-                    </>
-                ) : null}
+                        <span className={cn("block truncate", metric.valueClassName)}>{metric.value}</span>
+                    </span>
+                ))}
             </span>
         </span>
     );
