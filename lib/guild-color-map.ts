@@ -107,6 +107,7 @@ export function createGuildColorMapGroups(palette: GuildColorPaletteEntry[]): Gu
             name: guild.name,
             prefix: guild.prefix,
             color: guild.color,
+            stats: guild.stats,
         };
         const existing = grouped.get(guild.color);
 

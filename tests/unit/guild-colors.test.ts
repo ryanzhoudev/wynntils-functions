@@ -99,6 +99,20 @@ describe("Wynntils Bot-compatible guild color analysis", () => {
         expect(palette.some((guild) => guild.color === GUILD_COLOR_PLACEHOLDER)).toBe(false);
     });
 
+    it("preserves guild statistics through closest-color analysis", () => {
+        const stats = {
+            currentTerritories: 2,
+            currentSeasonRating: 12340,
+            previousSeasonRating: 9000,
+        };
+        const analysis = analyzeGuildColor(
+            "#FF0000",
+            createGuildColorPalette([{ name: "Active", prefix: "ACT", color: "#FF0000", stats }]),
+        );
+
+        expect(analysis.groups[0].guilds[0].stats).toEqual(stats);
+    });
+
     it("finds the nearest allowed value independently in all available RGB directions", () => {
         const suggestions = findDirectionalColorSuggestions("#000000", []);
 

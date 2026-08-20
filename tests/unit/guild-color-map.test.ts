@@ -33,9 +33,14 @@ describe("guild color map geometry", () => {
     });
 
     it("groups guilds that share one exact registered color", () => {
+        const stats = {
+            currentTerritories: 2,
+            currentSeasonRating: 12340,
+            previousSeasonRating: 9000,
+        };
         const groups = createGuildColorMapGroups(
             createGuildColorPalette([
-                { name: "Second", prefix: "TWO", color: "#FF0000" },
+                { name: "Second", prefix: "TWO", color: "#FF0000", stats },
                 { name: "First", prefix: "ONE", color: "#FF0000" },
                 { name: "Blue", prefix: "BLU", color: "#0000FF" },
             ]),
@@ -46,6 +51,7 @@ describe("guild color map geometry", () => {
             "First",
             "Second",
         ]);
+        expect(groups.find((group) => group.color === "#FF0000")?.guilds[1].stats).toEqual(stats);
     });
 
     it("classifies exact registered colors as claimed and bright unclaimed colors as allowed", () => {

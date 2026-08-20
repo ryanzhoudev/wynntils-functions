@@ -467,6 +467,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                                     <GuildStatsLink
                                                         key={`${guild.name}-${guild.prefix}`}
                                                         guild={guild}
+                                                        seasons={guildData?.stats ?? null}
                                                     />
                                                 ))}
                                             </div>
@@ -722,6 +723,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                                         <GuildStatsLink
                                                             key={`${guild.name}-${guild.prefix}`}
                                                             guild={guild}
+                                                            seasons={guildData?.stats ?? null}
                                                         />
                                                     ))}
                                                 </div>

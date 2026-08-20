@@ -11,14 +11,48 @@ import {
 
 const guildColorResponse = {
     guilds: [
-        { name: "Red One", prefix: "R1", color: "#FF0000" },
-        { name: "Red Two", prefix: "R2", color: "#FF0000" },
-        { name: "Blue Guild", prefix: "BLU", color: "#0000FF" },
-        { name: "Green Guild", prefix: "GRN", color: "#00FF00" },
+        {
+            name: "Red One",
+            prefix: "R1",
+            color: "#FF0000",
+            stats: { currentTerritories: 2, currentSeasonRating: 12340, previousSeasonRating: 8210 },
+        },
+        {
+            name: "Red Two",
+            prefix: "R2",
+            color: "#FF0000",
+            stats: { currentTerritories: 0, currentSeasonRating: 0, previousSeasonRating: 15000 },
+        },
+        {
+            name: "Blue Guild",
+            prefix: "BLU",
+            color: "#0000FF",
+            stats: { currentTerritories: null, currentSeasonRating: null, previousSeasonRating: null },
+        },
+        {
+            name: "Green Guild",
+            prefix: "GRN",
+            color: "#00FF00",
+            stats: { currentTerritories: 1, currentSeasonRating: 900, previousSeasonRating: 1200 },
+        },
     ],
     fetchedAt: Date.UTC(2026, 6, 29, 20, 0, 0),
     cacheSeconds: 600,
     excludedPlaceholderCount: 85,
+    stats: {
+        fetchedAt: Date.UTC(2026, 7, 19, 20, 0, 0),
+        cacheSeconds: 60,
+        currentSeason: {
+            id: "32",
+            startAt: "2026-07-24T23:01:00.000Z",
+            endAt: "2026-09-27T04:01:00.000Z",
+        },
+        previousSeason: {
+            id: "31",
+            startAt: "2026-05-29T23:01:00.000Z",
+            endAt: "2026-07-19T04:01:00.000Z",
+        },
+    },
     source: {
         url: "https://athena.wynntils.com/cache/get/guildList",
         etag: '"fixture"',
@@ -72,6 +106,18 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
     await expect(redOneLinks.first()).toHaveAttribute("href", "https://wynncraft.com/stats/guild/Red%20One");
     await expect(redOneLinks.first()).toHaveAttribute("target", "_blank");
     await expect(redOneLinks.first()).toHaveAttribute("rel", "noopener noreferrer");
+    await expect(page.getByText("2 territories · S32 12,340 SR · S31 8,210 SR", { exact: true })).toHaveCount(2);
+    await expect(page.getByText("0 territories · S32 0 SR · S31 15,000 SR", { exact: true })).toHaveCount(2);
+    await expect(page.getByText("— territories · S32 — SR · S31 — SR", { exact: true })).toHaveCount(1);
+    const mixedRatingLine = page.getByText("2 territories · S32 12,340 SR · S31 8,210 SR", { exact: true }).first();
+    await expect(mixedRatingLine.getByText("12,340 SR", { exact: true })).not.toHaveClass(/text-rose/);
+    await expect(mixedRatingLine.getByText("8,210 SR", { exact: true })).toHaveClass(/text-rose/);
+    await expect(
+        page
+            .getByText("— territories · S32 — SR · S31 — SR", { exact: true })
+            .getByText("— SR", { exact: true })
+            .first(),
+    ).not.toHaveClass(/text-rose/);
 
     await page.evaluate(() => {
         Object.defineProperty(navigator, "clipboard", {
@@ -184,6 +230,8 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     await expect(page.getByText("2 guilds share #FF0000")).toBeVisible();
     await expect(page.getByText("Red One [R1]")).toBeVisible();
     await expect(page.getByText("Red Two [R2]")).toBeVisible();
+    await expect(page.getByText("2 territories · S32 12,340 SR · S31 8,210 SR", { exact: true })).toBeVisible();
+    await expect(page.getByText("0 territories · S32 0 SR · S31 15,000 SR", { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: /Red One \[R1\].*opens in a new tab/ })).toHaveAttribute(
         "href",
         "https://wynncraft.com/stats/guild/Red%20One",

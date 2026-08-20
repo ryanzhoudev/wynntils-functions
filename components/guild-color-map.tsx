@@ -578,7 +578,10 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
                                             <ul className="mt-3 space-y-1 text-sm">
                                                 {sampleGroup.guilds.map((guild) => (
                                                     <li key={`${guild.name}-${guild.prefix}`}>
-                                                        <GuildStatsLink guild={guild} />
+                                                        <GuildStatsLink
+                                                            guild={guild}
+                                                            seasons={guildData?.stats ?? null}
+                                                        />
                                                     </li>
                                                 ))}
                                             </ul>
