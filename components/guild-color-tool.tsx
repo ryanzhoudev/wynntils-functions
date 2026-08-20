@@ -462,15 +462,16 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                             ) : null}
                                         </p>
                                         {closestGroup ? (
-                                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                                            <ul className="mt-2 space-y-1.5 text-sm">
                                                 {closestGroup.guilds.map((guild) => (
-                                                    <GuildStatsLink
+                                                    <li
                                                         key={`${guild.name}-${guild.prefix}`}
-                                                        guild={guild}
-                                                        seasons={guildData?.stats ?? null}
-                                                    />
+                                                        className="rounded-md bg-muted/40 p-2"
+                                                    >
+                                                        <GuildStatsLink guild={guild} seasons={guildData?.stats ?? null} />
+                                                    </li>
                                                 ))}
-                                            </div>
+                                            </ul>
                                         ) : null}
                                         <p className="mt-2 text-xs text-muted-foreground">
                                             Brightness {liveVerdict.brightness.toFixed(1)} /{" "}
@@ -718,15 +719,19 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                                     </div>
                                                     <p className="mt-2 text-sm font-medium">{guildGroupLabel(group)}</p>
                                                 </button>
-                                                <div className="flex flex-wrap gap-x-3 gap-y-1 border-t px-3 py-2 text-xs">
+                                                <ul className="space-y-1.5 border-t p-2 text-xs">
                                                     {group.guilds.map((guild) => (
-                                                        <GuildStatsLink
+                                                        <li
                                                             key={`${guild.name}-${guild.prefix}`}
-                                                            guild={guild}
-                                                            seasons={guildData?.stats ?? null}
-                                                        />
+                                                            className="rounded-md bg-muted/40 p-2"
+                                                        >
+                                                            <GuildStatsLink
+                                                                guild={guild}
+                                                                seasons={guildData?.stats ?? null}
+                                                            />
+                                                        </li>
                                                     ))}
-                                                </div>
+                                                </ul>
                                             </div>
                                         );
                                     })}

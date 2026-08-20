@@ -70,7 +70,7 @@ export default function GuildStatsLink({ guild, seasons, className }: GuildStats
                 <span className="sr-only">(opens in a new tab)</span>
             </a>
             <span
-                className="grid w-full border-t border-border/60 pt-1.5 text-xs leading-snug text-muted-foreground"
+                className="grid w-full text-xs leading-snug text-muted-foreground"
                 style={{ gridTemplateColumns: `repeat(${metrics.length}, minmax(0, 1fr))` }}
             >
                 {metrics.map((metric, index) => (

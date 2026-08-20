@@ -575,9 +575,12 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
                                             <p className="mt-1 text-xs text-muted-foreground">
                                                 Registered {sampleGroup.color} · ΔE {sampleDistance?.toFixed(2)}
                                             </p>
-                                            <ul className="mt-3 space-y-1 text-sm">
+                                            <ul className="mt-3 space-y-1.5 text-sm">
                                                 {sampleGroup.guilds.map((guild) => (
-                                                    <li key={`${guild.name}-${guild.prefix}`}>
+                                                    <li
+                                                        key={`${guild.name}-${guild.prefix}`}
+                                                        className="rounded-md bg-muted/40 p-2"
+                                                    >
                                                         <GuildStatsLink
                                                             guild={guild}
                                                             seasons={guildData?.stats ?? null}

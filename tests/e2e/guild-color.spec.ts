@@ -106,7 +106,14 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
     await expect(redOneLinks.first()).toHaveAttribute("href", "https://wynncraft.com/stats/guild/Red%20One");
     await expect(redOneLinks.first()).toHaveAttribute("target", "_blank");
     await expect(redOneLinks.first()).toHaveAttribute("rel", "noopener noreferrer");
+    const sharedGuildLists = page.getByRole("list").filter({
+        has: page.getByRole("link", { name: /Red One \[R1\].*opens in a new tab/ }),
+    });
+    await expect(sharedGuildLists).toHaveCount(2);
+    await expect(sharedGuildLists.first().getByRole("listitem")).toHaveCount(2);
+    await expect(sharedGuildLists.first().getByRole("listitem").first()).toHaveClass(/bg-muted\/40/);
     const redOneStats = redOneLinks.locator("..");
+    await expect(redOneStats.first().locator(":scope > span")).toHaveCSS("border-top-width", "0px");
     await expect(redOneStats.getByText("Previous S31", { exact: true })).toHaveCount(2);
     await expect(redOneStats.getByText("Territories", { exact: true })).toHaveCount(2);
     await expect(redOneStats.getByText("Current S32", { exact: true })).toHaveCount(2);
@@ -249,6 +256,9 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     const inspectedRedTwo = page.getByRole("link", { name: /Red Two \[R2\].*opens in a new tab/ });
     await expect(inspectedRedTwo.locator("..").getByText("0", { exact: true })).toBeVisible();
     await expect(inspectedRedTwo.locator("..").getByText("0 SR", { exact: true })).toBeVisible();
+    const inspectedGuildList = page.getByRole("list").filter({ has: inspectedRedOne });
+    await expect(inspectedGuildList.getByRole("listitem")).toHaveCount(2);
+    await expect(inspectedGuildList.getByRole("listitem").first()).toHaveClass(/bg-muted\/40/);
     await expect(page.getByText(/Registered #FF0000 · ΔE/)).toBeVisible();
 
     const sliderBounds = await lightness.boundingBox();
