@@ -39,7 +39,7 @@ export default function GuildStatsLink({ guild, seasons, className }: GuildStats
             : []),
         {
             key: "territories",
-            label: territoryCount === 1 ? "Territory" : "Territories",
+            label: territoryCount === 1 ? "Terr" : "Terrs",
             seasonId: null,
             value: formatStat(territoryCount),
             valueClassName: "font-medium tabular-nums text-foreground/75",
@@ -71,7 +71,11 @@ export default function GuildStatsLink({ guild, seasons, className }: GuildStats
             </a>
             <span
                 className="grid w-full text-xs leading-snug text-muted-foreground"
-                style={{ gridTemplateColumns: `repeat(${metrics.length}, minmax(0, 1fr))` }}
+                style={{
+                    gridTemplateColumns: metrics
+                        .map((metric) => `minmax(0, ${metric.key === "territories" ? 0.65 : 1.35}fr)`)
+                        .join(" "),
+                }}
             >
                 {metrics.map((metric, index) => (
                     <span

@@ -21,7 +21,7 @@ const guildColorResponse = {
             name: "Red Two",
             prefix: "R2",
             color: "#FF0000",
-            stats: { currentTerritories: 0, currentSeasonRating: 0, previousSeasonRating: 15000 },
+            stats: { currentTerritories: 0, currentSeasonRating: 6586691, previousSeasonRating: 15107093 },
         },
         {
             name: "Blue Guild",
@@ -115,7 +115,7 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
     const redOneStats = redOneLinks.locator("..");
     await expect(redOneStats.first().locator(":scope > span")).toHaveCSS("border-top-width", "0px");
     await expect(redOneStats.getByText("Previous S31", { exact: true })).toHaveCount(2);
-    await expect(redOneStats.getByText("Territories", { exact: true })).toHaveCount(2);
+    await expect(redOneStats.getByText("Terrs", { exact: true })).toHaveCount(2);
     await expect(redOneStats.getByText("Current S32", { exact: true })).toHaveCount(2);
     await expect(redOneStats.getByText("2", { exact: true })).toHaveCount(2);
     await expect(redOneStats.getByText("12,340 SR", { exact: true })).toHaveCount(2);
@@ -124,8 +124,20 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
     await expect(redOneStats.first().getByText("8,210 SR", { exact: true })).toHaveClass(/text-rose/);
 
     const redTwoStats = page.getByRole("link", { name: /Red Two \[R2\].*opens in a new tab/ }).locator("..");
-    await expect(redTwoStats.getByText("15,000 SR", { exact: true })).toHaveCount(2);
-    await expect(redTwoStats.getByText("0 SR", { exact: true })).toHaveCount(2);
+    const highPreviousRatings = redTwoStats.getByText("15,107,093 SR", { exact: true });
+    const highCurrentRatings = redTwoStats.getByText("6,586,691 SR", { exact: true });
+    await expect(highPreviousRatings).toHaveCount(2);
+    await expect(highCurrentRatings).toHaveCount(2);
+    expect(
+        await highPreviousRatings.evaluateAll((elements) =>
+            elements.every((element) => element.scrollWidth <= element.clientWidth),
+        ),
+    ).toBe(true);
+    expect(
+        await highCurrentRatings.evaluateAll((elements) =>
+            elements.every((element) => element.scrollWidth <= element.clientWidth),
+        ),
+    ).toBe(true);
 
     const unavailableStats = page
         .getByRole("link", { name: /Blue Guild \[BLU\].*opens in a new tab/ })
@@ -255,7 +267,9 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     );
     const inspectedRedTwo = page.getByRole("link", { name: /Red Two \[R2\].*opens in a new tab/ });
     await expect(inspectedRedTwo.locator("..").getByText("0", { exact: true })).toBeVisible();
-    await expect(inspectedRedTwo.locator("..").getByText("0 SR", { exact: true })).toBeVisible();
+    const inspectedHighRating = inspectedRedTwo.locator("..").getByText("15,107,093 SR", { exact: true });
+    await expect(inspectedHighRating).toBeVisible();
+    expect(await inspectedHighRating.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     const inspectedGuildList = page.getByRole("list").filter({ has: inspectedRedOne });
     await expect(inspectedGuildList.getByRole("listitem")).toHaveCount(2);
     await expect(inspectedGuildList.getByRole("listitem").first()).toHaveClass(/bg-muted\/40/);
