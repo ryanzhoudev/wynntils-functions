@@ -350,7 +350,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
             <main className="mx-auto grid w-full max-w-[100rem] gap-6 px-4 pb-12 xl:grid-cols-[20rem_minmax(0,1fr)]">
                 <div className="space-y-6 xl:sticky xl:top-4 xl:self-start">
                     <Card>
-                        <CardHeader className="flex-row items-center justify-between space-y-0">
+                        <CardHeader className="flex-row items-center justify-between space-y-0 pb-[22px]">
                             <CardTitle>Choose a color</CardTitle>
                             <Button
                                 type="button"
@@ -372,9 +372,9 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                             </Button>
                         </CardHeader>
                         <CardContent className="space-y-5">
-                            <div className="space-y-2">
-                                <Label htmlFor="guild-color">Guild color</Label>
-                                <div className="flex gap-2">
+                            <div className="grid grid-cols-2 gap-x-2 gap-y-2">
+                                <div className="space-y-2">
+                                    <Label htmlFor="guild-color">Guild color</Label>
                                     <Input
                                         id="guild-color"
                                         value={inputColor}
@@ -384,8 +384,20 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                         className="font-mono uppercase"
                                     />
                                 </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="guild-prefix">Preview tag</Label>
+                                    <Input
+                                        id="guild-prefix"
+                                        value={prefix}
+                                        onChange={(event) => setPrefix(event.target.value.slice(0, 8))}
+                                        placeholder={DEFAULT_PREFIX}
+                                        maxLength={8}
+                                    />
+                                </div>
                                 {!normalizedColor ? (
-                                    <p className="text-xs text-red-300">Use a three- or six-digit hexadecimal color.</p>
+                                    <p className="col-span-2 text-xs text-red-300">
+                                        Use a three- or six-digit hexadecimal color.
+                                    </p>
                                 ) : null}
                             </div>
 
@@ -393,17 +405,6 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                 value={normalizedColor ?? chosenPreviewColor}
                                 onChange={setInputColorOverride}
                             />
-
-                            <div className="space-y-2">
-                                <Label htmlFor="guild-prefix">Preview tag</Label>
-                                <Input
-                                    id="guild-prefix"
-                                    value={prefix}
-                                    onChange={(event) => setPrefix(event.target.value.slice(0, 8))}
-                                    placeholder={DEFAULT_PREFIX}
-                                    maxLength={8}
-                                />
-                            </div>
 
                             <div
                                 className={cn(

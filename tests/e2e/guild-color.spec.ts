@@ -74,10 +74,19 @@ test("updates the verdict while dragging the inline color picker", async ({ page
     await page.goto("/guild-color?hex=FFFFFF");
 
     const input = page.getByRole("textbox", { name: "Guild color", exact: true });
+    const previewTagInput = page.getByRole("textbox", { name: "Preview tag" });
     const plane = page.getByRole("slider", { name: "Saturation and brightness" });
     await expect(page.locator('input[type="color"]')).toHaveCount(0);
     await expect(plane).toBeVisible();
     await expect(page.getByText(/Allowed\? (?:🟩 Yes|🟥 No)/)).toBeVisible();
+
+    const inputBounds = await input.boundingBox();
+    const previewTagBounds = await previewTagInput.boundingBox();
+    expect(inputBounds).not.toBeNull();
+    expect(previewTagBounds).not.toBeNull();
+    expect(Math.abs(inputBounds!.y - previewTagBounds!.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(inputBounds!.width - previewTagBounds!.width)).toBeLessThanOrEqual(1);
+    expect(previewTagBounds!.x).toBeGreaterThan(inputBounds!.x + inputBounds!.width);
 
     const bounds = await plane.boundingBox();
     expect(bounds).not.toBeNull();
