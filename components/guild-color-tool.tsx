@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import InlineColorPicker from "@/components/inline-color-picker";
 import GuildStatsLink from "@/components/guild-stats-link";
+import { loadGuildColorData } from "@/lib/guild-color-client";
 import {
     analyzeGuildColor,
     createGuildColorPalette,
@@ -145,14 +146,6 @@ function formatDistance(distance: number): string {
     return Number.isFinite(distance) ? distance.toFixed(2) : "—";
 }
 
-function parseApiError(payload: unknown): string {
-    if (typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string") {
-        return payload.error;
-    }
-
-    return "Guild color data is temporarily unavailable.";
-}
-
 function subscribeToHashChange(callback: () => void): () => void {
     window.addEventListener("hashchange", callback);
 
@@ -239,19 +232,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
             setLoadError(null);
 
             try {
-                const response = await fetch("/api/guild-colors", {
-                    headers: {
-                        Accept: "application/json",
-                    },
-                    signal: controller.signal,
-                });
-                const payload: unknown = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(parseApiError(payload));
-                }
-
-                setGuildData(payload as GuildColorApiResponse);
+                await loadGuildColorData(controller.signal, setGuildData);
             } catch (error) {
                 if (controller.signal.aborted) {
                     return;

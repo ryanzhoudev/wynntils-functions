@@ -22,21 +22,60 @@ export interface GuildColorRecord {
     stats?: GuildColorStats;
 }
 
+export interface GuildColorStatsMetadata {
+    fetchedAt: number;
+    cacheSeconds: number;
+    currentSeason: GuildSeasonMetadata | null;
+    previousSeason: GuildSeasonMetadata | null;
+}
+
+export interface GuildColorStatsRecord {
+    name: string;
+    prefix: string;
+    stats: GuildColorStats;
+}
+
+export interface GuildColorStatsApiResponse extends GuildColorStatsMetadata {
+    guilds: GuildColorStatsRecord[];
+}
+
 export interface GuildColorApiResponse {
     guilds: GuildColorRecord[];
     fetchedAt: number;
     cacheSeconds: number;
     excludedPlaceholderCount: number;
-    stats: {
-        fetchedAt: number;
-        cacheSeconds: number;
-        currentSeason: GuildSeasonMetadata | null;
-        previousSeason: GuildSeasonMetadata | null;
-    };
+    stats: GuildColorStatsMetadata | null;
     source: {
         url: string;
         etag: string | null;
         freshness: "request-time-only";
+    };
+}
+
+function guildStatsIdentity(name: string, prefix: string): string {
+    return `${name.trim().toLocaleLowerCase()}\u0000${prefix.trim().toLocaleUpperCase()}`;
+}
+
+export function mergeGuildColorStats(
+    colors: GuildColorApiResponse,
+    stats: GuildColorStatsApiResponse,
+): GuildColorApiResponse {
+    const statsByGuild = new Map(
+        stats.guilds.map((guild) => [guildStatsIdentity(guild.name, guild.prefix), guild.stats] as const),
+    );
+
+    return {
+        ...colors,
+        guilds: colors.guilds.map((guild) => ({
+            ...guild,
+            stats: statsByGuild.get(guildStatsIdentity(guild.name, guild.prefix)),
+        })),
+        stats: {
+            fetchedAt: stats.fetchedAt,
+            cacheSeconds: stats.cacheSeconds,
+            currentSeason: stats.currentSeason,
+            previousSeason: stats.previousSeason,
+        },
     };
 }
 

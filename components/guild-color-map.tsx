@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import GuildStatsLink from "@/components/guild-stats-link";
+import { loadGuildColorData } from "@/lib/guild-color-client";
 import {
     classifyGuildColorMapPoint,
     createGuildColorMapGroups,
@@ -66,14 +67,6 @@ function replaceTargetQuery(color: string | null) {
     if (nextUrl !== currentUrl) {
         window.history.replaceState(window.history.state, "", nextUrl);
     }
-}
-
-function parseApiError(payload: unknown): string {
-    if (typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string") {
-        return payload.error;
-    }
-
-    return "Guild color data is temporarily unavailable.";
 }
 
 function guildGroupLabel(group: GuildColorMapGroup): string {
@@ -188,19 +181,7 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
             setLoadError(null);
 
             try {
-                const response = await fetch("/api/guild-colors", {
-                    headers: {
-                        Accept: "application/json",
-                    },
-                    signal: controller.signal,
-                });
-                const payload: unknown = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(parseApiError(payload));
-                }
-
-                setGuildData(payload as GuildColorApiResponse);
+                await loadGuildColorData(controller.signal, setGuildData);
             } catch (error) {
                 if (controller.signal.aborted) {
                     return;

@@ -1,10 +1,10 @@
-import { guildStatsUrl, type GuildColorApiResponse, type GuildColorRecord } from "@/lib/guild-colors";
+import { guildStatsUrl, type GuildColorRecord, type GuildColorStatsMetadata } from "@/lib/guild-colors";
 import { cn } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
 
 interface GuildStatsLinkProps {
     guild: GuildColorRecord;
-    seasons: Pick<GuildColorApiResponse["stats"], "currentSeason" | "previousSeason"> | null;
+    seasons: Pick<GuildColorStatsMetadata, "currentSeason" | "previousSeason"> | null;
     className?: string;
 }
 

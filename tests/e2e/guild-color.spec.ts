@@ -15,44 +15,27 @@ const guildColorResponse = {
             name: "Red One",
             prefix: "R1",
             color: "#FF0000",
-            stats: { currentTerritories: 2, currentSeasonRating: 12340, previousSeasonRating: 8210 },
         },
         {
             name: "Red Two",
             prefix: "R2",
             color: "#FF0000",
-            stats: { currentTerritories: 0, currentSeasonRating: 6586691, previousSeasonRating: 15107093 },
         },
         {
             name: "Blue Guild",
             prefix: "BLU",
             color: "#0000FF",
-            stats: { currentTerritories: null, currentSeasonRating: null, previousSeasonRating: null },
         },
         {
             name: "Green Guild",
             prefix: "GRN",
             color: "#00FF00",
-            stats: { currentTerritories: 1, currentSeasonRating: 900, previousSeasonRating: 1200 },
         },
     ],
     fetchedAt: Date.UTC(2026, 6, 29, 20, 0, 0),
     cacheSeconds: 600,
     excludedPlaceholderCount: 85,
-    stats: {
-        fetchedAt: Date.UTC(2026, 7, 19, 20, 0, 0),
-        cacheSeconds: 60,
-        currentSeason: {
-            id: "32",
-            startAt: "2026-07-24T23:01:00.000Z",
-            endAt: "2026-09-27T04:01:00.000Z",
-        },
-        previousSeason: {
-            id: "31",
-            startAt: "2026-05-29T23:01:00.000Z",
-            endAt: "2026-07-19T04:01:00.000Z",
-        },
-    },
+    stats: null,
     source: {
         url: "https://athena.wynntils.com/cache/get/guildList",
         etag: '"fixture"',
@@ -60,14 +43,81 @@ const guildColorResponse = {
     },
 };
 
+const guildColorStatsResponse = {
+    guilds: [
+        {
+            name: "Red One",
+            prefix: "R1",
+            stats: { currentTerritories: 2, currentSeasonRating: 12340, previousSeasonRating: 8210 },
+        },
+        {
+            name: "Red Two",
+            prefix: "R2",
+            stats: { currentTerritories: 0, currentSeasonRating: 6586691, previousSeasonRating: 15107093 },
+        },
+        {
+            name: "Blue Guild",
+            prefix: "BLU",
+            stats: { currentTerritories: null, currentSeasonRating: null, previousSeasonRating: null },
+        },
+        {
+            name: "Green Guild",
+            prefix: "GRN",
+            stats: { currentTerritories: 1, currentSeasonRating: 900, previousSeasonRating: 1200 },
+        },
+    ],
+    fetchedAt: Date.UTC(2026, 7, 19, 20, 0, 0),
+    cacheSeconds: 60,
+    currentSeason: {
+        id: "32",
+        startAt: "2026-07-24T23:01:00.000Z",
+        endAt: "2026-09-27T04:01:00.000Z",
+    },
+    previousSeason: {
+        id: "31",
+        startAt: "2026-05-29T23:01:00.000Z",
+        endAt: "2026-07-19T04:01:00.000Z",
+    },
+};
+
 async function mockGuildColors(page: Page) {
     await page.route("**/api/guild-colors", async (route) => {
         await route.fulfill({ json: guildColorResponse });
+    });
+    await page.route("**/api/guild-color-stats", async (route) => {
+        await route.fulfill({ json: guildColorStatsResponse });
     });
 }
 
 test.beforeEach(async ({ page }) => {
     await mockGuildColors(page);
+});
+
+test("renders color verdicts before optional activity statistics finish loading", async ({ page }) => {
+    let releaseStats: (() => void) | undefined;
+    const statsGate = new Promise<void>((resolve) => {
+        releaseStats = resolve;
+    });
+
+    await page.unroute("**/api/guild-color-stats");
+    await page.route("**/api/guild-color-stats", async (route) => {
+        await statsGate;
+        await route.fulfill({ json: guildColorStatsResponse });
+    });
+
+    await page.goto("/guild-color?hex=FF0000");
+
+    try {
+        await expect(page.getByText("Allowed? 🟥 No")).toBeVisible();
+        await expect(page.getByText("2 guilds use this color").first()).toBeVisible();
+        await expect(page.getByText("Previous S31", { exact: true })).toHaveCount(0);
+    } finally {
+        releaseStats?.();
+    }
+
+    const redOneStats = page.getByRole("link", { name: /Red One \[R1\].*opens in a new tab/ }).locator("..");
+    await expect(redOneStats.getByText("Previous S31", { exact: true })).toHaveCount(2);
+    await expect(redOneStats.getByText("12,340 SR", { exact: true })).toHaveCount(2);
 });
 
 test("updates the verdict while dragging the inline color picker", async ({ page }) => {
@@ -344,6 +394,21 @@ test("does not calculate an allowed verdict when the guild source fails", async 
     await page.goto("/guild-color/map");
     await expect(page.getByText("Guild colors could not be loaded")).toBeVisible();
     await expect(page.getByText("Unavailable. No claim map was calculated.")).toBeVisible();
+});
+
+test("keeps color verdicts available when activity statistics fail", async ({ page }) => {
+    await page.unroute("**/api/guild-color-stats");
+    await page.route("**/api/guild-color-stats", async (route) => {
+        await route.fulfill({
+            status: 502,
+            json: { error: "Guild activity statistics are temporarily unavailable." },
+        });
+    });
+
+    await page.goto("/guild-color?hex=FF0000");
+    await expect(page.getByText("Allowed? 🟥 No")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Red One \[R1\].*opens in a new tab/ }).first()).toBeVisible();
+    await expect(page.getByText("Current S32", { exact: true })).toHaveCount(0);
 });
 
 test("links to the guild color tool immediately before the classic UI", async ({ page }) => {
