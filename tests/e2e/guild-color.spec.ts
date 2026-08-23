@@ -307,6 +307,7 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     expect(bounds).not.toBeNull();
     const fullResolution = guildColorMapFullResolution(bounds!.width, 1.5);
     expect(fullResolution).toBe(1024);
+    await expect(map).toHaveAttribute("width", String(fullResolution));
 
     await page.mouse.move(
         bounds!.x + bounds!.width * ((75 - GUILD_COLOR_MAP_A_MIN) / (GUILD_COLOR_MAP_A_MAX - GUILD_COLOR_MAP_A_MIN)),
