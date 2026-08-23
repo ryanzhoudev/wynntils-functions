@@ -7,6 +7,7 @@ import {
     guildColorBrightness,
     hsvToRgb,
     MIN_GUILD_COLOR_BRIGHTNESS,
+    mergeGuildColorStats,
     normalizeGuildColorHex,
     parseAthenaGuildColors,
     rgbToHsv,
@@ -48,6 +49,56 @@ describe("guild color normalization and Athena parsing", () => {
         expect(guildStatsUrl("Red One / Ω")).toBe(
             "https://wynncraft.com/stats/guild/Red%20One%20%2F%20%CE%A9",
         );
+    });
+
+    it("merges separately loaded statistics by normalized guild identity", () => {
+        const merged = mergeGuildColorStats(
+            {
+                guilds: [
+                    { name: "Active Guild", prefix: "ACT", color: "#FF0000" },
+                    { name: "Unmatched Guild", prefix: "OLD", color: "#0000FF" },
+                ],
+                fetchedAt: 1,
+                cacheSeconds: 600,
+                excludedPlaceholderCount: 0,
+                stats: null,
+                source: {
+                    url: "https://example.com/guilds",
+                    etag: null,
+                    freshness: "request-time-only",
+                },
+            },
+            {
+                guilds: [
+                    {
+                        name: " active guild ",
+                        prefix: "act",
+                        stats: {
+                            currentTerritories: 3,
+                            currentSeasonRating: 12500,
+                            previousSeasonRating: 9000,
+                        },
+                    },
+                ],
+                fetchedAt: 2,
+                cacheSeconds: 60,
+                currentSeason: { id: "32", startAt: "start", endAt: "end" },
+                previousSeason: { id: "31", startAt: "start", endAt: "end" },
+            },
+        );
+
+        expect(merged.guilds[0].stats).toEqual({
+            currentTerritories: 3,
+            currentSeasonRating: 12500,
+            previousSeasonRating: 9000,
+        });
+        expect(merged.guilds[1].stats).toBeUndefined();
+        expect(merged.stats).toMatchObject({
+            fetchedAt: 2,
+            cacheSeconds: 60,
+            currentSeason: { id: "32" },
+            previousSeason: { id: "31" },
+        });
     });
 });
 
@@ -97,6 +148,20 @@ describe("Wynntils Bot-compatible guild color analysis", () => {
         });
         expect(analysis.conflictingGroups[0].guilds.map((guild) => guild.name)).toEqual(["Red One", "Red Two"]);
         expect(palette.some((guild) => guild.color === GUILD_COLOR_PLACEHOLDER)).toBe(false);
+    });
+
+    it("preserves guild statistics through closest-color analysis", () => {
+        const stats = {
+            currentTerritories: 2,
+            currentSeasonRating: 12340,
+            previousSeasonRating: 9000,
+        };
+        const analysis = analyzeGuildColor(
+            "#FF0000",
+            createGuildColorPalette([{ name: "Active", prefix: "ACT", color: "#FF0000", stats }]),
+        );
+
+        expect(analysis.groups[0].guilds[0].stats).toEqual(stats);
     });
 
     it("finds the nearest allowed value independently in all available RGB directions", () => {

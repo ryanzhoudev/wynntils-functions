@@ -3,10 +3,40 @@ export const MIN_GUILD_COLOR_DELTA_E = 20;
 export const GUILD_COLOR_PLACEHOLDER = "#C05F5F";
 export const WYNNCRAFT_GUILD_STATS_BASE_URL = "https://wynncraft.com/stats/guild";
 
+export interface GuildColorStats {
+    currentTerritories: number | null;
+    currentSeasonRating: number | null;
+    previousSeasonRating: number | null;
+}
+
+export interface GuildSeasonMetadata {
+    id: string;
+    startAt: string;
+    endAt: string;
+}
+
 export interface GuildColorRecord {
     name: string;
     prefix: string;
     color: string;
+    stats?: GuildColorStats;
+}
+
+export interface GuildColorStatsMetadata {
+    fetchedAt: number;
+    cacheSeconds: number;
+    currentSeason: GuildSeasonMetadata | null;
+    previousSeason: GuildSeasonMetadata | null;
+}
+
+export interface GuildColorStatsRecord {
+    name: string;
+    prefix: string;
+    stats: GuildColorStats;
+}
+
+export interface GuildColorStatsApiResponse extends GuildColorStatsMetadata {
+    guilds: GuildColorStatsRecord[];
 }
 
 export interface GuildColorApiResponse {
@@ -14,10 +44,38 @@ export interface GuildColorApiResponse {
     fetchedAt: number;
     cacheSeconds: number;
     excludedPlaceholderCount: number;
+    stats: GuildColorStatsMetadata | null;
     source: {
         url: string;
         etag: string | null;
         freshness: "request-time-only";
+    };
+}
+
+function guildStatsIdentity(name: string, prefix: string): string {
+    return `${name.trim().toLocaleLowerCase()}\u0000${prefix.trim().toLocaleUpperCase()}`;
+}
+
+export function mergeGuildColorStats(
+    colors: GuildColorApiResponse,
+    stats: GuildColorStatsApiResponse,
+): GuildColorApiResponse {
+    const statsByGuild = new Map(
+        stats.guilds.map((guild) => [guildStatsIdentity(guild.name, guild.prefix), guild.stats] as const),
+    );
+
+    return {
+        ...colors,
+        guilds: colors.guilds.map((guild) => ({
+            ...guild,
+            stats: statsByGuild.get(guildStatsIdentity(guild.name, guild.prefix)),
+        })),
+        stats: {
+            fetchedAt: stats.fetchedAt,
+            cacheSeconds: stats.cacheSeconds,
+            currentSeason: stats.currentSeason,
+            previousSeason: stats.previousSeason,
+        },
     };
 }
 
@@ -360,6 +418,7 @@ export function analyzeGuildColor(hex: string, palette: GuildColorPaletteEntry[]
             name: guild.name,
             prefix: guild.prefix,
             color: guild.color,
+            stats: guild.stats,
         };
 
         if (existing) {

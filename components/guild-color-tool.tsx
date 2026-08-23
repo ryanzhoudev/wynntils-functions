@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import InlineColorPicker from "@/components/inline-color-picker";
 import GuildStatsLink from "@/components/guild-stats-link";
+import { loadGuildColorData } from "@/lib/guild-color-client";
 import {
     analyzeGuildColor,
     createGuildColorPalette,
@@ -145,14 +146,6 @@ function formatDistance(distance: number): string {
     return Number.isFinite(distance) ? distance.toFixed(2) : "—";
 }
 
-function parseApiError(payload: unknown): string {
-    if (typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string") {
-        return payload.error;
-    }
-
-    return "Guild color data is temporarily unavailable.";
-}
-
 function subscribeToHashChange(callback: () => void): () => void {
     window.addEventListener("hashchange", callback);
 
@@ -239,19 +232,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
             setLoadError(null);
 
             try {
-                const response = await fetch("/api/guild-colors", {
-                    headers: {
-                        Accept: "application/json",
-                    },
-                    signal: controller.signal,
-                });
-                const payload: unknown = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(parseApiError(payload));
-                }
-
-                setGuildData(payload as GuildColorApiResponse);
+                await loadGuildColorData(controller.signal, setGuildData);
             } catch (error) {
                 if (controller.signal.aborted) {
                     return;
@@ -350,7 +331,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
             <main className="mx-auto grid w-full max-w-[100rem] gap-6 px-4 pb-12 xl:grid-cols-[20rem_minmax(0,1fr)]">
                 <div className="space-y-6 xl:sticky xl:top-4 xl:self-start">
                     <Card>
-                        <CardHeader className="flex-row items-center justify-between space-y-0">
+                        <CardHeader className="flex-row items-center justify-between space-y-0 pb-[22px]">
                             <CardTitle>Choose a color</CardTitle>
                             <Button
                                 type="button"
@@ -372,9 +353,9 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                             </Button>
                         </CardHeader>
                         <CardContent className="space-y-5">
-                            <div className="space-y-2">
-                                <Label htmlFor="guild-color">Guild color</Label>
-                                <div className="flex gap-2">
+                            <div className="grid grid-cols-2 gap-x-2 gap-y-2">
+                                <div className="space-y-2">
+                                    <Label htmlFor="guild-color">Guild color</Label>
                                     <Input
                                         id="guild-color"
                                         value={inputColor}
@@ -384,8 +365,20 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                         className="font-mono uppercase"
                                     />
                                 </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="guild-prefix">Preview tag</Label>
+                                    <Input
+                                        id="guild-prefix"
+                                        value={prefix}
+                                        onChange={(event) => setPrefix(event.target.value.slice(0, 8))}
+                                        placeholder={DEFAULT_PREFIX}
+                                        maxLength={8}
+                                    />
+                                </div>
                                 {!normalizedColor ? (
-                                    <p className="text-xs text-red-300">Use a three- or six-digit hexadecimal color.</p>
+                                    <p className="col-span-2 text-xs text-red-300">
+                                        Use a three- or six-digit hexadecimal color.
+                                    </p>
                                 ) : null}
                             </div>
 
@@ -393,17 +386,6 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                 value={normalizedColor ?? chosenPreviewColor}
                                 onChange={setInputColorOverride}
                             />
-
-                            <div className="space-y-2">
-                                <Label htmlFor="guild-prefix">Preview tag</Label>
-                                <Input
-                                    id="guild-prefix"
-                                    value={prefix}
-                                    onChange={(event) => setPrefix(event.target.value.slice(0, 8))}
-                                    placeholder={DEFAULT_PREFIX}
-                                    maxLength={8}
-                                />
-                            </div>
 
                             <div
                                 className={cn(
@@ -462,14 +444,16 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                             ) : null}
                                         </p>
                                         {closestGroup ? (
-                                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                                            <ul className="mt-2 space-y-1.5 text-sm">
                                                 {closestGroup.guilds.map((guild) => (
-                                                    <GuildStatsLink
+                                                    <li
                                                         key={`${guild.name}-${guild.prefix}`}
-                                                        guild={guild}
-                                                    />
+                                                        className="rounded-md bg-muted/40 p-2"
+                                                    >
+                                                        <GuildStatsLink guild={guild} seasons={guildData?.stats ?? null} />
+                                                    </li>
                                                 ))}
-                                            </div>
+                                            </ul>
                                         ) : null}
                                         <p className="mt-2 text-xs text-muted-foreground">
                                             Brightness {liveVerdict.brightness.toFixed(1)} /{" "}
@@ -717,14 +701,19 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                                     </div>
                                                     <p className="mt-2 text-sm font-medium">{guildGroupLabel(group)}</p>
                                                 </button>
-                                                <div className="flex flex-wrap gap-x-3 gap-y-1 border-t px-3 py-2 text-xs">
+                                                <ul className="space-y-1.5 border-t p-2 text-xs">
                                                     {group.guilds.map((guild) => (
-                                                        <GuildStatsLink
+                                                        <li
                                                             key={`${guild.name}-${guild.prefix}`}
-                                                            guild={guild}
-                                                        />
+                                                            className="rounded-md bg-muted/40 p-2"
+                                                        >
+                                                            <GuildStatsLink
+                                                                guild={guild}
+                                                                seasons={guildData?.stats ?? null}
+                                                            />
+                                                        </li>
                                                     ))}
-                                                </div>
+                                                </ul>
                                             </div>
                                         );
                                     })}

@@ -1,4 +1,4 @@
-import { GuildColorApiResponse, parseAthenaGuildColors } from "@/lib/guild-colors";
+import { type GuildColorApiResponse, parseAthenaGuildColors } from "@/lib/guild-colors";
 import { connection, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -41,6 +41,7 @@ export async function GET() {
             fetchedAt: readFetchedAt(upstreamResponse),
             cacheSeconds: CACHE_SECONDS,
             excludedPlaceholderCount,
+            stats: null,
             source: {
                 url: ATHENA_GUILD_LIST_URL,
                 etag: upstreamResponse.headers.get("etag"),
