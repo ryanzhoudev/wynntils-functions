@@ -236,12 +236,13 @@ test("looks up guild colors by tag or name and includes the preview tag in share
     await guildLookup.fill("[blu]");
     await page.getByRole("button", { name: "Use Blue Guild [BLU] color #0000FF" }).click();
     await expect(colorInput).toHaveValue("#0000FF");
-    await expect(previewTagInput).toHaveValue("WYN");
+    await expect(previewTagInput).toHaveValue("BLU");
     await expect(guildLookup).toHaveValue("");
 
     await guildLookup.fill("green guild");
     await page.getByRole("button", { name: "Use Green Guild [GRN] color #00FF00" }).click();
     await expect(colorInput).toHaveValue("#00FF00");
+    await expect(previewTagInput).toHaveValue("GRN");
 
     await previewTagInput.fill("new");
     await page.evaluate(() => {

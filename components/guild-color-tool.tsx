@@ -292,6 +292,7 @@ export default function GuildColorTool({ initialColor, initialPrefix }: GuildCol
 
     function applyGuildLookupColor(guild: GuildColorRecord) {
         setInputColorOverride(guild.color);
+        setPrefix(normalizePreviewTag(guild.prefix));
         setGuildLookup("");
     }
 
