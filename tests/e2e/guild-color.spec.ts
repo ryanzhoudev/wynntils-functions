@@ -120,6 +120,79 @@ test("renders color verdicts before optional activity statistics finish loading"
     await expect(redOneStats.getByText("12,340 SR", { exact: true })).toHaveCount(2);
 });
 
+test("keeps the inspected map point while optional activity statistics load", async ({ page }) => {
+    let releaseStats: (() => void) | undefined;
+    const statsGate = new Promise<void>((resolve) => {
+        releaseStats = resolve;
+    });
+
+    await page.addInitScript(() => {
+        const originalPostMessage = Worker.prototype.postMessage;
+        let renderRequestCount = 0;
+
+        Worker.prototype.postMessage = function (...args) {
+            const [message] = args;
+
+            if (typeof message === "object" && message !== null && "type" in message && message.type === "render") {
+                renderRequestCount += 1;
+            }
+
+            return Reflect.apply(originalPostMessage, this, args);
+        };
+        Object.defineProperty(window, "__guildMapRenderRequestCount", {
+            configurable: true,
+            get: () => renderRequestCount,
+        });
+    });
+    await page.unroute("**/api/guild-color-stats");
+    await page.route("**/api/guild-color-stats", async (route) => {
+        await statsGate;
+        await route.fulfill({ json: guildColorStatsResponse });
+    });
+    await page.goto("/guild-color/map");
+
+    try {
+        const mapStatus = page.getByTestId("map-status");
+        await expect(mapStatus).toContainText("Showing L* 75", { timeout: 15_000 });
+        const lightness = page.getByRole("slider", { name: "Lightness view" });
+        await lightness.fill("53");
+        await expect(mapStatus).toContainText("Showing L* 53", { timeout: 15_000 });
+
+        const map = page.getByRole("img", { name: "Guild color claims at Lab lightness 53" });
+        const bounds = await map.boundingBox();
+        expect(bounds).not.toBeNull();
+        const devicePixelRatio = await page.evaluate(() => window.devicePixelRatio);
+        await expect(map).toHaveAttribute(
+            "width",
+            String(guildColorMapFullResolution(bounds!.width, devicePixelRatio)),
+        );
+        await page.mouse.move(
+            bounds!.x +
+                bounds!.width * ((75 - GUILD_COLOR_MAP_A_MIN) / (GUILD_COLOR_MAP_A_MAX - GUILD_COLOR_MAP_A_MIN)),
+            bounds!.y +
+                bounds!.height * ((GUILD_COLOR_MAP_B_MAX - 60) / (GUILD_COLOR_MAP_B_MAX - GUILD_COLOR_MAP_B_MIN)),
+        );
+        await expect(page.getByText("2 guilds share #FF0000")).toBeVisible();
+        await expect(page.getByText("Previous S31", { exact: true })).toHaveCount(0);
+
+        const renderRequestsBeforeStats = await page.evaluate(
+            () => (window as typeof window & { __guildMapRenderRequestCount: number }).__guildMapRenderRequestCount,
+        );
+        releaseStats?.();
+        await expect(page.getByText("Previous S31", { exact: true })).toHaveCount(2);
+        await page.waitForTimeout(100);
+
+        expect(
+            await page.evaluate(
+                () => (window as typeof window & { __guildMapRenderRequestCount: number }).__guildMapRenderRequestCount,
+            ),
+        ).toBe(renderRequestsBeforeStats);
+        await expect(page.getByText("2 guilds share #FF0000")).toBeVisible();
+    } finally {
+        releaseStats?.();
+    }
+});
+
 test("updates the verdict while dragging the inline color picker", async ({ page }) => {
     await page.goto("/guild-color?hex=FFFFFF");
 

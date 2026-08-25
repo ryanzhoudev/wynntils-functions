@@ -18,6 +18,7 @@ import {
     guildColorMapFullResolution,
     type GuildColorMapGroup,
     type GuildColorMapRenderResponse,
+    type GuildColorMapWorkerGroup,
     type GuildColorMapWorkerResponse,
     labToMapPosition,
     readGuildColorMapPoint,
@@ -100,6 +101,7 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
     const [isAdjustingLightness, setIsAdjustingLightness] = useState(false);
     const [fullRenderResolution, setFullRenderResolution] = useState(GUILD_COLOR_MAP_RESOLUTION);
     const [guildData, setGuildData] = useState<GuildColorApiResponse | null>(null);
+    const [workerGroups, setWorkerGroups] = useState<GuildColorMapWorkerGroup[]>([]);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [loadAttempt, setLoadAttempt] = useState(0);
     const [renderError, setRenderError] = useState<string | null>(null);
@@ -114,7 +116,6 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
         () => createGuildColorMapGroups(createGuildColorPalette(guildData?.guilds ?? [])),
         [guildData],
     );
-    const workerGroups = useMemo(() => groups.map(({ color, lab }) => ({ color, lab })), [groups]);
     const target = useMemo(() => {
         const rgb = targetColor ? hexToRgb(targetColor) : null;
 
@@ -181,13 +182,25 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
             setLoadError(null);
 
             try {
-                await loadGuildColorData(controller.signal, setGuildData);
+                await loadGuildColorData(controller.signal, (data, phase) => {
+                    setGuildData(data);
+
+                    if (phase === "colors") {
+                        setWorkerGroups(
+                            createGuildColorMapGroups(createGuildColorPalette(data.guilds)).map(({ color, lab }) => ({
+                                color,
+                                lab,
+                            })),
+                        );
+                    }
+                });
             } catch (error) {
                 if (controller.signal.aborted) {
                     return;
                 }
 
                 setGuildData(null);
+                setWorkerGroups([]);
                 setLoadError(error instanceof Error ? error.message : "Guild color data is temporarily unavailable.");
             }
         }
@@ -234,7 +247,7 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
     }, []);
 
     useEffect(() => {
-        if (!workerRef.current || !guildData || workerGroups.length === 0) {
+        if (!workerRef.current || workerGroups.length === 0) {
             return;
         }
 
@@ -249,7 +262,7 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
             height: resolution,
             groups: workerGroups,
         });
-    }, [fullRenderResolution, guildData, isAdjustingLightness, lightness, workerGroups]);
+    }, [fullRenderResolution, isAdjustingLightness, lightness, workerGroups]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
