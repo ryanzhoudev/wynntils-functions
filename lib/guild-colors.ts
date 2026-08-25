@@ -79,6 +79,59 @@ export function mergeGuildColorStats(
     };
 }
 
+function normalizeGuildLookupQuery(query: string): string {
+    const trimmed = query.trim();
+    const unwrapped = trimmed.startsWith("[") && trimmed.endsWith("]") ? trimmed.slice(1, -1).trim() : trimmed;
+
+    return unwrapped.toLowerCase();
+}
+
+export function findGuildColorsByIdentity(
+    guilds: ReadonlyArray<GuildColorRecord>,
+    query: string,
+    limit = 8,
+): GuildColorRecord[] {
+    const normalizedQuery = normalizeGuildLookupQuery(query);
+    const resultLimit = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : 0;
+
+    if (!normalizedQuery || resultLimit === 0) {
+        return [];
+    }
+
+    return guilds
+        .flatMap((guild) => {
+            const name = guild.name.trim().toLowerCase();
+            const prefix = guild.prefix.trim().toLowerCase();
+            let rank: number;
+
+            if (prefix === normalizedQuery) {
+                rank = 0;
+            } else if (name === normalizedQuery) {
+                rank = 1;
+            } else if (prefix.startsWith(normalizedQuery)) {
+                rank = 2;
+            } else if (name.startsWith(normalizedQuery)) {
+                rank = 3;
+            } else if (prefix.includes(normalizedQuery)) {
+                rank = 4;
+            } else if (name.includes(normalizedQuery)) {
+                rank = 5;
+            } else {
+                return [];
+            }
+
+            return [{ guild, rank }];
+        })
+        .sort(
+            (first, second) =>
+                first.rank - second.rank ||
+                first.guild.name.localeCompare(second.guild.name) ||
+                first.guild.prefix.localeCompare(second.guild.prefix),
+        )
+        .slice(0, resultLimit)
+        .map(({ guild }) => guild);
+}
+
 export interface Rgb {
     r: number;
     g: number;

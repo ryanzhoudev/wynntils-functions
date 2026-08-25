@@ -1,6 +1,7 @@
 import {
     analyzeGuildColor,
     createGuildColorPalette,
+    findGuildColorsByIdentity,
     findDirectionalColorSuggestions,
     GUILD_COLOR_PLACEHOLDER,
     guildStatsUrl,
@@ -99,6 +100,27 @@ describe("guild color normalization and Athena parsing", () => {
             currentSeason: { id: "32" },
             previousSeason: { id: "31" },
         });
+    });
+
+    it("finds guild colors by bracketed tag or name with the strongest matches first", () => {
+        const guilds = [
+            { name: "The Blue Guild", prefix: "BLU", color: "#0000FF" },
+            { name: "Bluestone", prefix: "STONE", color: "#1111FF" },
+            { name: "Blue", prefix: "B", color: "#2222FF" },
+            { name: "Other", prefix: "XBLU", color: "#3333FF" },
+        ];
+
+        expect(findGuildColorsByIdentity(guilds, " [blu] ").map((guild) => guild.name)).toEqual([
+            "The Blue Guild",
+            "Blue",
+            "Bluestone",
+            "Other",
+        ]);
+        expect(findGuildColorsByIdentity(guilds, "BLUE", 2).map((guild) => guild.name)).toEqual([
+            "Blue",
+            "Bluestone",
+        ]);
+        expect(findGuildColorsByIdentity(guilds, "missing")).toEqual([]);
     });
 });
 

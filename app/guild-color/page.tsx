@@ -19,6 +19,7 @@ function firstValue(value: string | string[] | undefined): string | null {
 export default async function GuildColorPage({ searchParams }: { searchParams: SearchParams }) {
     const params = await searchParams;
     const initialColor = firstValue(params.hex) ?? firstValue(params.color);
+    const initialPrefix = firstValue(params.tag);
 
-    return <GuildColorTool initialColor={initialColor} />;
+    return <GuildColorTool initialColor={initialColor} initialPrefix={initialPrefix} />;
 }

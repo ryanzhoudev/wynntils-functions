@@ -13,10 +13,12 @@ import {
     createGuildColorPalette,
     type DirectionalColorSuggestion,
     evaluateGuildColor,
+    findGuildColorsByIdentity,
     findDirectionalColorSuggestions,
     GUILD_COLOR_DIRECTIONS,
     type GuildColorApiResponse,
     type GuildColorGroup,
+    type GuildColorRecord,
     MIN_GUILD_COLOR_BRIGHTNESS,
     MIN_GUILD_COLOR_DELTA_E,
     normalizeGuildColorHex,
@@ -32,6 +34,7 @@ import {
     Map as MapIcon,
     Palette,
     RotateCcw,
+    Search,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -48,6 +51,7 @@ const DIRECTION_BADGE_STYLES: Record<DirectionalColorSuggestion["channel"], stri
 
 interface GuildColorToolProps {
     initialColor: string | null;
+    initialPrefix: string | null;
 }
 
 interface GuildPreviewSelection {
@@ -164,11 +168,16 @@ function readServerHashColor(): null {
     return null;
 }
 
-export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
+function normalizePreviewTag(value: string | null | undefined): string {
+    return value?.trim().toUpperCase().slice(0, 8) || DEFAULT_PREFIX;
+}
+
+export default function GuildColorTool({ initialColor, initialPrefix }: GuildColorToolProps) {
     const hashColor = useSyncExternalStore(subscribeToHashChange, readHashColor, readServerHashColor);
     const [inputColorOverride, setInputColorOverride] = useState<string | null>(null);
     const inputColor = inputColorOverride ?? normalizeGuildColorHex(initialColor ?? "") ?? hashColor ?? DEFAULT_COLOR;
-    const [prefix, setPrefix] = useState(DEFAULT_PREFIX);
+    const [prefix, setPrefix] = useState(() => normalizePreviewTag(initialPrefix));
+    const [guildLookup, setGuildLookup] = useState("");
     const [guildData, setGuildData] = useState<GuildColorApiResponse | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [loadAttempt, setLoadAttempt] = useState(0);
@@ -178,6 +187,10 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
     const normalizedColor = normalizeGuildColorHex(inputColor);
     const deferredNormalizedColor = normalizeGuildColorHex(deferredInputColor);
     const palette = useMemo(() => createGuildColorPalette(guildData?.guilds ?? []), [guildData]);
+    const guildLookupMatches = useMemo(
+        () => findGuildColorsByIdentity(guildData?.guilds ?? [], guildLookup),
+        [guildData, guildLookup],
+    );
     const liveVerdict = useMemo(
         () => (guildData && normalizedColor ? evaluateGuildColor(normalizedColor, palette) : null),
         [guildData, normalizedColor, palette],
@@ -277,6 +290,11 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
         });
     }
 
+    function applyGuildLookupColor(guild: GuildColorRecord) {
+        setInputColorOverride(guild.color);
+        setGuildLookup("");
+    }
+
     async function copyShareUrl() {
         if (!normalizedColor) {
             return;
@@ -286,6 +304,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
         shareUrl.search = "";
         shareUrl.hash = "";
         shareUrl.searchParams.set("hex", normalizedColor.slice(1));
+        shareUrl.searchParams.set("tag", normalizePreviewTag(prefix));
 
         try {
             await navigator.clipboard.writeText(shareUrl.toString());
@@ -450,7 +469,10 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                                         key={`${guild.name}-${guild.prefix}`}
                                                         className="rounded-md bg-muted/40 p-2"
                                                     >
-                                                        <GuildStatsLink guild={guild} seasons={guildData?.stats ?? null} />
+                                                        <GuildStatsLink
+                                                            guild={guild}
+                                                            seasons={guildData?.stats ?? null}
+                                                        />
                                                     </li>
                                                 ))}
                                             </ul>
@@ -474,9 +496,70 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                 Guild color data
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2 text-sm">
+                        <CardContent className="space-y-4 text-sm">
+                            <div className="space-y-2">
+                                <Label htmlFor="guild-lookup">Find a guild</Label>
+                                <div className="relative">
+                                    <Search
+                                        className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                                        aria-hidden="true"
+                                    />
+                                    <Input
+                                        id="guild-lookup"
+                                        value={guildLookup}
+                                        onChange={(event) => setGuildLookup(event.target.value)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Escape") {
+                                                setGuildLookup("");
+                                            }
+                                        }}
+                                        placeholder="Guild name or tag"
+                                        autoComplete="off"
+                                        spellCheck={false}
+                                        disabled={!guildData}
+                                        className="pl-9"
+                                    />
+                                </div>
+                                {guildLookup.trim() && guildData ? (
+                                    <div className="mt-2 max-h-56 overflow-y-auto rounded-md border border-border bg-card p-1 text-card-foreground shadow-md">
+                                        {guildLookupMatches.length > 0 ? (
+                                            <ul className="space-y-1">
+                                                {guildLookupMatches.map((guild) => (
+                                                    <li key={`${guild.name}-${guild.prefix}-${guild.color}`}>
+                                                        <button
+                                                            type="button"
+                                                            aria-label={`Use ${guild.name} [${guild.prefix.toUpperCase()}] color ${guild.color}`}
+                                                            className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                            onClick={() => applyGuildLookupColor(guild)}
+                                                        >
+                                                            <span
+                                                                aria-hidden="true"
+                                                                className="size-5 shrink-0 rounded-sm border border-white/20"
+                                                                style={{ backgroundColor: guild.color }}
+                                                            />
+                                                            <span className="min-w-0 flex-1 truncate font-medium">
+                                                                {guild.name}{" "}
+                                                                <span className="text-muted-foreground">
+                                                                    [{guild.prefix.toUpperCase()}]
+                                                                </span>
+                                                            </span>
+                                                            <code className="shrink-0 text-[0.7rem] text-muted-foreground">
+                                                                {guild.color}
+                                                            </code>
+                                                        </button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                                                No registered guilds match this search.
+                                            </p>
+                                        )}
+                                    </div>
+                                ) : null}
+                            </div>
                             {guildData ? (
-                                <>
+                                <div className="space-y-2">
                                     <Badge variant="secondary">
                                         {guildData.guilds.length.toLocaleString()} guild colors
                                     </Badge>
@@ -486,7 +569,7 @@ export default function GuildColorTool({ initialColor }: GuildColorToolProps) {
                                     <p className="text-xs text-muted-foreground">
                                         Excluded {guildData.excludedPlaceholderCount} placeholder entries using #C05F5F.
                                     </p>
-                                </>
+                                </div>
                             ) : loadError ? (
                                 <p className="text-amber-200">
                                     Unavailable. The tool will not issue a verdict without guild data.

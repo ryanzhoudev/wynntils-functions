@@ -224,6 +224,46 @@ test("updates the verdict while dragging the inline color picker", async ({ page
     await page.mouse.up();
 });
 
+test("looks up guild colors by tag or name and includes the preview tag in shared URLs", async ({ page }) => {
+    await page.goto("/guild-color?hex=FFFFFF&tag=wyN");
+
+    const colorInput = page.getByRole("textbox", { name: "Guild color", exact: true });
+    const previewTagInput = page.getByRole("textbox", { name: "Preview tag" });
+    const guildLookup = page.getByRole("textbox", { name: "Find a guild" });
+    await expect(previewTagInput).toHaveValue("WYN");
+    await expect(guildLookup).toBeEnabled();
+
+    await guildLookup.fill("[blu]");
+    await page.getByRole("button", { name: "Use Blue Guild [BLU] color #0000FF" }).click();
+    await expect(colorInput).toHaveValue("#0000FF");
+    await expect(previewTagInput).toHaveValue("WYN");
+    await expect(guildLookup).toHaveValue("");
+
+    await guildLookup.fill("green guild");
+    await page.getByRole("button", { name: "Use Green Guild [GRN] color #00FF00" }).click();
+    await expect(colorInput).toHaveValue("#00FF00");
+
+    await previewTagInput.fill("new");
+    await page.evaluate(() => {
+        Object.defineProperty(navigator, "clipboard", {
+            configurable: true,
+            value: {
+                writeText: async (value: string) => {
+                    window.localStorage.setItem("guild-color-lookup-share-url", value);
+                },
+            },
+        });
+    });
+    await page.getByRole("button", { name: "Copy link" }).click();
+    const copiedUrl = await page.evaluate(() => window.localStorage.getItem("guild-color-lookup-share-url"));
+    expect(copiedUrl).toBe(new URL("/guild-color?hex=00FF00&tag=NEW", page.url()).toString());
+
+    await page.goto(copiedUrl!);
+    await expect(colorInput).toHaveValue("#00FF00");
+    await expect(previewTagInput).toHaveValue("NEW");
+    await expect(page.getByRole("img", { name: /Entered color #00FF00:.*with the tag NEW/ })).toBeVisible();
+});
+
 test("preloads colors, previews every blocker, and keeps suggestions separate from the input", async ({ page }) => {
     await page.goto("/guild-color?hex=FF0000");
 
@@ -290,7 +330,7 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
     await page.getByRole("button", { name: "Copy link" }).click();
     await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
     expect(await page.evaluate(() => window.localStorage.getItem("guild-color-share-url"))).toBe(
-        new URL("/guild-color?hex=FF0000", page.url()).toString(),
+        new URL("/guild-color?hex=FF0000&tag=TAG", page.url()).toString(),
     );
 
     await expect(page.getByText("R−", { exact: true })).toHaveClass(/bg-rose-500\/20/);
