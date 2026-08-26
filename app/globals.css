@@ -67,3 +67,21 @@
     content-visibility: auto;
     contain-intrinsic-size: auto 20rem;
 }
+
+@keyframes ide-file-select-flash {
+    0%,
+    40%,
+    80%,
+    100% {
+        border-color: var(--input);
+        background-color: var(--background);
+        box-shadow: 0 0 0 0 transparent;
+    }
+
+    20%,
+    60% {
+        border-color: var(--primary);
+        background-color: color-mix(in oklch, var(--primary) 14%, var(--background));
+        box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 35%, transparent);
+    }
+}

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { WynntilsLspClient } from "@/lib/ide/lsp-client";
 import { WYNNTILS_LANGUAGE, ensureWynntilsLanguage, registerWynntilsProviders } from "@/lib/ide/monaco";
-import { createIdeFileUri } from "@/lib/ide/workspace";
+import { createCompiledIdeFileName, createIdeFileUri } from "@/lib/ide/workspace";
 import { CompileResult, IdeFile, LspDiagnostic, LspSignatureHelp } from "@/lib/ide/types";
 import { compileSupersetToWynntils } from "@/lib/ide/upstream-compile";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
@@ -80,6 +80,7 @@ export default function WynntilsIde() {
     const [compileStatus, setCompileStatus] = useState<CompileStatus | null>(null);
     const [isCompiling, setIsCompiling] = useState(false);
     const [isCopyingCompiledOutput, setIsCopyingCompiledOutput] = useState(false);
+    const [fileSelectFlashKey, setFileSelectFlashKey] = useState(0);
 
     const [diagnosticMarkers, setDiagnosticMarkers] = useState<MonacoEditor.IMarkerData[]>([]);
     const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -413,7 +414,14 @@ export default function WynntilsIde() {
             return;
         }
 
-        addFile("compiled.wynntils", compileResult.code);
+        const sourceFileName = activeFileRef.current?.name;
+
+        if (!sourceFileName) {
+            return;
+        }
+
+        addFile(createCompiledIdeFileName(sourceFileName), compileResult.code);
+        setFileSelectFlashKey((current) => current + 1);
     };
 
     const copyCompiledOutput = useCallback(async () => {
@@ -500,6 +508,7 @@ export default function WynntilsIde() {
                         <IdeToolbar
                             workspace={workspace}
                             activeFileId={activeFileId}
+                            fileSelectFlashKey={fileSelectFlashKey}
                             importInputRef={fileImportRef}
                             isCompiling={isCompiling}
                             showDiagnostics={showDiagnostics}
