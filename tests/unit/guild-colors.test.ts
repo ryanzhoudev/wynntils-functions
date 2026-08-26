@@ -152,15 +152,18 @@ describe("guild color normalization and Athena parsing", () => {
                 color: "#00FFFC",
                 stats: { ...belowThreshold, previousSeasonRating: null },
             },
+            { name: " Wanytails ", prefix: "wany", color: "#FF00FF", stats: belowThreshold },
             { name: "No stats", prefix: "NIL", color: "#00FFFB" },
         ];
 
         expect(isGuildBelowActivityThreshold(records[0])).toBe(true);
+        expect(isGuildBelowActivityThreshold(records[4])).toBe(false);
         expect(filterGuildColorsByActivity(records, false)).toEqual(records);
         expect(filterGuildColorsByActivity(records, true).map((guild) => guild.name)).toEqual([
             "At threshold",
             "Has territory",
             "Unknown rating",
+            " Wanytails ",
             "No stats",
         ]);
     });

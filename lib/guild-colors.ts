@@ -4,6 +4,9 @@ export const GUILD_COLOR_PLACEHOLDER = "#C05F5F";
 export const GUILD_ACTIVITY_RATING_THRESHOLD = 10_000;
 export const WYNNCRAFT_GUILD_STATS_BASE_URL = "https://wynncraft.com/stats/guild";
 
+const PROTECTED_GUILD_NAME = "wanytails";
+const PROTECTED_GUILD_PREFIX = "WANY";
+
 export interface GuildColorStats {
     currentTerritories: number | null;
     currentSeasonRating: number | null;
@@ -81,6 +84,13 @@ export function mergeGuildColorStats(
 }
 
 export function isGuildBelowActivityThreshold(guild: GuildColorRecord): boolean {
+    if (
+        guild.name.trim().toLocaleLowerCase() === PROTECTED_GUILD_NAME &&
+        guild.prefix.trim().toLocaleUpperCase() === PROTECTED_GUILD_PREFIX
+    ) {
+        return false;
+    }
+
     const stats = guild.stats;
 
     return Boolean(
