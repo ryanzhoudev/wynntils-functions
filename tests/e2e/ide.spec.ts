@@ -55,6 +55,9 @@ test("context, compile output, files, and persistence work end to end", async ({
         '{accessory_durability("Ring_1")}',
     );
 
+    await page.getByRole("button", { name: "Create file from output" }).click();
+    await expect(page.locator("select option:checked")).toHaveText("e2e-compiled.wynntils");
+
     page.once("dialog", (dialog) => dialog.accept("second"));
     await page.getByRole("button", { name: "New", exact: true }).click();
     await expect(page.locator("select")).toHaveValue(/.+/);
@@ -63,7 +66,7 @@ test("context, compile output, files, and persistence work end to end", async ({
         const raw = window.localStorage.getItem(storageKey);
         if (!raw) return false;
         const workspace = JSON.parse(raw) as { files: Array<{ name: string }>; activeFileId: string };
-        return workspace.files.length === 2 && workspace.files.some((file) => file.name === "second.wynntils");
+        return workspace.files.length === 3 && workspace.files.some((file) => file.name === "second.wynntils");
     }, IDE_STORAGE_KEY);
 
     await page.reload();

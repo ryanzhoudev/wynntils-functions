@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { WynntilsLspClient } from "@/lib/ide/lsp-client";
 import { WYNNTILS_LANGUAGE, ensureWynntilsLanguage, registerWynntilsProviders } from "@/lib/ide/monaco";
-import { createIdeFileUri } from "@/lib/ide/workspace";
+import { createCompiledIdeFileName, createIdeFileUri } from "@/lib/ide/workspace";
 import { CompileResult, IdeFile, LspDiagnostic, LspSignatureHelp } from "@/lib/ide/types";
 import { compileSupersetToWynntils } from "@/lib/ide/upstream-compile";
 import { useFunctionCatalog } from "@/lib/use-function-catalog";
@@ -413,7 +413,13 @@ export default function WynntilsIde() {
             return;
         }
 
-        addFile("compiled.wynntils", compileResult.code);
+        const sourceFileName = activeFileRef.current?.name;
+
+        if (!sourceFileName) {
+            return;
+        }
+
+        addFile(createCompiledIdeFileName(sourceFileName), compileResult.code);
     };
 
     const copyCompiledOutput = useCallback(async () => {

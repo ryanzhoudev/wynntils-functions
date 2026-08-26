@@ -1,5 +1,7 @@
 import type { IdeFile } from "@/lib/ide/types";
 
+const WYNNTILS_FILE_EXTENSION = ".wynntils";
+
 export function createIdeFile(name: string, content: string): IdeFile {
     return {
         id: crypto.randomUUID(),
@@ -16,7 +18,14 @@ export function sanitizeIdeFileName(name: string) {
         return "untitled.wynntils";
     }
 
-    return trimmed.endsWith(".wynntils") ? trimmed : `${trimmed}.wynntils`;
+    return trimmed.endsWith(WYNNTILS_FILE_EXTENSION) ? trimmed : `${trimmed}${WYNNTILS_FILE_EXTENSION}`;
+}
+
+export function createCompiledIdeFileName(name: string) {
+    const sanitizedName = sanitizeIdeFileName(name);
+    const baseName = sanitizedName.slice(0, -WYNNTILS_FILE_EXTENSION.length);
+
+    return `${baseName}-compiled${WYNNTILS_FILE_EXTENSION}`;
 }
 
 export function createIdeFileUri(fileId: string) {
