@@ -56,7 +56,9 @@ test("context, compile output, files, and persistence work end to end", async ({
     );
 
     await page.getByRole("button", { name: "Create file from output" }).click();
-    await expect(page.locator("select option:checked")).toHaveText("e2e-compiled.wynntils");
+    const fileSelect = page.locator("select");
+    await expect(fileSelect.locator("option:checked")).toHaveText("e2e-compiled.wynntils");
+    await expect(fileSelect).toHaveCSS("animation-name", "ide-file-select-flash");
 
     page.once("dialog", (dialog) => dialog.accept("second"));
     await page.getByRole("button", { name: "New", exact: true }).click();

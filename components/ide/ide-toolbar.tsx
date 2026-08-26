@@ -20,6 +20,7 @@ function workerStatusDotClass(status: LspStatus) {
 export function IdeToolbar({
     workspace,
     activeFileId,
+    fileSelectFlashKey,
     importInputRef,
     isCompiling,
     showDiagnostics,
@@ -39,6 +40,7 @@ export function IdeToolbar({
 }: {
     workspace: IdeWorkspace;
     activeFileId: string | null;
+    fileSelectFlashKey: number;
     importInputRef: RefObject<HTMLInputElement | null>;
     isCompiling: boolean;
     showDiagnostics: boolean;
@@ -59,9 +61,14 @@ export function IdeToolbar({
     return (
         <div className="flex flex-wrap items-center gap-2">
             <select
+                key={fileSelectFlashKey}
                 value={activeFileId ?? ""}
                 onChange={(event) => onSelectFile(event.target.value)}
-                className="h-9 min-w-72 rounded-md border border-input bg-background px-2 text-sm"
+                className={`h-9 min-w-72 rounded-md border border-input bg-background px-2 text-sm ${
+                    fileSelectFlashKey > 0
+                        ? "animate-[ide-file-select-flash_900ms_ease-out] motion-reduce:animate-none"
+                        : ""
+                }`}
             >
                 {workspace.files.map((file) => (
                     <option key={file.id} value={file.id}>
