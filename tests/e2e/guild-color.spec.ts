@@ -31,6 +31,11 @@ const guildColorResponse = {
             prefix: "GRN",
             color: "#00FF00",
         },
+        {
+            name: "Low Activity",
+            prefix: "LOW",
+            color: "#00FFFF",
+        },
     ],
     fetchedAt: Date.UTC(2026, 6, 29, 20, 0, 0),
     cacheSeconds: 600,
@@ -64,6 +69,11 @@ const guildColorStatsResponse = {
             name: "Green Guild",
             prefix: "GRN",
             stats: { currentTerritories: 1, currentSeasonRating: 900, previousSeasonRating: 1200 },
+        },
+        {
+            name: "Low Activity",
+            prefix: "LOW",
+            stats: { currentTerritories: 0, currentSeasonRating: 9999, previousSeasonRating: 0 },
         },
     ],
     fetchedAt: Date.UTC(2026, 7, 19, 20, 0, 0),
@@ -118,6 +128,60 @@ test("renders color verdicts before optional activity statistics finish loading"
     const redOneStats = page.getByRole("link", { name: /Red One \[R1\].*opens in a new tab/ }).locator("..");
     await expect(redOneStats.getByText("Previous S31", { exact: true })).toHaveCount(2);
     await expect(redOneStats.getByText("12,340 SR", { exact: true })).toHaveCount(2);
+});
+
+test("ignores only fully known low-activity guilds and shares the setting", async ({ page }) => {
+    let releaseStats: (() => void) | undefined;
+    const statsGate = new Promise<void>((resolve) => {
+        releaseStats = resolve;
+    });
+
+    await page.unroute("**/api/guild-color-stats");
+    await page.route("**/api/guild-color-stats", async (route) => {
+        await statsGate;
+        await route.fulfill({ json: guildColorStatsResponse });
+    });
+    await page.goto("/guild-color?hex=00FFFF&ignoreLowActivity=1");
+
+    const activityToggle = page.getByRole("button", { name: "Ignore low-activity guilds" });
+    await expect(activityToggle).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByText("Waiting for activity statistics…").first()).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Find a guild" })).toBeDisabled();
+
+    releaseStats?.();
+    await expect(page.getByText("Allowed? 🟩 Yes")).toBeVisible();
+    await expect(page.getByTestId("activity-filter-status")).toContainText("Ignoring 1 guild");
+    await expect(page.getByRole("link", { name: /Low Activity \[LOW\]/ })).toHaveCount(0);
+
+    const guildLookup = page.getByRole("textbox", { name: "Find a guild" });
+    await guildLookup.fill("low");
+    await expect(page.getByText("No registered guilds match this search.")).toBeVisible();
+    await guildLookup.fill("");
+    await expect(page.getByRole("link", { name: "Color map" })).toHaveAttribute(
+        "href",
+        "/guild-color/map?hex=00FFFF&ignoreLowActivity=1",
+    );
+
+    await page.evaluate(() => {
+        Object.defineProperty(navigator, "clipboard", {
+            configurable: true,
+            value: {
+                writeText: async (value: string) => {
+                    window.localStorage.setItem("guild-color-activity-share-url", value);
+                },
+            },
+        });
+    });
+    await page.getByRole("button", { name: "Copy link" }).click();
+    expect(await page.evaluate(() => window.localStorage.getItem("guild-color-activity-share-url"))).toBe(
+        new URL("/guild-color?hex=00FFFF&tag=TAG&ignoreLowActivity=1", page.url()).toString(),
+    );
+
+    await activityToggle.click();
+    await expect(activityToggle).toHaveAttribute("aria-pressed", "false");
+    await expect(page).not.toHaveURL(/ignoreLowActivity/);
+    await expect(page.getByText("Allowed? 🟥 No")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Low Activity \[LOW\]/ }).first()).toBeVisible();
 });
 
 test("keeps the inspected map point while optional activity statistics load", async ({ page }) => {
@@ -402,8 +466,8 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
 
     await expect(page.getByRole("heading", { name: "Guild Color Claim Map" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Back to picker" })).toHaveAttribute("href", "/guild-color");
-    await expect(page.getByText("3 unique colors")).toBeVisible();
-    await expect(page.getByText("4 guilds")).toBeVisible();
+    await expect(page.getByText("4 unique colors")).toBeVisible();
+    await expect(page.getByText("5 guilds")).toBeVisible();
     await expect(page.getByText("85 placeholder entries", { exact: false })).toBeVisible();
 
     const lightness = page.getByRole("slider", { name: "Lightness view" });
@@ -462,6 +526,34 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     await expect(canvas).toHaveAttribute("width", String(GUILD_COLOR_MAP_PREVIEW_RESOLUTION));
     await page.mouse.up();
     await expect(canvas).toHaveAttribute("width", String(fullResolution));
+});
+
+test("applies the activity filter to map claims and preserves it in navigation", async ({ page }) => {
+    await page.goto("/guild-color/map?hex=00FFFF&ignoreLowActivity=1");
+
+    const activityToggle = page.getByRole("button", { name: "Ignore low-activity guilds" });
+    const pointDetails = page.getByRole("heading", { name: "Point details" }).locator("..").locator("..");
+    await expect(activityToggle).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("link", { name: "Back to picker" })).toHaveAttribute(
+        "href",
+        "/guild-color?hex=00FFFF&ignoreLowActivity=1",
+    );
+    await expect(page.getByTestId("activity-filter-status")).toContainText("Ignoring 1 guild");
+    await expect(page.getByText("3 unique colors")).toBeVisible();
+    await expect(page.getByText("4 guilds")).toBeVisible();
+    await expect(page.getByRole("img", { name: "Selected color #00FFFF" })).toBeVisible({ timeout: 15_000 });
+    await expect(pointDetails.getByText("Allowed", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Low Activity \[LOW\]/ })).toHaveCount(0);
+
+    await activityToggle.click();
+    await expect(activityToggle).toHaveAttribute("aria-pressed", "false");
+    await expect(page).not.toHaveURL(/ignoreLowActivity/);
+    await expect(page.getByRole("link", { name: "Back to picker" })).toHaveAttribute(
+        "href",
+        "/guild-color?hex=00FFFF",
+    );
+    await expect(pointDetails.getByText("Not allowed", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("link", { name: /Low Activity \[LOW\]/ })).toBeVisible();
 });
 
 test("jumps directly to a hex on the perceptual color map", async ({ page }) => {
@@ -524,6 +616,12 @@ test("keeps color verdicts available when activity statistics fail", async ({ pa
     await expect(page.getByText("Allowed? 🟥 No")).toBeVisible();
     await expect(page.getByRole("link", { name: /Red One \[R1\].*opens in a new tab/ }).first()).toBeVisible();
     await expect(page.getByText("Current S32", { exact: true })).toHaveCount(0);
+
+    await page.goto("/guild-color?hex=FF0000&ignoreLowActivity=1");
+    await expect(page.getByText("Allowed? 🟥 No")).toBeVisible();
+    await expect(page.getByTestId("activity-filter-status")).toContainText(
+        "Activity filtering is unavailable. All guilds remain included",
+    );
 });
 
 test("links to the guild color tool immediately before the classic UI", async ({ page }) => {

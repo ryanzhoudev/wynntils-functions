@@ -1,6 +1,7 @@
 export const MIN_GUILD_COLOR_BRIGHTNESS = 60;
 export const MIN_GUILD_COLOR_DELTA_E = 20;
 export const GUILD_COLOR_PLACEHOLDER = "#C05F5F";
+export const GUILD_ACTIVITY_RATING_THRESHOLD = 10_000;
 export const WYNNCRAFT_GUILD_STATS_BASE_URL = "https://wynncraft.com/stats/guild";
 
 export interface GuildColorStats {
@@ -77,6 +78,26 @@ export function mergeGuildColorStats(
             previousSeason: stats.previousSeason,
         },
     };
+}
+
+export function isGuildBelowActivityThreshold(guild: GuildColorRecord): boolean {
+    const stats = guild.stats;
+
+    return Boolean(
+        stats &&
+            stats.currentTerritories === 0 &&
+            stats.currentSeasonRating !== null &&
+            stats.currentSeasonRating < GUILD_ACTIVITY_RATING_THRESHOLD &&
+            stats.previousSeasonRating !== null &&
+            stats.previousSeasonRating < GUILD_ACTIVITY_RATING_THRESHOLD,
+    );
+}
+
+export function filterGuildColorsByActivity(
+    guilds: ReadonlyArray<GuildColorRecord>,
+    ignoreBelowThreshold: boolean,
+): GuildColorRecord[] {
+    return ignoreBelowThreshold ? guilds.filter((guild) => !isGuildBelowActivityThreshold(guild)) : [...guilds];
 }
 
 function normalizeGuildLookupQuery(query: string): string {

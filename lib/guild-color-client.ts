@@ -21,6 +21,7 @@ async function readJson(response: Response): Promise<unknown> {
 export async function loadGuildColorData(
     signal: AbortSignal,
     onData: (data: GuildColorApiResponse, phase: GuildColorDataPhase) => void,
+    onStatsUnavailable?: (message: string) => void,
 ): Promise<void> {
     const colorResponse = await fetch("/api/guild-colors", {
         headers: {
@@ -56,6 +57,9 @@ export async function loadGuildColorData(
     } catch (error) {
         if (!signal.aborted) {
             console.warn("Failed to load optional guild activity statistics", error);
+            onStatsUnavailable?.(
+                error instanceof Error ? error.message : "Guild activity statistics are temporarily unavailable.",
+            );
         }
     }
 }

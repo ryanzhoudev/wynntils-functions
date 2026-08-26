@@ -13,8 +13,10 @@ import {
     createGuildColorPalette,
     type DirectionalColorSuggestion,
     evaluateGuildColor,
+    filterGuildColorsByActivity,
     findGuildColorsByIdentity,
     findDirectionalColorSuggestions,
+    GUILD_ACTIVITY_RATING_THRESHOLD,
     GUILD_COLOR_DIRECTIONS,
     type GuildColorApiResponse,
     type GuildColorGroup,
@@ -31,6 +33,7 @@ import {
     CheckCircle2,
     Copy,
     Database,
+    Filter,
     Map as MapIcon,
     Palette,
     RotateCcw,
@@ -52,7 +55,10 @@ const DIRECTION_BADGE_STYLES: Record<DirectionalColorSuggestion["channel"], stri
 interface GuildColorToolProps {
     initialColor: string | null;
     initialPrefix: string | null;
+    initialIgnoreLowActivity: boolean;
 }
+
+type GuildColorStatsStatus = "loading" | "ready" | "unavailable";
 
 interface GuildPreviewSelection {
     forColor: string;
@@ -172,7 +178,26 @@ function normalizePreviewTag(value: string | null | undefined): string {
     return value?.trim().toUpperCase().slice(0, 8) || DEFAULT_PREFIX;
 }
 
-export default function GuildColorTool({ initialColor, initialPrefix }: GuildColorToolProps) {
+function guildColorRouteHref(path: string, color: string | null, ignoreLowActivity: boolean): string {
+    const searchParams = new URLSearchParams();
+
+    if (color) {
+        searchParams.set("hex", color.slice(1));
+    }
+
+    if (ignoreLowActivity) {
+        searchParams.set("ignoreLowActivity", "1");
+    }
+
+    const query = searchParams.toString();
+    return query ? `${path}?${query}` : path;
+}
+
+export default function GuildColorTool({
+    initialColor,
+    initialPrefix,
+    initialIgnoreLowActivity,
+}: GuildColorToolProps) {
     const hashColor = useSyncExternalStore(subscribeToHashChange, readHashColor, readServerHashColor);
     const [inputColorOverride, setInputColorOverride] = useState<string | null>(null);
     const inputColor = inputColorOverride ?? normalizeGuildColorHex(initialColor ?? "") ?? hashColor ?? DEFAULT_COLOR;
@@ -181,23 +206,45 @@ export default function GuildColorTool({ initialColor, initialPrefix }: GuildCol
     const [guildData, setGuildData] = useState<GuildColorApiResponse | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [loadAttempt, setLoadAttempt] = useState(0);
+    const [ignoreLowActivity, setIgnoreLowActivity] = useState(initialIgnoreLowActivity);
+    const [statsStatus, setStatsStatus] = useState<GuildColorStatsStatus>("loading");
+    const [statsError, setStatsError] = useState<string | null>(null);
     const [selection, setSelection] = useState<PreviewSelection | null>(null);
     const [shareStatus, setShareStatus] = useState<"idle" | "copied" | "error">("idle");
     const deferredInputColor = useDeferredValue(inputColor);
     const normalizedColor = normalizeGuildColorHex(inputColor);
     const deferredNormalizedColor = normalizeGuildColorHex(deferredInputColor);
-    const palette = useMemo(() => createGuildColorPalette(guildData?.guilds ?? []), [guildData]);
+    const activityFilterPending = ignoreLowActivity && statsStatus === "loading";
+    const activityFilterUnavailable = ignoreLowActivity && statsStatus === "unavailable";
+    const effectiveGuilds = useMemo(() => {
+        if (!guildData || activityFilterPending) {
+            return [];
+        }
+
+        return filterGuildColorsByActivity(
+            guildData.guilds,
+            ignoreLowActivity && statsStatus === "ready",
+        );
+    }, [activityFilterPending, guildData, ignoreLowActivity, statsStatus]);
+    const ignoredGuildCount =
+        guildData && ignoreLowActivity && statsStatus === "ready"
+            ? guildData.guilds.length - effectiveGuilds.length
+            : 0;
+    const palette = useMemo(() => createGuildColorPalette(effectiveGuilds), [effectiveGuilds]);
     const guildLookupMatches = useMemo(
-        () => findGuildColorsByIdentity(guildData?.guilds ?? [], guildLookup),
-        [guildData, guildLookup],
+        () => findGuildColorsByIdentity(effectiveGuilds, guildLookup),
+        [effectiveGuilds, guildLookup],
     );
     const liveVerdict = useMemo(
-        () => (guildData && normalizedColor ? evaluateGuildColor(normalizedColor, palette) : null),
-        [guildData, normalizedColor, palette],
+        () => (guildData && !activityFilterPending && normalizedColor ? evaluateGuildColor(normalizedColor, palette) : null),
+        [activityFilterPending, guildData, normalizedColor, palette],
     );
     const analysis = useMemo(
-        () => (guildData && deferredNormalizedColor ? analyzeGuildColor(deferredNormalizedColor, palette) : null),
-        [deferredNormalizedColor, guildData, palette],
+        () =>
+            guildData && !activityFilterPending && deferredNormalizedColor
+                ? analyzeGuildColor(deferredNormalizedColor, palette)
+                : null,
+        [activityFilterPending, deferredNormalizedColor, guildData, palette],
     );
     const suggestions = useMemo(
         () =>
@@ -243,9 +290,24 @@ export default function GuildColorTool({ initialColor, initialPrefix }: GuildCol
 
         async function loadGuildColors() {
             setLoadError(null);
+            setStatsStatus("loading");
+            setStatsError(null);
 
             try {
-                await loadGuildColorData(controller.signal, setGuildData);
+                await loadGuildColorData(
+                    controller.signal,
+                    (data, phase) => {
+                        setGuildData(data);
+
+                        if (phase === "stats") {
+                            setStatsStatus("ready");
+                        }
+                    },
+                    (message) => {
+                        setStatsStatus("unavailable");
+                        setStatsError(message);
+                    },
+                );
             } catch (error) {
                 if (controller.signal.aborted) {
                     return;
@@ -296,6 +358,22 @@ export default function GuildColorTool({ initialColor, initialPrefix }: GuildCol
         setGuildLookup("");
     }
 
+    function toggleActivityFilter() {
+        const enabled = !ignoreLowActivity;
+        const url = new URL(window.location.href);
+
+        if (enabled) {
+            url.searchParams.set("ignoreLowActivity", "1");
+        } else {
+            url.searchParams.delete("ignoreLowActivity");
+        }
+
+        setIgnoreLowActivity(enabled);
+        setSelection(null);
+        setGuildLookup("");
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+
     async function copyShareUrl() {
         if (!normalizedColor) {
             return;
@@ -306,6 +384,10 @@ export default function GuildColorTool({ initialColor, initialPrefix }: GuildCol
         shareUrl.hash = "";
         shareUrl.searchParams.set("hex", normalizedColor.slice(1));
         shareUrl.searchParams.set("tag", normalizePreviewTag(prefix));
+
+        if (ignoreLowActivity) {
+            shareUrl.searchParams.set("ignoreLowActivity", "1");
+        }
 
         try {
             await navigator.clipboard.writeText(shareUrl.toString());
@@ -321,19 +403,24 @@ export default function GuildColorTool({ initialColor, initialPrefix }: GuildCol
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <header className="mx-auto flex w-full max-w-[100rem] flex-col gap-4 px-4 py-6 md:flex-row md:items-center md:justify-between">
+            <header className="mx-auto flex w-full max-w-[100rem] flex-col gap-4 px-4 py-6 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-3">
                     <Palette className="size-7 text-primary" aria-hidden="true" />
                     <h1 className="text-3xl font-bold tracking-tight">Guild Color Picker</h1>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant={ignoreLowActivity ? "secondary" : "outline"}
+                        aria-pressed={ignoreLowActivity}
+                        onClick={toggleActivityFilter}
+                    >
+                        <Filter className="size-4" aria-hidden="true" />
+                        Ignore low-activity guilds
+                    </Button>
                     <Button variant="outline" asChild>
                         <Link
-                            href={
-                                normalizedColor
-                                    ? `/guild-color/map?hex=${normalizedColor.slice(1)}`
-                                    : "/guild-color/map"
-                            }
+                            href={guildColorRouteHref("/guild-color/map", normalizedColor, ignoreLowActivity)}
                         >
                             <MapIcon className="size-4" aria-hidden="true" />
                             Color map
@@ -441,7 +528,11 @@ export default function GuildColorTool({ initialColor, initialPrefix }: GuildCol
                                         </Button>
                                     </>
                                 ) : !liveVerdict ? (
-                                    <p className="font-semibold">Checking color…</p>
+                                    <p className="font-semibold">
+                                        {activityFilterPending
+                                            ? "Waiting for activity statistics…"
+                                            : "Checking color…"}
+                                    </p>
                                 ) : (
                                     <>
                                         <div className="flex items-center gap-2 font-semibold">
@@ -517,11 +608,11 @@ export default function GuildColorTool({ initialColor, initialPrefix }: GuildCol
                                         placeholder="Guild name or tag"
                                         autoComplete="off"
                                         spellCheck={false}
-                                        disabled={!guildData}
+                                        disabled={!guildData || activityFilterPending}
                                         className="pl-9"
                                     />
                                 </div>
-                                {guildLookup.trim() && guildData ? (
+                                {guildLookup.trim() && guildData && !activityFilterPending ? (
                                     <div className="mt-2 max-h-56 overflow-y-auto rounded-md border border-border bg-card p-1 text-card-foreground shadow-md">
                                         {guildLookupMatches.length > 0 ? (
                                             <ul className="space-y-1">
@@ -562,8 +653,25 @@ export default function GuildColorTool({ initialColor, initialPrefix }: GuildCol
                             {guildData ? (
                                 <div className="space-y-2">
                                     <Badge variant="secondary">
-                                        {guildData.guilds.length.toLocaleString()} guild colors
+                                        {(activityFilterPending ? guildData.guilds : effectiveGuilds).length.toLocaleString()} guild
+                                        colors
                                     </Badge>
+                                    {ignoreLowActivity && statsStatus === "ready" ? (
+                                        <p className="text-xs text-muted-foreground" data-testid="activity-filter-status">
+                                            Ignoring {ignoredGuildCount.toLocaleString()} guild
+                                            {ignoredGuildCount === 1 ? "" : "s"} with 0 territories and both season ratings
+                                            below {GUILD_ACTIVITY_RATING_THRESHOLD.toLocaleString()} SR.
+                                        </p>
+                                    ) : activityFilterPending ? (
+                                        <p className="text-xs text-amber-200" data-testid="activity-filter-status">
+                                            Waiting for activity statistics before filtering guild colors.
+                                        </p>
+                                    ) : activityFilterUnavailable ? (
+                                        <p className="text-xs text-amber-200" data-testid="activity-filter-status">
+                                            Activity filtering is unavailable. All guilds remain included
+                                            {statsError ? `: ${statsError}` : "."}
+                                        </p>
+                                    ) : null}
                                     <p className="text-muted-foreground">
                                         Athena response timestamp: {new Date(guildData.fetchedAt).toLocaleString()}.
                                     </p>
@@ -702,7 +810,11 @@ export default function GuildColorTool({ initialColor, initialPrefix }: GuildCol
                                             })}
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-muted-foreground">Waiting for guild data…</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {activityFilterPending
+                                                ? "Waiting for activity statistics…"
+                                                : "Waiting for guild data…"}
+                                        </p>
                                     )}
                                 </CardContent>
                                 <CardFooter className="mt-auto">
@@ -804,7 +916,11 @@ export default function GuildColorTool({ initialColor, initialPrefix }: GuildCol
                                 </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground">
-                                    {loadError ? "Guild comparisons are unavailable." : "Loading closest guild colors…"}
+                                    {loadError
+                                        ? "Guild comparisons are unavailable."
+                                        : activityFilterPending
+                                          ? "Waiting for activity statistics…"
+                                          : "Loading closest guild colors…"}
                                 </p>
                             )}
                         </CardContent>

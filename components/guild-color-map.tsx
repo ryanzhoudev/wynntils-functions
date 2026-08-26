@@ -26,6 +26,8 @@ import {
 import {
     createGuildColorPalette,
     deltaE76,
+    filterGuildColorsByActivity,
+    GUILD_ACTIVITY_RATING_THRESHOLD,
     type GuildColorApiResponse,
     hexToRgb,
     MIN_GUILD_COLOR_DELTA_E,
@@ -34,7 +36,7 @@ import {
     rgbToHex,
 } from "@/lib/guild-colors";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Database, Map as MapIcon, RefreshCw } from "lucide-react";
+import { ArrowLeft, Database, Filter, Map as MapIcon, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
@@ -46,7 +48,10 @@ interface MapSample {
 
 interface GuildColorMapProps {
     initialColor?: string | null;
+    initialIgnoreLowActivity: boolean;
 }
+
+type GuildColorStatsStatus = "loading" | "ready" | "unavailable";
 
 function roundLightness(lightness: number): number {
     return Math.round(lightness * 10) / 10;
@@ -70,6 +75,37 @@ function replaceTargetQuery(color: string | null) {
     }
 }
 
+function guildColorRouteHref(path: string, color: string | null, ignoreLowActivity: boolean): string {
+    const searchParams = new URLSearchParams();
+
+    if (color) {
+        searchParams.set("hex", color.slice(1));
+    }
+
+    if (ignoreLowActivity) {
+        searchParams.set("ignoreLowActivity", "1");
+    }
+
+    const query = searchParams.toString();
+    return query ? `${path}?${query}` : path;
+}
+
+function workerGroupsEqual(
+    first: ReadonlyArray<GuildColorMapWorkerGroup>,
+    second: ReadonlyArray<GuildColorMapWorkerGroup>,
+): boolean {
+    return (
+        first.length === second.length &&
+        first.every(
+            (group, index) =>
+                group.color === second[index].color &&
+                group.lab.L === second[index].lab.L &&
+                group.lab.a === second[index].lab.a &&
+                group.lab.b === second[index].lab.b,
+        )
+    );
+}
+
 function guildGroupLabel(group: GuildColorMapGroup): string {
     if (group.guilds.length === 1) {
         const guild = group.guilds[0];
@@ -88,13 +124,14 @@ function LegendItem({ className, label }: { className: string; label: string }) 
     );
 }
 
-export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
+export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }: GuildColorMapProps) {
     const normalizedInitialColor = normalizeGuildColorHex(initialColor ?? "");
     const initialRgb = normalizedInitialColor ? hexToRgb(normalizedInitialColor) : null;
     const initialLightness = initialRgb ? roundLightness(rgbToLab(initialRgb).L) : GUILD_COLOR_MAP_DEFAULT_LIGHTNESS;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const workerRef = useRef<Worker | null>(null);
+    const workerGroupsRef = useRef<GuildColorMapWorkerGroup[]>([]);
     const latestRequestId = useRef(0);
     const latestRenderedRequestId = useRef(0);
     const [lightness, setLightness] = useState(initialLightness);
@@ -104,6 +141,9 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
     const [workerGroups, setWorkerGroups] = useState<GuildColorMapWorkerGroup[]>([]);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [loadAttempt, setLoadAttempt] = useState(0);
+    const [ignoreLowActivity, setIgnoreLowActivity] = useState(initialIgnoreLowActivity);
+    const [statsStatus, setStatsStatus] = useState<GuildColorStatsStatus>("loading");
+    const [statsError, setStatsError] = useState<string | null>(null);
     const [renderError, setRenderError] = useState<string | null>(null);
     const [renderedMap, setRenderedMap] = useState<GuildColorMapRenderResponse | null>(null);
     const [sample, setSample] = useState<MapSample | null>(null);
@@ -112,10 +152,31 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
     const [jumpError, setJumpError] = useState<string | null>(
         initialColor && !normalizedInitialColor ? "Use a three- or six-digit hexadecimal color." : null,
     );
+    const activityFilterPending = ignoreLowActivity && statsStatus === "loading";
+    const activityFilterUnavailable = ignoreLowActivity && statsStatus === "unavailable";
+    const effectiveGuilds = useMemo(() => {
+        if (!guildData || activityFilterPending) {
+            return [];
+        }
+
+        return filterGuildColorsByActivity(
+            guildData.guilds,
+            ignoreLowActivity && statsStatus === "ready",
+        );
+    }, [activityFilterPending, guildData, ignoreLowActivity, statsStatus]);
+    const ignoredGuildCount =
+        guildData && ignoreLowActivity && statsStatus === "ready"
+            ? guildData.guilds.length - effectiveGuilds.length
+            : 0;
     const groups = useMemo(
-        () => createGuildColorMapGroups(createGuildColorPalette(guildData?.guilds ?? [])),
-        [guildData],
+        () => createGuildColorMapGroups(createGuildColorPalette(effectiveGuilds)),
+        [effectiveGuilds],
     );
+    const nextWorkerGroups = useMemo(
+        () => groups.map(({ color, lab }) => ({ color, lab })),
+        [groups],
+    );
+    const canRenderMap = Boolean(guildData && !activityFilterPending);
     const target = useMemo(() => {
         const rgb = targetColor ? hexToRgb(targetColor) : null;
 
@@ -180,27 +241,30 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
 
         async function loadGuildColors() {
             setLoadError(null);
+            setStatsStatus("loading");
+            setStatsError(null);
 
             try {
-                await loadGuildColorData(controller.signal, (data, phase) => {
-                    setGuildData(data);
+                await loadGuildColorData(
+                    controller.signal,
+                    (data, phase) => {
+                        setGuildData(data);
 
-                    if (phase === "colors") {
-                        setWorkerGroups(
-                            createGuildColorMapGroups(createGuildColorPalette(data.guilds)).map(({ color, lab }) => ({
-                                color,
-                                lab,
-                            })),
-                        );
-                    }
-                });
+                        if (phase === "stats") {
+                            setStatsStatus("ready");
+                        }
+                    },
+                    (message) => {
+                        setStatsStatus("unavailable");
+                        setStatsError(message);
+                    },
+                );
             } catch (error) {
                 if (controller.signal.aborted) {
                     return;
                 }
 
                 setGuildData(null);
-                setWorkerGroups([]);
                 setLoadError(error instanceof Error ? error.message : "Guild color data is temporarily unavailable.");
             }
         }
@@ -211,6 +275,18 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
     }, [loadAttempt]);
 
     useEffect(() => {
+        if (workerGroupsEqual(workerGroupsRef.current, nextWorkerGroups)) {
+            return;
+        }
+
+        workerGroupsRef.current = nextWorkerGroups;
+        latestRequestId.current += 1;
+        setWorkerGroups(nextWorkerGroups);
+        setRenderedMap(null);
+        setSample(null);
+    }, [nextWorkerGroups]);
+
+    useEffect(() => {
         const worker = new Worker(new URL("../lib/guild-color-map/worker.ts", import.meta.url), {
             type: "module",
         });
@@ -219,7 +295,10 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
         worker.onmessage = (event: MessageEvent<GuildColorMapWorkerResponse>) => {
             const response = event.data;
 
-            if (response.requestId < latestRenderedRequestId.current) {
+            if (
+                response.requestId !== latestRequestId.current ||
+                response.requestId < latestRenderedRequestId.current
+            ) {
                 return;
             }
 
@@ -247,7 +326,7 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
     }, []);
 
     useEffect(() => {
-        if (!workerRef.current || workerGroups.length === 0) {
+        if (!workerRef.current || !canRenderMap || !workerGroupsEqual(workerGroups, workerGroupsRef.current)) {
             return;
         }
 
@@ -262,7 +341,7 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
             height: resolution,
             groups: workerGroups,
         });
-    }, [fullRenderResolution, isAdjustingLightness, lightness, workerGroups]);
+    }, [canRenderMap, fullRenderResolution, isAdjustingLightness, lightness, workerGroups]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -336,15 +415,33 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
         replaceTargetQuery(null);
     }
 
+    function toggleActivityFilter() {
+        const enabled = !ignoreLowActivity;
+        const url = new URL(window.location.href);
+
+        if (enabled) {
+            url.searchParams.set("ignoreLowActivity", "1");
+        } else {
+            url.searchParams.delete("ignoreLowActivity");
+        }
+
+        setIgnoreLowActivity(enabled);
+        setSample(null);
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+
     const renderedMapIsPreview = Boolean(renderedMap && renderedMap.width === GUILD_COLOR_MAP_PREVIEW_RESOLUTION);
     const requestedResolution = isAdjustingLightness ? GUILD_COLOR_MAP_PREVIEW_RESOLUTION : fullRenderResolution;
     const isRendering = Boolean(
-        guildData && (!renderedMap || renderedMap.lightness !== lightness || renderedMap.width !== requestedResolution),
+        canRenderMap &&
+            (!renderedMap || renderedMap.lightness !== lightness || renderedMap.width !== requestedResolution),
     );
     const statusText = loadError
         ? "Guild data unavailable"
         : !guildData
           ? "Loading guild colors"
+          : activityFilterPending
+            ? "Waiting for activity statistics"
           : renderError
             ? "Map rendering failed"
             : !renderedMap
@@ -355,14 +452,23 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <header className="mx-auto flex w-full max-w-[100rem] flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between">
+            <header className="mx-auto flex w-full max-w-[100rem] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-3">
                     <MapIcon className="size-7 text-primary" aria-hidden="true" />
                     <h1 className="text-3xl font-bold tracking-tight">Guild Color Claim Map</h1>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant={ignoreLowActivity ? "secondary" : "outline"}
+                        aria-pressed={ignoreLowActivity}
+                        onClick={toggleActivityFilter}
+                    >
+                        <Filter className="size-4" aria-hidden="true" />
+                        Ignore low-activity guilds
+                    </Button>
                     <Button variant="outline" asChild>
-                        <Link href={targetColor ? `/guild-color?hex=${targetColor.slice(1)}` : "/guild-color"}>
+                        <Link href={guildColorRouteHref("/guild-color", targetColor, ignoreLowActivity)}>
                             <ArrowLeft className="size-4" aria-hidden="true" />
                             Back to picker
                         </Link>
@@ -501,7 +607,10 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
                             ) : !renderedMap || renderError ? (
                                 <div className="absolute inset-0 grid place-items-center bg-background/85 p-6 text-center">
                                     <p className="text-sm text-muted-foreground">
-                                        {renderError ?? "Building the color-space view…"}
+                                        {renderError ??
+                                            (activityFilterPending
+                                                ? "Waiting for activity statistics before building the map…"
+                                                : "Building the color-space view…")}
                                     </p>
                                 </div>
                             ) : null}
@@ -612,9 +721,25 @@ export default function GuildColorMap({ initialColor }: GuildColorMapProps) {
                                             {groups.length.toLocaleString()} unique colors
                                         </Badge>
                                         <Badge variant="secondary">
-                                            {guildData.guilds.length.toLocaleString()} guilds
+                                            {(activityFilterPending ? guildData.guilds : effectiveGuilds).length.toLocaleString()} guilds
                                         </Badge>
                                     </div>
+                                    {ignoreLowActivity && statsStatus === "ready" ? (
+                                        <p className="text-xs text-muted-foreground" data-testid="activity-filter-status">
+                                            Ignoring {ignoredGuildCount.toLocaleString()} guild
+                                            {ignoredGuildCount === 1 ? "" : "s"} with 0 territories and both season ratings
+                                            below {GUILD_ACTIVITY_RATING_THRESHOLD.toLocaleString()} SR.
+                                        </p>
+                                    ) : activityFilterPending ? (
+                                        <p className="text-xs text-amber-200" data-testid="activity-filter-status">
+                                            Waiting for activity statistics before filtering guild colors.
+                                        </p>
+                                    ) : activityFilterUnavailable ? (
+                                        <p className="text-xs text-amber-200" data-testid="activity-filter-status">
+                                            Activity filtering is unavailable. All guilds remain included
+                                            {statsError ? `: ${statsError}` : "."}
+                                        </p>
+                                    ) : null}
                                     <p className="text-muted-foreground">
                                         Athena response timestamp: {new Date(guildData.fetchedAt).toLocaleString()}.
                                     </p>

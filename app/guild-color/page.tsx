@@ -20,6 +20,13 @@ export default async function GuildColorPage({ searchParams }: { searchParams: S
     const params = await searchParams;
     const initialColor = firstValue(params.hex) ?? firstValue(params.color);
     const initialPrefix = firstValue(params.tag);
+    const initialIgnoreLowActivity = firstValue(params.ignoreLowActivity) === "1";
 
-    return <GuildColorTool initialColor={initialColor} initialPrefix={initialPrefix} />;
+    return (
+        <GuildColorTool
+            initialColor={initialColor}
+            initialPrefix={initialPrefix}
+            initialIgnoreLowActivity={initialIgnoreLowActivity}
+        />
+    );
 }

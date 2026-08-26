@@ -19,6 +19,7 @@ function firstValue(value: string | string[] | undefined): string | null {
 export default async function GuildColorMapPage({ searchParams }: { searchParams: SearchParams }) {
     const params = await searchParams;
     const initialColor = firstValue(params.hex) ?? firstValue(params.color);
+    const initialIgnoreLowActivity = firstValue(params.ignoreLowActivity) === "1";
 
-    return <GuildColorMap initialColor={initialColor} />;
+    return <GuildColorMap initialColor={initialColor} initialIgnoreLowActivity={initialIgnoreLowActivity} />;
 }
