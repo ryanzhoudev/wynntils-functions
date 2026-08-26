@@ -1,11 +1,15 @@
 import {
     analyzeGuildColor,
     createGuildColorPalette,
+    filterGuildColorsByActivity,
+    findGuildColorsByIdentity,
     findDirectionalColorSuggestions,
+    GUILD_ACTIVITY_RATING_THRESHOLD,
     GUILD_COLOR_PLACEHOLDER,
     guildStatsUrl,
     guildColorBrightness,
     hsvToRgb,
+    isGuildBelowActivityThreshold,
     MIN_GUILD_COLOR_BRIGHTNESS,
     mergeGuildColorStats,
     normalizeGuildColorHex,
@@ -99,6 +103,92 @@ describe("guild color normalization and Athena parsing", () => {
             currentSeason: { id: "32" },
             previousSeason: { id: "31" },
         });
+    });
+
+    it("finds guild colors by bracketed tag or name with the strongest matches first", () => {
+        const guilds = [
+            { name: "The Blue Guild", prefix: "BLU", color: "#0000FF" },
+            { name: "Bluestone", prefix: "STONE", color: "#1111FF" },
+            { name: "Blue", prefix: "B", color: "#2222FF" },
+            { name: "Other", prefix: "XBLU", color: "#3333FF" },
+        ];
+
+        expect(findGuildColorsByIdentity(guilds, " [blu] ").map((guild) => guild.name)).toEqual([
+            "The Blue Guild",
+            "Blue",
+            "Bluestone",
+            "Other",
+        ]);
+        expect(findGuildColorsByIdentity(guilds, "BLUE", 2).map((guild) => guild.name)).toEqual([
+            "Blue",
+            "Bluestone",
+        ]);
+        expect(findGuildColorsByIdentity(guilds, "missing")).toEqual([]);
+    });
+
+    it("only filters guilds with known zero-territory and sub-threshold ratings", () => {
+        const belowThreshold = {
+            currentTerritories: 0,
+            currentSeasonRating: GUILD_ACTIVITY_RATING_THRESHOLD - 1,
+            previousSeasonRating: 0,
+        };
+        const records = [
+            { name: "Below", prefix: "LOW", color: "#00FFFF", stats: belowThreshold },
+            {
+                name: "At threshold",
+                prefix: "TEN",
+                color: "#00FFFE",
+                stats: { ...belowThreshold, currentSeasonRating: GUILD_ACTIVITY_RATING_THRESHOLD },
+            },
+            {
+                name: "Has territory",
+                prefix: "TER",
+                color: "#00FFFD",
+                stats: { ...belowThreshold, currentTerritories: 1 },
+            },
+            {
+                name: "Unknown rating",
+                prefix: "UNK",
+                color: "#00FFFC",
+                stats: { ...belowThreshold, previousSeasonRating: null },
+            },
+            { name: " Wanytails ", prefix: "wany", color: "#FF00FF", stats: belowThreshold },
+            { name: "No stats", prefix: "NIL", color: "#00FFFB" },
+        ];
+
+        expect(isGuildBelowActivityThreshold(records[0])).toBe(true);
+        expect(isGuildBelowActivityThreshold(records[4])).toBe(false);
+        expect(filterGuildColorsByActivity(records, false)).toEqual(records);
+        expect(filterGuildColorsByActivity(records, true).map((guild) => guild.name)).toEqual([
+            "At threshold",
+            "Has territory",
+            "Unknown rating",
+            " Wanytails ",
+            "No stats",
+        ]);
+    });
+
+    it("removes only qualifying guilds from a shared color group", () => {
+        const guilds = [
+            {
+                name: "Below",
+                prefix: "LOW",
+                color: "#FF0000",
+                stats: { currentTerritories: 0, currentSeasonRating: 100, previousSeasonRating: 200 },
+            },
+            {
+                name: "Active",
+                prefix: "ACT",
+                color: "#FF0000",
+                stats: { currentTerritories: 1, currentSeasonRating: 0, previousSeasonRating: 0 },
+            },
+        ];
+        const filteredAnalysis = analyzeGuildColor(
+            "#FF0000",
+            createGuildColorPalette(filterGuildColorsByActivity(guilds, true)),
+        );
+
+        expect(filteredAnalysis.conflictingGroups[0].guilds.map((guild) => guild.name)).toEqual(["Active"]);
     });
 });
 

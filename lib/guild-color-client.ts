@@ -4,6 +4,8 @@ import {
     mergeGuildColorStats,
 } from "@/lib/guild-colors";
 
+export type GuildColorDataPhase = "colors" | "stats";
+
 function parseApiError(payload: unknown, fallback: string): string {
     if (typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string") {
         return payload.error;
@@ -18,7 +20,8 @@ async function readJson(response: Response): Promise<unknown> {
 
 export async function loadGuildColorData(
     signal: AbortSignal,
-    onData: (data: GuildColorApiResponse) => void,
+    onData: (data: GuildColorApiResponse, phase: GuildColorDataPhase) => void,
+    onStatsUnavailable?: (message: string) => void,
 ): Promise<void> {
     const colorResponse = await fetch("/api/guild-colors", {
         headers: {
@@ -33,7 +36,7 @@ export async function loadGuildColorData(
     }
 
     const colors = colorPayload as GuildColorApiResponse;
-    onData(colors);
+    onData(colors, "colors");
 
     try {
         const statsResponse = await fetch("/api/guild-color-stats", {
@@ -49,11 +52,14 @@ export async function loadGuildColorData(
         }
 
         if (!signal.aborted) {
-            onData(mergeGuildColorStats(colors, statsPayload as GuildColorStatsApiResponse));
+            onData(mergeGuildColorStats(colors, statsPayload as GuildColorStatsApiResponse), "stats");
         }
     } catch (error) {
         if (!signal.aborted) {
             console.warn("Failed to load optional guild activity statistics", error);
+            onStatsUnavailable?.(
+                error instanceof Error ? error.message : "Guild activity statistics are temporarily unavailable.",
+            );
         }
     }
 }

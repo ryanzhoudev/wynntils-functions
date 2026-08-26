@@ -1,7 +1,11 @@
 export const MIN_GUILD_COLOR_BRIGHTNESS = 60;
 export const MIN_GUILD_COLOR_DELTA_E = 20;
 export const GUILD_COLOR_PLACEHOLDER = "#C05F5F";
+export const GUILD_ACTIVITY_RATING_THRESHOLD = 10_000;
 export const WYNNCRAFT_GUILD_STATS_BASE_URL = "https://wynncraft.com/stats/guild";
+
+const PROTECTED_GUILD_NAME = "wanytails";
+const PROTECTED_GUILD_PREFIX = "WANY";
 
 export interface GuildColorStats {
     currentTerritories: number | null;
@@ -77,6 +81,86 @@ export function mergeGuildColorStats(
             previousSeason: stats.previousSeason,
         },
     };
+}
+
+export function isGuildBelowActivityThreshold(guild: GuildColorRecord): boolean {
+    if (
+        guild.name.trim().toLocaleLowerCase() === PROTECTED_GUILD_NAME &&
+        guild.prefix.trim().toLocaleUpperCase() === PROTECTED_GUILD_PREFIX
+    ) {
+        return false;
+    }
+
+    const stats = guild.stats;
+
+    return Boolean(
+        stats &&
+            stats.currentTerritories === 0 &&
+            stats.currentSeasonRating !== null &&
+            stats.currentSeasonRating < GUILD_ACTIVITY_RATING_THRESHOLD &&
+            stats.previousSeasonRating !== null &&
+            stats.previousSeasonRating < GUILD_ACTIVITY_RATING_THRESHOLD,
+    );
+}
+
+export function filterGuildColorsByActivity(
+    guilds: ReadonlyArray<GuildColorRecord>,
+    ignoreBelowThreshold: boolean,
+): GuildColorRecord[] {
+    return ignoreBelowThreshold ? guilds.filter((guild) => !isGuildBelowActivityThreshold(guild)) : [...guilds];
+}
+
+function normalizeGuildLookupQuery(query: string): string {
+    const trimmed = query.trim();
+    const unwrapped = trimmed.startsWith("[") && trimmed.endsWith("]") ? trimmed.slice(1, -1).trim() : trimmed;
+
+    return unwrapped.toLowerCase();
+}
+
+export function findGuildColorsByIdentity(
+    guilds: ReadonlyArray<GuildColorRecord>,
+    query: string,
+    limit = 8,
+): GuildColorRecord[] {
+    const normalizedQuery = normalizeGuildLookupQuery(query);
+    const resultLimit = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : 0;
+
+    if (!normalizedQuery || resultLimit === 0) {
+        return [];
+    }
+
+    return guilds
+        .flatMap((guild) => {
+            const name = guild.name.trim().toLowerCase();
+            const prefix = guild.prefix.trim().toLowerCase();
+            let rank: number;
+
+            if (prefix === normalizedQuery) {
+                rank = 0;
+            } else if (name === normalizedQuery) {
+                rank = 1;
+            } else if (prefix.startsWith(normalizedQuery)) {
+                rank = 2;
+            } else if (name.startsWith(normalizedQuery)) {
+                rank = 3;
+            } else if (prefix.includes(normalizedQuery)) {
+                rank = 4;
+            } else if (name.includes(normalizedQuery)) {
+                rank = 5;
+            } else {
+                return [];
+            }
+
+            return [{ guild, rank }];
+        })
+        .sort(
+            (first, second) =>
+                first.rank - second.rank ||
+                first.guild.name.localeCompare(second.guild.name) ||
+                first.guild.prefix.localeCompare(second.guild.prefix),
+        )
+        .slice(0, resultLimit)
+        .map(({ guild }) => guild);
 }
 
 export interface Rgb {
