@@ -613,7 +613,7 @@ test("jumps directly to a hex on the perceptual color map", async ({ page }) => 
     await expect(page.getByRole("img", { name: "Selected color #FF0000" })).toBeVisible();
 });
 
-test("selects a clicked perceptual map color in the jump field and marker", async ({ page }) => {
+test("selects clicked and dragged perceptual map colors in the jump field and marker", async ({ page }) => {
     await page.goto("/guild-color/map");
 
     const jumpInput = page.getByRole("textbox", { name: "Jump to hex" });
@@ -634,6 +634,21 @@ test("selects a clicked perceptual map color in the jump field and marker", asyn
         "href",
         `/guild-color?hex=${selectedColor.slice(1)}`,
     );
+
+    const canvasBounds = await canvas.boundingBox();
+    expect(canvasBounds).not.toBeNull();
+    await page.mouse.move(canvasBounds!.x + canvasBounds!.width * 0.5, canvasBounds!.y + canvasBounds!.height * 0.5);
+    await page.mouse.down();
+    await page.mouse.move(canvasBounds!.x + canvasBounds!.width * 0.58, canvasBounds!.y + canvasBounds!.height * 0.5, {
+        steps: 4,
+    });
+    await expect(jumpInput).not.toHaveValue(selectedColor);
+
+    const draggedColor = await jumpInput.inputValue();
+
+    await expect(page.getByRole("img", { name: `Selected color ${draggedColor}` })).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("hex")).toBe(draggedColor.slice(1));
+    await page.mouse.up();
 });
 
 test("does not calculate an allowed verdict when the guild source fails", async ({ page }) => {

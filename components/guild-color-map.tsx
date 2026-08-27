@@ -38,7 +38,14 @@ import {
 import { cn } from "@/lib/utils";
 import { ArrowLeft, Database, Filter, Map as MapIcon, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+    type FormEvent,
+    type PointerEvent as ReactPointerEvent,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 
 interface MapSample {
     ownerIndex: number;
@@ -132,6 +139,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const workerRef = useRef<Worker | null>(null);
     const workerGroupsRef = useRef<GuildColorMapWorkerGroup[]>([]);
+    const activeMapPointerId = useRef<number | null>(null);
     const latestRequestId = useRef(0);
     const latestRenderedRequestId = useRef(0);
     const [lightness, setLightness] = useState(initialLightness);
@@ -407,6 +415,36 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
         replaceTargetQuery(selectedColor);
     }
 
+    function startMapSelection(event: ReactPointerEvent<HTMLCanvasElement>) {
+        if (!event.isPrimary || event.button !== 0) {
+            return;
+        }
+
+        activeMapPointerId.current = event.pointerId;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        selectMapColor(event.clientX, event.clientY);
+    }
+
+    function moveMapPointer(event: ReactPointerEvent<HTMLCanvasElement>) {
+        if (activeMapPointerId.current === event.pointerId) {
+            selectMapColor(event.clientX, event.clientY);
+        } else {
+            inspectMap(event.clientX, event.clientY);
+        }
+    }
+
+    function stopMapSelection(event: ReactPointerEvent<HTMLCanvasElement>) {
+        if (activeMapPointerId.current !== event.pointerId) {
+            return;
+        }
+
+        activeMapPointerId.current = null;
+
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+    }
+
     function jumpToColor(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const normalizedColor = normalizeGuildColorHex(jumpInput);
@@ -579,10 +617,13 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                 role="img"
                                 aria-label={`Guild color claims at Lab lightness ${renderedMap?.lightness ?? lightness}`}
                                 className="size-full cursor-crosshair touch-none"
-                                onPointerMove={(event) => inspectMap(event.clientX, event.clientY)}
-                                onPointerDown={(event) => {
-                                    if (event.isPrimary && event.button === 0) {
-                                        selectMapColor(event.clientX, event.clientY);
+                                onPointerMove={moveMapPointer}
+                                onPointerDown={startMapSelection}
+                                onPointerUp={stopMapSelection}
+                                onPointerCancel={stopMapSelection}
+                                onLostPointerCapture={(event) => {
+                                    if (activeMapPointerId.current === event.pointerId) {
+                                        activeMapPointerId.current = null;
                                     }
                                 }}
                             />
@@ -639,8 +680,8 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                         </div>
                         <p className="mt-3 text-xs text-muted-foreground">
                             Claimed regions are derived from the nearest registered guild color within ΔE{" "}
-                            {MIN_GUILD_COLOR_DELTA_E}. Move across the map to inspect a point; click or tap to select its
-                            hex.
+                            {MIN_GUILD_COLOR_DELTA_E}. Move across the map to inspect a point; click, tap, or drag to
+                            select its hex.
                         </p>
                     </CardContent>
                 </Card>
@@ -723,7 +764,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                 </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground">
-                                    Move over the map to inspect a color, or click or tap to select it.
+                                    Move over the map to inspect a color, or click, tap, or drag to select it.
                                 </p>
                             )}
                         </CardContent>
