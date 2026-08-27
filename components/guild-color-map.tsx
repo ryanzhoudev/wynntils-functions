@@ -364,11 +364,11 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
         context.putImageData(new ImageData(pixels, renderedMap.width, renderedMap.height), 0, 0);
     }, [renderedMap]);
 
-    function inspectMap(clientX: number, clientY: number) {
+    function inspectMap(clientX: number, clientY: number): MapSample | null {
         const canvas = canvasRef.current;
 
         if (!canvas || !renderedMap) {
-            return;
+            return null;
         }
 
         const bounds = canvas.getBoundingClientRect();
@@ -382,11 +382,29 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
         );
         const index = y * renderedMap.width + x;
 
-        setSample({
+        const nextSample = {
             ownerIndex: renderedMap.owners[index],
             flags: renderedMap.flags[index],
             point: readGuildColorMapPoint(x, y, renderedMap.width, renderedMap.height, renderedMap.lightness),
-        });
+        } satisfies MapSample;
+
+        setSample(nextSample);
+        return nextSample;
+    }
+
+    function selectMapColor(clientX: number, clientY: number) {
+        const selectedSample = inspectMap(clientX, clientY);
+
+        if (!selectedSample?.point.inGamut) {
+            return;
+        }
+
+        const selectedColor = rgbToHex(selectedSample.point.rgb);
+
+        setJumpInput(selectedColor);
+        setTargetColor(selectedColor);
+        setJumpError(null);
+        replaceTargetQuery(selectedColor);
     }
 
     function jumpToColor(event: FormEvent<HTMLFormElement>) {
@@ -562,7 +580,11 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                 aria-label={`Guild color claims at Lab lightness ${renderedMap?.lightness ?? lightness}`}
                                 className="size-full cursor-crosshair touch-none"
                                 onPointerMove={(event) => inspectMap(event.clientX, event.clientY)}
-                                onPointerDown={(event) => inspectMap(event.clientX, event.clientY)}
+                                onPointerDown={(event) => {
+                                    if (event.isPrimary && event.button === 0) {
+                                        selectMapColor(event.clientX, event.clientY);
+                                    }
+                                }}
                             />
                             {targetColor && targetMarkerPosition && targetSample ? (
                                 <span
@@ -617,7 +639,8 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                         </div>
                         <p className="mt-3 text-xs text-muted-foreground">
                             Claimed regions are derived from the nearest registered guild color within ΔE{" "}
-                            {MIN_GUILD_COLOR_DELTA_E}. Move across the map to inspect a point.
+                            {MIN_GUILD_COLOR_DELTA_E}. Move across the map to inspect a point; click or tap to select its
+                            hex.
                         </p>
                     </CardContent>
                 </Card>
@@ -700,7 +723,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                 </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground">
-                                    Move over or tap the map to inspect a color and its nearest claim.
+                                    Move over the map to inspect a color, or click or tap to select it.
                                 </p>
                             )}
                         </CardContent>

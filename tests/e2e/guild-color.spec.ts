@@ -605,6 +605,29 @@ test("jumps directly to a hex on the perceptual color map", async ({ page }) => 
     await expect(page.getByRole("img", { name: "Selected color #FF0000" })).toBeVisible();
 });
 
+test("selects a clicked perceptual map color in the jump field and marker", async ({ page }) => {
+    await page.goto("/guild-color/map");
+
+    const jumpInput = page.getByRole("textbox", { name: "Jump to hex" });
+    const canvas = page.locator("canvas");
+
+    await expect(page.getByTestId("map-coverage")).toBeVisible({ timeout: 15_000 });
+    await expect(jumpInput).toHaveValue("");
+    await canvas.click({ button: "right" });
+    await expect(jumpInput).toHaveValue("");
+    await canvas.click();
+    await expect(jumpInput).toHaveValue(/^#[0-9A-F]{6}$/);
+
+    const selectedColor = await jumpInput.inputValue();
+
+    await expect(page.getByRole("img", { name: `Selected color ${selectedColor}` })).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("hex")).toBe(selectedColor.slice(1));
+    await expect(page.getByRole("link", { name: "Back to picker" })).toHaveAttribute(
+        "href",
+        `/guild-color?hex=${selectedColor.slice(1)}`,
+    );
+});
+
 test("does not calculate an allowed verdict when the guild source fails", async ({ page }) => {
     await page.unroute("**/api/guild-colors");
     await page.route("**/api/guild-colors", async (route) => {
