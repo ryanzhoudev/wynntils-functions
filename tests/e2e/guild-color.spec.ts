@@ -349,7 +349,7 @@ test("looks up guild colors by tag or name and includes the preview tag in share
     await expect(page.getByRole("img", { name: /Entered color #00FF00:.*with the tag NEW/ })).toBeVisible();
 });
 
-test("preloads colors, previews every blocker, and keeps suggestions separate from the input", async ({ page }) => {
+test("preloads colors, previews blockers, and applies an active suggestion on request", async ({ page }) => {
     await page.goto("/guild-color?hex=FF0000");
 
     const input = page.getByRole("textbox", { name: "Guild color", exact: true });
@@ -421,6 +421,7 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
     await expect(page.getByText("R−", { exact: true })).toHaveClass(/bg-rose-500\/20/);
     await expect(page.getByText("G−", { exact: true })).toHaveClass(/bg-emerald-500\/20/);
     await expect(page.getByText("B−", { exact: true })).toHaveClass(/bg-sky-500\/20/);
+    await expect(page.getByRole("button", { name: "Use suggestion" })).toHaveCount(0);
 
     const chosenPreviewBorder = await page
         .getByRole("img", { name: /Entered color .* territory bordered/ })
@@ -443,12 +444,19 @@ test("preloads colors, previews every blocker, and keeps suggestions separate fr
 
     await expect(input).toHaveValue("#FF0000");
     await expect(page.getByText("R− allowed suggestion · #CA0000", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Use suggestion" })).toBeVisible();
 
     await page.getByRole("textbox", { name: "Preview tag" }).fill("NEW");
     await expect(
         page.getByRole("img", { name: /allowed suggestion: territory bordered.*with the tag NEW/i }),
     ).toBeVisible();
 
+    await page.getByRole("button", { name: "Use suggestion" }).click();
+    await expect(input).toHaveValue("#CA0000");
+    await expect(page.getByRole("img", { name: /Entered color #CA0000:.*with the tag NEW/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Use suggestion" })).toHaveCount(0);
+
+    await redMinusSuggestion.click();
     await page.getByRole("button", { name: "Return to closest" }).click();
     await expect(page.getByText("2 guilds use this color · #FF0000")).toBeVisible();
 });

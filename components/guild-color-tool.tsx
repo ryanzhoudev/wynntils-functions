@@ -352,6 +352,11 @@ export default function GuildColorTool({
         });
     }
 
+    function applySuggestion(suggestion: SuggestionPreviewSelection) {
+        setInputColorOverride(suggestion.color);
+        setSelection(null);
+    }
+
     function applyGuildLookupColor(guild: GuildColorRecord) {
         setInputColorOverride(guild.color);
         setPrefix(normalizePreviewTag(guild.prefix));
@@ -713,13 +718,28 @@ export default function GuildColorTool({
                                 </CardContent>
                             </Card>
                             <Card>
-                                <CardHeader>
-                                    <CardTitle>Comparison preview</CardTitle>
-                                    <p className="text-sm text-muted-foreground">
-                                        {activeSelection
-                                            ? `${activeSelection.label} · ${activeSelection.color}`
-                                            : "Waiting for guild color data"}
-                                    </p>
+                                <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+                                    <div className="min-w-0 flex-1 space-y-1.5">
+                                        <CardTitle>Comparison preview</CardTitle>
+                                        <p className="text-sm text-muted-foreground">
+                                            {activeSelection
+                                                ? `${activeSelection.label} · ${activeSelection.color}`
+                                                : "Waiting for guild color data"}
+                                        </p>
+                                    </div>
+                                    {activeSelection?.kind === "suggestion" ? (
+                                        <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="outline"
+                                            className="size-8 shrink-0"
+                                            aria-label="Use suggestion"
+                                            title="Use suggestion"
+                                            onClick={() => applySuggestion(activeSelection)}
+                                        >
+                                            <ArrowLeft className="size-4" aria-hidden="true" />
+                                        </Button>
+                                    ) : null}
                                 </CardHeader>
                                 <CardContent>
                                     {activeSelection ? (
