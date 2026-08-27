@@ -727,8 +727,9 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                     {ignoreLowActivity && statsStatus === "ready" ? (
                                         <p className="text-xs text-muted-foreground" data-testid="activity-filter-status">
                                             Ignoring {ignoredGuildCount.toLocaleString()} guild
-                                            {ignoredGuildCount === 1 ? "" : "s"} with 0 territories and both season ratings
-                                            below {GUILD_ACTIVITY_RATING_THRESHOLD.toLocaleString()} SR.
+                                            {ignoredGuildCount === 1 ? "" : "s"} missing from Wynncraft&apos;s guild directory
+                                            or with 0 territories and both season ratings below{" "}
+                                            {GUILD_ACTIVITY_RATING_THRESHOLD.toLocaleString()} SR.
                                         </p>
                                     ) : activityFilterPending ? (
                                         <p className="text-xs text-amber-200" data-testid="activity-filter-status">

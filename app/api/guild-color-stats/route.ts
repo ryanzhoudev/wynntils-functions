@@ -131,6 +131,7 @@ export async function GET() {
             guilds: guilds.map((guild) => ({
                 name: guild.name,
                 prefix: guild.prefix,
+                wynncraftIdentityResolved: guild.wynncraftIdentityResolved ?? null,
                 stats: guild.stats ?? {
                     currentTerritories: null,
                     currentSeasonRating: null,

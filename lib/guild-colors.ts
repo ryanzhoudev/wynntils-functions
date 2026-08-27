@@ -24,6 +24,7 @@ export interface GuildColorRecord {
     prefix: string;
     color: string;
     stats?: GuildColorStats;
+    wynncraftIdentityResolved?: boolean | null;
 }
 
 export interface GuildColorStatsMetadata {
@@ -37,6 +38,7 @@ export interface GuildColorStatsRecord {
     name: string;
     prefix: string;
     stats: GuildColorStats;
+    wynncraftIdentityResolved: boolean | null;
 }
 
 export interface GuildColorStatsApiResponse extends GuildColorStatsMetadata {
@@ -64,16 +66,19 @@ export function mergeGuildColorStats(
     colors: GuildColorApiResponse,
     stats: GuildColorStatsApiResponse,
 ): GuildColorApiResponse {
-    const statsByGuild = new Map(
-        stats.guilds.map((guild) => [guildStatsIdentity(guild.name, guild.prefix), guild.stats] as const),
-    );
+    const statsByGuild = new Map(stats.guilds.map((guild) => [guildStatsIdentity(guild.name, guild.prefix), guild] as const));
 
     return {
         ...colors,
-        guilds: colors.guilds.map((guild) => ({
-            ...guild,
-            stats: statsByGuild.get(guildStatsIdentity(guild.name, guild.prefix)),
-        })),
+        guilds: colors.guilds.map((guild) => {
+            const matchedStats = statsByGuild.get(guildStatsIdentity(guild.name, guild.prefix));
+
+            return {
+                ...guild,
+                stats: matchedStats?.stats,
+                wynncraftIdentityResolved: matchedStats?.wynncraftIdentityResolved,
+            };
+        }),
         stats: {
             fetchedAt: stats.fetchedAt,
             cacheSeconds: stats.cacheSeconds,
@@ -83,11 +88,15 @@ export function mergeGuildColorStats(
     };
 }
 
-export function isGuildBelowActivityThreshold(guild: GuildColorRecord): boolean {
-    if (
+function isProtectedGuildColor(guild: GuildColorRecord): boolean {
+    return (
         guild.name.trim().toLocaleLowerCase() === PROTECTED_GUILD_NAME &&
         guild.prefix.trim().toLocaleUpperCase() === PROTECTED_GUILD_PREFIX
-    ) {
+    );
+}
+
+export function isGuildBelowActivityThreshold(guild: GuildColorRecord): boolean {
+    if (isProtectedGuildColor(guild)) {
         return false;
     }
 
@@ -107,7 +116,15 @@ export function filterGuildColorsByActivity(
     guilds: ReadonlyArray<GuildColorRecord>,
     ignoreBelowThreshold: boolean,
 ): GuildColorRecord[] {
-    return ignoreBelowThreshold ? guilds.filter((guild) => !isGuildBelowActivityThreshold(guild)) : [...guilds];
+    if (!ignoreBelowThreshold) {
+        return [...guilds];
+    }
+
+    return guilds.filter(
+        (guild) =>
+            isProtectedGuildColor(guild) ||
+            (guild.wynncraftIdentityResolved !== false && !isGuildBelowActivityThreshold(guild)),
+    );
 }
 
 function normalizeGuildLookupQuery(query: string): string {

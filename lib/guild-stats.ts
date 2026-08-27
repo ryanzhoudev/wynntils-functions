@@ -222,6 +222,10 @@ export function enrichGuildColorStats(guilds: GuildColorRecord[], sources: Guild
             previousSeasonRating: uuid ? readSeasonRating(uuid, sources.previousSeasonLeaderboard) : null,
         };
 
-        return { ...guild, stats };
+        return {
+            ...guild,
+            stats,
+            wynncraftIdentityResolved: directory ? uuid !== null : null,
+        };
     });
 }

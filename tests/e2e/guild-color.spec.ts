@@ -58,31 +58,37 @@ const guildColorStatsResponse = {
         {
             name: "Red One",
             prefix: "R1",
+            wynncraftIdentityResolved: true,
             stats: { currentTerritories: 2, currentSeasonRating: 12340, previousSeasonRating: 8210 },
         },
         {
             name: "Red Two",
             prefix: "R2",
+            wynncraftIdentityResolved: true,
             stats: { currentTerritories: 0, currentSeasonRating: 6586691, previousSeasonRating: 15107093 },
         },
         {
             name: "Blue Guild",
             prefix: "BLU",
+            wynncraftIdentityResolved: false,
             stats: { currentTerritories: null, currentSeasonRating: null, previousSeasonRating: null },
         },
         {
             name: "Green Guild",
             prefix: "GRN",
+            wynncraftIdentityResolved: true,
             stats: { currentTerritories: 1, currentSeasonRating: 900, previousSeasonRating: 1200 },
         },
         {
             name: "Low Activity",
             prefix: "LOW",
+            wynncraftIdentityResolved: true,
             stats: { currentTerritories: 0, currentSeasonRating: 9999, previousSeasonRating: 0 },
         },
         {
             name: "Wanytails",
             prefix: "WANY",
+            wynncraftIdentityResolved: true,
             stats: { currentTerritories: 0, currentSeasonRating: 0, previousSeasonRating: 0 },
         },
     ],
@@ -140,7 +146,7 @@ test("renders color verdicts before optional activity statistics finish loading"
     await expect(redOneStats.getByText("12,340 SR", { exact: true })).toHaveCount(2);
 });
 
-test("ignores only fully known low-activity guilds and shares the setting", async ({ page }) => {
+test("ignores low-activity and unresolved guilds and shares the setting", async ({ page }) => {
     let releaseStats: (() => void) | undefined;
     const statsGate = new Promise<void>((resolve) => {
         releaseStats = resolve;
@@ -160,11 +166,13 @@ test("ignores only fully known low-activity guilds and shares the setting", asyn
 
     releaseStats?.();
     await expect(page.getByText("Allowed? 🟩 Yes")).toBeVisible();
-    await expect(page.getByTestId("activity-filter-status")).toContainText("Ignoring 1 guild");
+    await expect(page.getByTestId("activity-filter-status")).toContainText("Ignoring 2 guilds");
     await expect(page.getByRole("link", { name: /Low Activity \[LOW\]/ })).toHaveCount(0);
 
     const guildLookup = page.getByRole("textbox", { name: "Find a guild" });
     await guildLookup.fill("low");
+    await expect(page.getByText("No registered guilds match this search.")).toBeVisible();
+    await guildLookup.fill("blu");
     await expect(page.getByText("No registered guilds match this search.")).toBeVisible();
     await guildLookup.fill("wany");
     await expect(page.getByRole("button", { name: "Use Wanytails [WANY] color #0000FF" })).toBeVisible();
@@ -550,9 +558,9 @@ test("applies the activity filter to map claims and preserves it in navigation",
         "href",
         "/guild-color?hex=00FFFF&ignoreLowActivity=1",
     );
-    await expect(page.getByTestId("activity-filter-status")).toContainText("Ignoring 1 guild");
+    await expect(page.getByTestId("activity-filter-status")).toContainText("Ignoring 2 guilds");
     await expect(page.getByText("3 unique colors")).toBeVisible();
-    await expect(page.getByText("5 guilds")).toBeVisible();
+    await expect(page.getByText("4 guilds")).toBeVisible();
     await expect(page.getByRole("img", { name: "Selected color #00FFFF" })).toBeVisible({ timeout: 15_000 });
     await expect(pointDetails.getByText("Allowed", { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: /Low Activity \[LOW\]/ })).toHaveCount(0);
