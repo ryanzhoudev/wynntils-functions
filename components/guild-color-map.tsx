@@ -53,6 +53,12 @@ interface MapSample {
     point: ReturnType<typeof readGuildColorMapPoint>;
 }
 
+interface MapHoverSample {
+    sample: MapSample;
+    xPercent: number;
+    yPercent: number;
+}
+
 interface GuildColorMapProps {
     initialColor?: string | null;
     initialIgnoreLowActivity: boolean;
@@ -154,7 +160,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
     const [statsError, setStatsError] = useState<string | null>(null);
     const [renderError, setRenderError] = useState<string | null>(null);
     const [renderedMap, setRenderedMap] = useState<GuildColorMapRenderResponse | null>(null);
-    const [sample, setSample] = useState<MapSample | null>(null);
+    const [hoverSample, setHoverSample] = useState<MapHoverSample | null>(null);
     const [jumpInput, setJumpInput] = useState(normalizedInitialColor ?? initialColor ?? "");
     const [targetColor, setTargetColor] = useState<string | null>(normalizedInitialColor);
     const [jumpError, setJumpError] = useState<string | null>(
@@ -205,13 +211,26 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
             point,
         } satisfies MapSample;
     }, [lightness, renderedMap, target, workerGroups]);
-    const activeSample = sample ?? targetSample;
+    const activeSample = targetColor ? targetSample : (hoverSample?.sample ?? null);
     const sampleGroup =
         activeSample?.ownerIndex !== undefined && activeSample.ownerIndex >= 0 ? groups[activeSample.ownerIndex] : null;
     const sampleInGamut = Boolean(activeSample && (activeSample.flags & GUILD_COLOR_MAP_FLAG_IN_GAMUT) !== 0);
     const sampleBrightEnough = Boolean(activeSample && (activeSample.flags & GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH) !== 0);
     const sampleAllowed = sampleInGamut && sampleBrightEnough && !sampleGroup;
     const sampleDistance = activeSample && sampleGroup ? deltaE76(activeSample.point.lab, sampleGroup.lab) : null;
+    const hoverPoint = hoverSample?.sample ?? null;
+    const hoverInGamut = Boolean(hoverPoint && (hoverPoint.flags & GUILD_COLOR_MAP_FLAG_IN_GAMUT) !== 0);
+    const hoverBrightEnough = Boolean(hoverPoint && (hoverPoint.flags & GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH) !== 0);
+    const hoverGroup = hoverPoint && hoverPoint.ownerIndex >= 0 ? groups[hoverPoint.ownerIndex] : null;
+    const hoverColor = hoverInGamut && hoverPoint ? rgbToHex(hoverPoint.point.rgb) : null;
+    const hoverStatus = !hoverInGamut
+        ? "Outside RGB"
+        : hoverGroup
+          ? "Guild claim"
+          : hoverBrightEnough
+            ? "Allowed"
+            : "Too dark";
+    const showHoverTooltip = Boolean(targetColor && hoverSample && hoverColor !== targetColor);
     const targetMarkerPosition = target ? labToMapPosition(target.lab, 101, 101) : null;
     const allowedPercentage =
         renderedMap && renderedMap.statistics.inGamut > 0
@@ -291,7 +310,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
         latestRequestId.current += 1;
         setWorkerGroups(nextWorkerGroups);
         setRenderedMap(null);
-        setSample(null);
+        setHoverSample(null);
     }, [nextWorkerGroups]);
 
     useEffect(() => {
@@ -320,7 +339,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
             latestRenderedRequestId.current = response.requestId;
             setRenderError(null);
             setRenderedMap(response);
-            setSample(null);
+            setHoverSample(null);
         };
 
         worker.onerror = (event) => {
@@ -372,7 +391,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
         context.putImageData(new ImageData(pixels, renderedMap.width, renderedMap.height), 0, 0);
     }, [renderedMap]);
 
-    function inspectMap(clientX: number, clientY: number): MapSample | null {
+    function readMapPointerSample(clientX: number, clientY: number): MapHoverSample | null {
         const canvas = canvasRef.current;
 
         if (!canvas || !renderedMap) {
@@ -380,28 +399,32 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
         }
 
         const bounds = canvas.getBoundingClientRect();
-        const x = Math.min(
-            renderedMap.width - 1,
-            Math.max(0, Math.floor(((clientX - bounds.left) / bounds.width) * renderedMap.width)),
-        );
-        const y = Math.min(
-            renderedMap.height - 1,
-            Math.max(0, Math.floor(((clientY - bounds.top) / bounds.height) * renderedMap.height)),
-        );
+        const xProgress = Math.min(1, Math.max(0, (clientX - bounds.left) / bounds.width));
+        const yProgress = Math.min(1, Math.max(0, (clientY - bounds.top) / bounds.height));
+        const x = Math.min(renderedMap.width - 1, Math.floor(xProgress * renderedMap.width));
+        const y = Math.min(renderedMap.height - 1, Math.floor(yProgress * renderedMap.height));
         const index = y * renderedMap.width + x;
 
-        const nextSample = {
-            ownerIndex: renderedMap.owners[index],
-            flags: renderedMap.flags[index],
-            point: readGuildColorMapPoint(x, y, renderedMap.width, renderedMap.height, renderedMap.lightness),
-        } satisfies MapSample;
+        return {
+            sample: {
+                ownerIndex: renderedMap.owners[index],
+                flags: renderedMap.flags[index],
+                point: readGuildColorMapPoint(x, y, renderedMap.width, renderedMap.height, renderedMap.lightness),
+            },
+            xPercent: xProgress * 100,
+            yPercent: yProgress * 100,
+        } satisfies MapHoverSample;
+    }
 
-        setSample(nextSample);
-        return nextSample;
+    function inspectMap(clientX: number, clientY: number): MapSample | null {
+        const nextHoverSample = readMapPointerSample(clientX, clientY);
+
+        setHoverSample(nextHoverSample);
+        return nextHoverSample?.sample ?? null;
     }
 
     function selectMapColor(clientX: number, clientY: number) {
-        const selectedSample = inspectMap(clientX, clientY);
+        const selectedSample = readMapPointerSample(clientX, clientY)?.sample;
 
         if (!selectedSample?.point.inGamut) {
             return;
@@ -409,6 +432,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
 
         const selectedColor = rgbToHex(selectedSample.point.rgb);
 
+        setHoverSample(null);
         setJumpInput(selectedColor);
         setTargetColor(selectedColor);
         setJumpError(null);
@@ -445,6 +469,14 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
         }
     }
 
+    function clearMapSelection() {
+        setTargetColor(null);
+        setJumpInput("");
+        setHoverSample(null);
+        setJumpError(null);
+        replaceTargetQuery(null);
+    }
+
     function jumpToColor(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const normalizedColor = normalizeGuildColorHex(jumpInput);
@@ -458,7 +490,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
         setJumpInput(normalizedColor);
         setTargetColor(normalizedColor);
         setLightness(roundLightness(rgbToLab(rgb).L));
-        setSample(null);
+        setHoverSample(null);
         setJumpError(null);
         replaceTargetQuery(normalizedColor);
     }
@@ -466,7 +498,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
     function changeLightness(nextLightness: number) {
         setLightness(nextLightness);
         setTargetColor(null);
-        setSample(null);
+        setHoverSample(null);
         setJumpError(null);
         replaceTargetQuery(null);
     }
@@ -482,7 +514,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
         }
 
         setIgnoreLowActivity(enabled);
-        setSample(null);
+        setHoverSample(null);
         window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     }
 
@@ -621,10 +653,16 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                 onPointerDown={startMapSelection}
                                 onPointerUp={stopMapSelection}
                                 onPointerCancel={stopMapSelection}
+                                onPointerLeave={() => {
+                                    if (activeMapPointerId.current === null) {
+                                        setHoverSample(null);
+                                    }
+                                }}
                                 onLostPointerCapture={(event) => {
                                     if (activeMapPointerId.current === event.pointerId) {
                                         activeMapPointerId.current = null;
                                     }
+                                    setHoverSample(null);
                                 }}
                             />
                             {targetColor && targetMarkerPosition && targetSample ? (
@@ -637,6 +675,24 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                         top: `${targetMarkerPosition.y}%`,
                                     }}
                                 />
+                            ) : null}
+                            {showHoverTooltip && hoverSample ? (
+                                <div
+                                    aria-hidden="true"
+                                    data-testid="map-hover-tooltip"
+                                    className="pointer-events-none absolute z-20 whitespace-nowrap rounded-md border border-border/80 bg-background/95 px-2 py-1 text-xs shadow-lg backdrop-blur"
+                                    style={{
+                                        left: `${Math.min(92, Math.max(8, hoverSample.xPercent))}%`,
+                                        top: `${hoverSample.yPercent}%`,
+                                        transform:
+                                            hoverSample.yPercent < 18
+                                                ? "translate(-50%, 0.75rem)"
+                                                : "translate(-50%, calc(-100% - 0.75rem))",
+                                    }}
+                                >
+                                    <code className="font-semibold">{hoverColor ?? "Outside RGB"}</code>
+                                    {hoverColor ? <span className="text-muted-foreground"> · {hoverStatus}</span> : null}
+                                </div>
                             ) : null}
                             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 rounded bg-black/65 px-2 py-1 text-xs font-semibold">
                                 Green −a*
@@ -688,8 +744,20 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
 
                 <aside className="space-y-6 xl:sticky xl:top-4 xl:self-start">
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Point details</CardTitle>
+                        <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <CardTitle>Point details</CardTitle>
+                                {targetColor ? (
+                                    <Badge variant="secondary">Selected point</Badge>
+                                ) : hoverSample ? (
+                                    <Badge variant="outline">Hover preview</Badge>
+                                ) : null}
+                            </div>
+                            {targetColor ? (
+                                <Button type="button" variant="ghost" size="sm" onClick={clearMapSelection}>
+                                    Clear selection
+                                </Button>
+                            ) : null}
                         </CardHeader>
                         <CardContent>
                             {activeSample ? (
@@ -705,7 +773,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                             }}
                                         />
                                         <div>
-                                            <code className="font-semibold">
+                                            <code className="font-semibold" data-testid="map-point-hex">
                                                 {activeSample.point.inGamut
                                                     ? rgbToHex(activeSample.point.rgb)
                                                     : "Outside RGB"}
@@ -762,9 +830,11 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                         </p>
                                     ) : null}
                                 </div>
+                            ) : targetColor ? (
+                                <p className="text-sm text-muted-foreground">Rendering the selected point…</p>
                             ) : (
                                 <p className="text-sm text-muted-foreground">
-                                    Move over the map to inspect a color, or click, tap, or drag to select it.
+                                    Move over the map to preview a color, or click, tap, or drag to select it.
                                 </p>
                             )}
                         </CardContent>

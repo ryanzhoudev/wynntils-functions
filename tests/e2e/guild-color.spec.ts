@@ -618,17 +618,23 @@ test("selects clicked and dragged perceptual map colors in the jump field and ma
 
     const jumpInput = page.getByRole("textbox", { name: "Jump to hex" });
     const canvas = page.locator("canvas");
+    const pointHex = page.getByTestId("map-point-hex");
 
     await expect(page.getByTestId("map-coverage")).toBeVisible({ timeout: 15_000 });
     await expect(jumpInput).toHaveValue("");
+    await canvas.hover();
+    await expect(page.getByText("Hover preview", { exact: true })).toBeVisible();
+    await expect(pointHex).toHaveText(/^#[0-9A-F]{6}$/);
     await canvas.click({ button: "right" });
     await expect(jumpInput).toHaveValue("");
     await canvas.click();
     await expect(jumpInput).toHaveValue(/^#[0-9A-F]{6}$/);
+    await expect(page.getByText("Selected point", { exact: true })).toBeVisible();
 
     const selectedColor = await jumpInput.inputValue();
 
     await expect(page.getByRole("img", { name: `Selected color ${selectedColor}` })).toBeVisible();
+    await expect(pointHex).toHaveText(selectedColor);
     expect(new URL(page.url()).searchParams.get("hex")).toBe(selectedColor.slice(1));
     await expect(page.getByRole("link", { name: "Back to picker" })).toHaveAttribute(
         "href",
@@ -637,6 +643,14 @@ test("selects clicked and dragged perceptual map colors in the jump field and ma
 
     const canvasBounds = await canvas.boundingBox();
     expect(canvasBounds).not.toBeNull();
+    await page.mouse.move(
+        canvasBounds!.x + canvasBounds!.width * 0.58,
+        canvasBounds!.y + canvasBounds!.height * 0.5,
+    );
+    await expect(page.getByTestId("map-hover-tooltip")).toBeVisible();
+    await expect(jumpInput).toHaveValue(selectedColor);
+    await expect(pointHex).toHaveText(selectedColor);
+
     await page.mouse.move(canvasBounds!.x + canvasBounds!.width * 0.5, canvasBounds!.y + canvasBounds!.height * 0.5);
     await page.mouse.down();
     await page.mouse.move(canvasBounds!.x + canvasBounds!.width * 0.58, canvasBounds!.y + canvasBounds!.height * 0.5, {
@@ -647,8 +661,16 @@ test("selects clicked and dragged perceptual map colors in the jump field and ma
     const draggedColor = await jumpInput.inputValue();
 
     await expect(page.getByRole("img", { name: `Selected color ${draggedColor}` })).toBeVisible();
+    await expect(pointHex).toHaveText(draggedColor);
     expect(new URL(page.url()).searchParams.get("hex")).toBe(draggedColor.slice(1));
     await page.mouse.up();
+
+    await page.getByRole("button", { name: "Clear selection" }).click();
+    await expect(jumpInput).toHaveValue("");
+    await expect(page.getByRole("img", { name: /Selected color/ })).toHaveCount(0);
+    await expect(page).not.toHaveURL(/hex=/);
+    await canvas.hover();
+    await expect(page.getByText("Hover preview", { exact: true })).toBeVisible();
 });
 
 test("does not calculate an allowed verdict when the guild source fails", async ({ page }) => {
