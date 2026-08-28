@@ -543,13 +543,44 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
 
     const sliderBounds = await lightness.boundingBox();
     expect(sliderBounds).not.toBeNull();
+    await page.evaluate(() => {
+        const canvas = document.querySelector("canvas");
+        const previewLabels: string[] = [];
+
+        if (!canvas) {
+            throw new Error("Expected the guild color map canvas.");
+        }
+
+        new MutationObserver(() => {
+            const label = canvas.getAttribute("aria-label");
+
+            if (label) {
+                previewLabels.push(label);
+            }
+        }).observe(canvas, { attributes: true, attributeFilter: ["aria-label"] });
+        Object.defineProperty(window, "__guildMapPreviewLabels", {
+            configurable: true,
+            value: previewLabels,
+        });
+    });
     await page.mouse.move(sliderBounds!.x + sliderBounds!.width * 0.53, sliderBounds!.y + sliderBounds!.height / 2);
     await page.mouse.down();
-    await page.mouse.move(sliderBounds!.x + sliderBounds!.width * 0.35, sliderBounds!.y + sliderBounds!.height / 2, {
-        steps: 4,
-    });
+    for (let step = 1; step <= 60; step += 1) {
+        const progress = step / 60;
+        const sliderPosition = 0.53 + (0.35 - 0.53) * progress;
+        await page.mouse.move(
+            sliderBounds!.x + sliderBounds!.width * sliderPosition,
+            sliderBounds!.y + sliderBounds!.height / 2,
+        );
+        await page.waitForTimeout(12);
+    }
+    const previewLabels = await page.evaluate(
+        () =>
+            (window as typeof window & { __guildMapPreviewLabels: string[] }).__guildMapPreviewLabels,
+    );
     const draggedLightness = await lightness.inputValue();
     const canvas = page.locator("canvas");
+    expect(new Set(previewLabels).size).toBeGreaterThan(1);
     await expect(canvas).toHaveAttribute("aria-label", `Guild color claims at Lab lightness ${draggedLightness}`);
     await expect(canvas).toHaveAttribute("width", String(GUILD_COLOR_MAP_PREVIEW_RESOLUTION));
     await page.mouse.up();

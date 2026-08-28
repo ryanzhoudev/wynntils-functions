@@ -4,12 +4,23 @@ import {
     GUILD_COLOR_MAP_FLAG_CLAIMED,
     guildColorMapFullResolution,
     labToMapPosition,
+    shouldApplyGuildColorMapResponse,
 } from "@/lib/guild-color-map";
 import { renderGuildColorMapSlice } from "@/lib/guild-color-map/renderer";
 import { createGuildColorPalette, labToRgb, rgbToLab } from "@/lib/guild-colors";
 import { describe, expect, it } from "vitest";
 
 describe("guild color map geometry", () => {
+    it("applies ordered preview frames while newer render requests are still pending", () => {
+        const latestRequestedRequestId = 5;
+        const completedPreviewRequestId = 4;
+
+        expect(completedPreviewRequestId).toBeLessThan(latestRequestedRequestId);
+        expect(shouldApplyGuildColorMapResponse(completedPreviewRequestId, 1, 3)).toBe(true);
+        expect(shouldApplyGuildColorMapResponse(completedPreviewRequestId, 1, 4)).toBe(false);
+        expect(shouldApplyGuildColorMapResponse(completedPreviewRequestId, 4, 0)).toBe(false);
+    });
+
     it("adapts completed renders to the displayed map size", () => {
         expect(guildColorMapFullResolution(462)).toBe(600);
         expect(guildColorMapFullResolution(768)).toBe(768);
