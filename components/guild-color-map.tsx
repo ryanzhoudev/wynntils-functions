@@ -36,7 +36,7 @@ import {
     rgbToHex,
 } from "@/lib/guild-colors";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Database, Filter, Map as MapIcon, RefreshCw } from "lucide-react";
+import { ArrowLeft, Database, Filter, Map as MapIcon, RefreshCw, X } from "lucide-react";
 import Link from "next/link";
 import {
     type FormEvent,
@@ -743,21 +743,16 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                 </Card>
 
                 <aside className="space-y-6 xl:sticky xl:top-4 xl:self-start">
-                    <Card>
-                        <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <CardTitle>Point details</CardTitle>
+                    <Card data-testid="map-point-details">
+                        <CardHeader>
+                            <CardTitle className="flex flex-wrap items-center gap-2">
+                                Point details
                                 {targetColor ? (
                                     <Badge variant="secondary">Selected point</Badge>
                                 ) : hoverSample ? (
                                     <Badge variant="outline">Hover preview</Badge>
                                 ) : null}
-                            </div>
-                            {targetColor ? (
-                                <Button type="button" variant="ghost" size="sm" onClick={clearMapSelection}>
-                                    Clear selection
-                                </Button>
-                            ) : null}
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {activeSample ? (
@@ -772,7 +767,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                                     : undefined,
                                             }}
                                         />
-                                        <div>
+                                        <div className="min-w-0">
                                             <code className="font-semibold" data-testid="map-point-hex">
                                                 {activeSample.point.inGamut
                                                     ? rgbToHex(activeSample.point.rgb)
@@ -784,6 +779,19 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                                 {activeSample.point.lab.b.toFixed(1)}
                                             </p>
                                         </div>
+                                        {targetColor ? (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="ml-auto h-8 shrink-0 px-2 text-xs text-muted-foreground"
+                                                aria-label="Clear selection"
+                                                onClick={clearMapSelection}
+                                            >
+                                                <X className="size-3.5" aria-hidden="true" />
+                                                Clear
+                                            </Button>
+                                        ) : null}
                                     </div>
 
                                     <div className="flex flex-wrap gap-2">

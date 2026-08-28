@@ -560,7 +560,7 @@ test("applies the activity filter to map claims and preserves it in navigation",
     await page.goto("/guild-color/map?hex=00FFFF&ignoreLowActivity=1");
 
     const activityToggle = page.getByRole("button", { name: "Ignore low-activity guilds" });
-    const pointDetails = page.getByRole("heading", { name: "Point details" }).locator("..").locator("..");
+    const pointDetails = page.getByTestId("map-point-details");
     await expect(activityToggle).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("link", { name: "Back to picker" })).toHaveAttribute(
         "href",
@@ -622,7 +622,9 @@ test("selects clicked and dragged perceptual map colors in the jump field and ma
 
     await expect(page.getByTestId("map-coverage")).toBeVisible({ timeout: 15_000 });
     await expect(jumpInput).toHaveValue("");
-    await canvas.hover();
+    const canvasBounds = await canvas.boundingBox();
+    expect(canvasBounds).not.toBeNull();
+    await page.mouse.move(canvasBounds!.x + canvasBounds!.width * 0.45, canvasBounds!.y + canvasBounds!.height * 0.5);
     await expect(page.getByText("Hover preview", { exact: true })).toBeVisible();
     await expect(pointHex).toHaveText(/^#[0-9A-F]{6}$/);
     await canvas.click({ button: "right" });
@@ -641,8 +643,6 @@ test("selects clicked and dragged perceptual map colors in the jump field and ma
         `/guild-color?hex=${selectedColor.slice(1)}`,
     );
 
-    const canvasBounds = await canvas.boundingBox();
-    expect(canvasBounds).not.toBeNull();
     await page.mouse.move(
         canvasBounds!.x + canvasBounds!.width * 0.58,
         canvasBounds!.y + canvasBounds!.height * 0.5,
@@ -669,7 +669,7 @@ test("selects clicked and dragged perceptual map colors in the jump field and ma
     await expect(jumpInput).toHaveValue("");
     await expect(page.getByRole("img", { name: /Selected color/ })).toHaveCount(0);
     await expect(page).not.toHaveURL(/hex=/);
-    await canvas.hover();
+    await page.mouse.move(canvasBounds!.x + canvasBounds!.width * 0.45, canvasBounds!.y + canvasBounds!.height * 0.5);
     await expect(page.getByText("Hover preview", { exact: true })).toBeVisible();
 });
 
