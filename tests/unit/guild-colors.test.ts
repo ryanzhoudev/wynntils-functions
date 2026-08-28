@@ -77,6 +77,7 @@ describe("guild color normalization and Athena parsing", () => {
                     {
                         name: " active guild ",
                         prefix: "act",
+                        wynncraftIdentityResolved: true,
                         stats: {
                             currentTerritories: 3,
                             currentSeasonRating: 12500,
@@ -96,7 +97,9 @@ describe("guild color normalization and Athena parsing", () => {
             currentSeasonRating: 12500,
             previousSeasonRating: 9000,
         });
+        expect(merged.guilds[0].wynncraftIdentityResolved).toBe(true);
         expect(merged.guilds[1].stats).toBeUndefined();
+        expect(merged.guilds[1].wynncraftIdentityResolved).toBeUndefined();
         expect(merged.stats).toMatchObject({
             fetchedAt: 2,
             cacheSeconds: 60,
@@ -126,7 +129,7 @@ describe("guild color normalization and Athena parsing", () => {
         expect(findGuildColorsByIdentity(guilds, "missing")).toEqual([]);
     });
 
-    it("only filters guilds with known zero-territory and sub-threshold ratings", () => {
+    it("filters known low activity and unresolved identities without guessing on unavailable sources", () => {
         const belowThreshold = {
             currentTerritories: 0,
             currentSeasonRating: GUILD_ACTIVITY_RATING_THRESHOLD - 1,
@@ -152,8 +155,33 @@ describe("guild color normalization and Athena parsing", () => {
                 color: "#00FFFC",
                 stats: { ...belowThreshold, previousSeasonRating: null },
             },
-            { name: " Wanytails ", prefix: "wany", color: "#FF00FF", stats: belowThreshold },
-            { name: "No stats", prefix: "NIL", color: "#00FFFB" },
+            {
+                name: " Wanytails ",
+                prefix: "wany",
+                color: "#FF00FF",
+                stats: belowThreshold,
+                wynncraftIdentityResolved: false,
+            },
+            {
+                name: "Missing from Wynncraft",
+                prefix: "NIL",
+                color: "#00FFFB",
+                stats: { currentTerritories: null, currentSeasonRating: null, previousSeasonRating: null },
+                wynncraftIdentityResolved: false,
+            },
+            {
+                name: "Directory unavailable",
+                prefix: "ERR",
+                color: "#00FFFA",
+                wynncraftIdentityResolved: null,
+            },
+            {
+                name: "Resolved but stats unavailable",
+                prefix: "API",
+                color: "#00FFF9",
+                stats: { currentTerritories: null, currentSeasonRating: null, previousSeasonRating: null },
+                wynncraftIdentityResolved: true,
+            },
         ];
 
         expect(isGuildBelowActivityThreshold(records[0])).toBe(true);
@@ -164,7 +192,8 @@ describe("guild color normalization and Athena parsing", () => {
             "Has territory",
             "Unknown rating",
             " Wanytails ",
-            "No stats",
+            "Directory unavailable",
+            "Resolved but stats unavailable",
         ]);
     });
 

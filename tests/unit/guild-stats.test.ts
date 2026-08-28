@@ -155,6 +155,7 @@ describe("guild color statistics enrichment", () => {
                 previousSeasonRating: null,
             },
         ]);
+        expect(enriched.map((guild) => guild.wynncraftIdentityResolved)).toEqual([true, true, false]);
     });
 
     it("keeps each independently unavailable source unknown", () => {
@@ -172,6 +173,23 @@ describe("guild color statistics enrichment", () => {
             currentTerritories: null,
             currentSeasonRating: null,
             previousSeasonRating: 0,
+        });
+        expect(enriched.wynncraftIdentityResolved).toBe(true);
+    });
+
+    it("marks guild identity as unknown when the Wynncraft directory is unavailable", () => {
+        const [enriched] = enrichGuildColorStats(guilds.slice(0, 1), {
+            directory: null,
+            territoryCounts: new Map(),
+            currentSeasonLeaderboard: { ratings: new Map(), complete: true },
+            previousSeasonLeaderboard: { ratings: new Map(), complete: true },
+        });
+
+        expect(enriched.wynncraftIdentityResolved).toBeNull();
+        expect(enriched.stats).toEqual({
+            currentTerritories: null,
+            currentSeasonRating: null,
+            previousSeasonRating: null,
         });
     });
 });

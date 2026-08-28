@@ -58,31 +58,37 @@ const guildColorStatsResponse = {
         {
             name: "Red One",
             prefix: "R1",
+            wynncraftIdentityResolved: true,
             stats: { currentTerritories: 2, currentSeasonRating: 12340, previousSeasonRating: 8210 },
         },
         {
             name: "Red Two",
             prefix: "R2",
+            wynncraftIdentityResolved: true,
             stats: { currentTerritories: 0, currentSeasonRating: 6586691, previousSeasonRating: 15107093 },
         },
         {
             name: "Blue Guild",
             prefix: "BLU",
+            wynncraftIdentityResolved: false,
             stats: { currentTerritories: null, currentSeasonRating: null, previousSeasonRating: null },
         },
         {
             name: "Green Guild",
             prefix: "GRN",
+            wynncraftIdentityResolved: true,
             stats: { currentTerritories: 1, currentSeasonRating: 900, previousSeasonRating: 1200 },
         },
         {
             name: "Low Activity",
             prefix: "LOW",
+            wynncraftIdentityResolved: true,
             stats: { currentTerritories: 0, currentSeasonRating: 9999, previousSeasonRating: 0 },
         },
         {
             name: "Wanytails",
             prefix: "WANY",
+            wynncraftIdentityResolved: true,
             stats: { currentTerritories: 0, currentSeasonRating: 0, previousSeasonRating: 0 },
         },
     ],
@@ -140,7 +146,7 @@ test("renders color verdicts before optional activity statistics finish loading"
     await expect(redOneStats.getByText("12,340 SR", { exact: true })).toHaveCount(2);
 });
 
-test("ignores only fully known low-activity guilds and shares the setting", async ({ page }) => {
+test("ignores low-activity and unresolved guilds and shares the setting", async ({ page }) => {
     let releaseStats: (() => void) | undefined;
     const statsGate = new Promise<void>((resolve) => {
         releaseStats = resolve;
@@ -160,11 +166,13 @@ test("ignores only fully known low-activity guilds and shares the setting", asyn
 
     releaseStats?.();
     await expect(page.getByText("Allowed? 🟩 Yes")).toBeVisible();
-    await expect(page.getByTestId("activity-filter-status")).toContainText("Ignoring 1 guild");
+    await expect(page.getByTestId("activity-filter-status")).toContainText("Ignoring 2 guilds");
     await expect(page.getByRole("link", { name: /Low Activity \[LOW\]/ })).toHaveCount(0);
 
     const guildLookup = page.getByRole("textbox", { name: "Find a guild" });
     await guildLookup.fill("low");
+    await expect(page.getByText("No registered guilds match this search.")).toBeVisible();
+    await guildLookup.fill("blu");
     await expect(page.getByText("No registered guilds match this search.")).toBeVisible();
     await guildLookup.fill("wany");
     await expect(page.getByRole("button", { name: "Use Wanytails [WANY] color #0000FF" })).toBeVisible();
@@ -552,15 +560,15 @@ test("applies the activity filter to map claims and preserves it in navigation",
     await page.goto("/guild-color/map?hex=00FFFF&ignoreLowActivity=1");
 
     const activityToggle = page.getByRole("button", { name: "Ignore low-activity guilds" });
-    const pointDetails = page.getByRole("heading", { name: "Point details" }).locator("..").locator("..");
+    const pointDetails = page.getByTestId("map-point-details");
     await expect(activityToggle).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("link", { name: "Back to picker" })).toHaveAttribute(
         "href",
         "/guild-color?hex=00FFFF&ignoreLowActivity=1",
     );
-    await expect(page.getByTestId("activity-filter-status")).toContainText("Ignoring 1 guild");
+    await expect(page.getByTestId("activity-filter-status")).toContainText("Ignoring 2 guilds");
     await expect(page.getByText("3 unique colors")).toBeVisible();
-    await expect(page.getByText("5 guilds")).toBeVisible();
+    await expect(page.getByText("4 guilds")).toBeVisible();
     await expect(page.getByRole("img", { name: "Selected color #00FFFF" })).toBeVisible({ timeout: 15_000 });
     await expect(pointDetails.getByText("Allowed", { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: /Low Activity \[LOW\]/ })).toHaveCount(0);
@@ -603,6 +611,66 @@ test("jumps directly to a hex on the perceptual color map", async ({ page }) => 
     await page.goto("/guild-color/map?color=FF0000");
     await expect(page.getByRole("textbox", { name: "Jump to hex" })).toHaveValue("#FF0000");
     await expect(page.getByRole("img", { name: "Selected color #FF0000" })).toBeVisible();
+});
+
+test("selects clicked and dragged perceptual map colors in the jump field and marker", async ({ page }) => {
+    await page.goto("/guild-color/map");
+
+    const jumpInput = page.getByRole("textbox", { name: "Jump to hex" });
+    const canvas = page.locator("canvas");
+    const pointHex = page.getByTestId("map-point-hex");
+
+    await expect(page.getByTestId("map-coverage")).toBeVisible({ timeout: 15_000 });
+    await expect(jumpInput).toHaveValue("");
+    const canvasBounds = await canvas.boundingBox();
+    expect(canvasBounds).not.toBeNull();
+    await page.mouse.move(canvasBounds!.x + canvasBounds!.width * 0.45, canvasBounds!.y + canvasBounds!.height * 0.5);
+    await expect(page.getByText("Hover preview", { exact: true })).toBeVisible();
+    await expect(pointHex).toHaveText(/^#[0-9A-F]{6}$/);
+    await canvas.click({ button: "right" });
+    await expect(jumpInput).toHaveValue("");
+    await canvas.click();
+    await expect(jumpInput).toHaveValue(/^#[0-9A-F]{6}$/);
+    await expect(page.getByText("Selected point", { exact: true })).toBeVisible();
+
+    const selectedColor = await jumpInput.inputValue();
+
+    await expect(page.getByRole("img", { name: `Selected color ${selectedColor}` })).toBeVisible();
+    await expect(pointHex).toHaveText(selectedColor);
+    expect(new URL(page.url()).searchParams.get("hex")).toBe(selectedColor.slice(1));
+    await expect(page.getByRole("link", { name: "Back to picker" })).toHaveAttribute(
+        "href",
+        `/guild-color?hex=${selectedColor.slice(1)}`,
+    );
+
+    await page.mouse.move(
+        canvasBounds!.x + canvasBounds!.width * 0.58,
+        canvasBounds!.y + canvasBounds!.height * 0.5,
+    );
+    await expect(page.getByTestId("map-hover-tooltip")).toBeVisible();
+    await expect(jumpInput).toHaveValue(selectedColor);
+    await expect(pointHex).toHaveText(selectedColor);
+
+    await page.mouse.move(canvasBounds!.x + canvasBounds!.width * 0.5, canvasBounds!.y + canvasBounds!.height * 0.5);
+    await page.mouse.down();
+    await page.mouse.move(canvasBounds!.x + canvasBounds!.width * 0.58, canvasBounds!.y + canvasBounds!.height * 0.5, {
+        steps: 4,
+    });
+    await expect(jumpInput).not.toHaveValue(selectedColor);
+
+    const draggedColor = await jumpInput.inputValue();
+
+    await expect(page.getByRole("img", { name: `Selected color ${draggedColor}` })).toBeVisible();
+    await expect(pointHex).toHaveText(draggedColor);
+    expect(new URL(page.url()).searchParams.get("hex")).toBe(draggedColor.slice(1));
+    await page.mouse.up();
+
+    await page.getByRole("button", { name: "Clear selection" }).click();
+    await expect(jumpInput).toHaveValue("");
+    await expect(page.getByRole("img", { name: /Selected color/ })).toHaveCount(0);
+    await expect(page).not.toHaveURL(/hex=/);
+    await page.mouse.move(canvasBounds!.x + canvasBounds!.width * 0.45, canvasBounds!.y + canvasBounds!.height * 0.5);
+    await expect(page.getByText("Hover preview", { exact: true })).toBeVisible();
 });
 
 test("does not calculate an allowed verdict when the guild source fails", async ({ page }) => {

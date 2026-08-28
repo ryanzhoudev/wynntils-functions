@@ -20,6 +20,7 @@ const stats: GuildColorStatsApiResponse = {
         {
             name: "Active Guild",
             prefix: "ACT",
+            wynncraftIdentityResolved: true,
             stats: {
                 currentTerritories: 3,
                 currentSeasonRating: 12_500,
