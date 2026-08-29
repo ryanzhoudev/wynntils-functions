@@ -22,6 +22,7 @@ import {
     type GuildColorMapWorkerResponse,
     labToMapPosition,
     readGuildColorMapPoint,
+    shouldApplyGuildColorMapResponse,
 } from "@/lib/guild-color-map";
 import {
     createGuildColorPalette,
@@ -148,6 +149,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
     const activeMapPointerId = useRef<number | null>(null);
     const latestRequestId = useRef(0);
     const latestRenderedRequestId = useRef(0);
+    const lastInvalidatedRequestId = useRef(0);
     const [lightness, setLightness] = useState(initialLightness);
     const [isAdjustingLightness, setIsAdjustingLightness] = useState(false);
     const [fullRenderResolution, setFullRenderResolution] = useState(GUILD_COLOR_MAP_RESOLUTION);
@@ -308,6 +310,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
 
         workerGroupsRef.current = nextWorkerGroups;
         latestRequestId.current += 1;
+        lastInvalidatedRequestId.current = latestRequestId.current;
         setWorkerGroups(nextWorkerGroups);
         setRenderedMap(null);
         setHoverSample(null);
@@ -323,8 +326,11 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
             const response = event.data;
 
             if (
-                response.requestId !== latestRequestId.current ||
-                response.requestId < latestRenderedRequestId.current
+                !shouldApplyGuildColorMapResponse(
+                    response.requestId,
+                    lastInvalidatedRequestId.current,
+                    latestRenderedRequestId.current,
+                )
             ) {
                 return;
             }
