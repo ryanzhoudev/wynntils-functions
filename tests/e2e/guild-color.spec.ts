@@ -44,7 +44,6 @@ const guildColorResponse = {
     ],
     fetchedAt: Date.UTC(2026, 6, 29, 20, 0, 0),
     cacheSeconds: 600,
-    excludedPlaceholderCount: 85,
     stats: null,
     source: {
         url: "https://athena.wynntils.com/cache/get/guildList",
@@ -356,7 +355,6 @@ test("preloads colors, previews blockers, and applies an active suggestion on re
     await expect(input).toHaveValue("#FF0000");
     await expect(page.getByText("Allowed? 🟥 No")).toBeVisible();
     await expect(page.getByText("2 guilds use this color").first()).toBeVisible();
-    await expect(page.getByText("85 placeholder entries", { exact: false })).toBeVisible();
 
     const redOneLinks = page.getByRole("link", { name: /Red One \[R1\].*opens in a new tab/ });
     await expect(redOneLinks).toHaveCount(2);
@@ -496,7 +494,6 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     await expect(page.getByRole("link", { name: "Back to picker" })).toHaveAttribute("href", "/guild-color");
     await expect(page.getByText("4 unique colors")).toBeVisible();
     await expect(page.getByText("6 guilds")).toBeVisible();
-    await expect(page.getByText("85 placeholder entries", { exact: false })).toBeVisible();
 
     const lightness = page.getByRole("slider", { name: "Lightness view" });
     await lightness.fill("53");

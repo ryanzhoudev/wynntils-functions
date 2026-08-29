@@ -886,9 +886,6 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                     <p className="text-muted-foreground">
                                         Athena response timestamp: {new Date(guildData.fetchedAt).toLocaleString()}.
                                     </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Excluded {guildData.excludedPlaceholderCount} placeholder entries using #C05F5F.
-                                    </p>
                                 </>
                             ) : loadError ? (
                                 <p className="text-amber-200">Unavailable. No claim map was calculated.</p>

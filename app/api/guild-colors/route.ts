@@ -30,7 +30,7 @@ export async function GET() {
             throw new Error(`Athena returned HTTP ${upstreamResponse.status}.`);
         }
 
-        const { guilds, excludedPlaceholderCount } = parseAthenaGuildColors(await upstreamResponse.json());
+        const { guilds } = parseAthenaGuildColors(await upstreamResponse.json());
 
         if (guilds.length === 0) {
             throw new Error("Athena returned no usable guild colors.");
@@ -40,7 +40,6 @@ export async function GET() {
             guilds,
             fetchedAt: readFetchedAt(upstreamResponse),
             cacheSeconds: CACHE_SECONDS,
-            excludedPlaceholderCount,
             stats: null,
             source: {
                 url: ATHENA_GUILD_LIST_URL,
