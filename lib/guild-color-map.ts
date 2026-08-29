@@ -84,6 +84,14 @@ export interface GuildColorMapRenderFailure {
 
 export type GuildColorMapWorkerResponse = GuildColorMapRenderResponse | GuildColorMapRenderFailure;
 
+export function shouldApplyGuildColorMapResponse(
+    requestId: number,
+    lastInvalidatedRequestId: number,
+    latestRenderedRequestId: number,
+): boolean {
+    return requestId > lastInvalidatedRequestId && requestId > latestRenderedRequestId;
+}
+
 export function guildColorMapFullResolution(displayWidth: number, devicePixelRatio = 1): number {
     const pixelRatio = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
     const physicalWidth = displayWidth * pixelRatio;
