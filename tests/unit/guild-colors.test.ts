@@ -5,7 +5,6 @@ import {
     findGuildColorsByIdentity,
     findDirectionalColorSuggestions,
     GUILD_ACTIVITY_RATING_THRESHOLD,
-    GUILD_COLOR_PLACEHOLDER,
     guildStatsUrl,
     guildColorBrightness,
     hsvToRgb,
@@ -25,11 +24,11 @@ describe("guild color normalization and Athena parsing", () => {
         expect(normalizeGuildColorHex("not-a-color")).toBeNull();
     });
 
-    it("keeps strict six-digit Athena colors and explicitly excludes the placeholder", () => {
+    it("keeps all strict six-digit Athena colors, including #C05F5F", () => {
         const result = parseAthenaGuildColors({
             data: [
                 { _id: "Valid Guild", prefix: "VG", color: "#12ab90" },
-                { _id: "Placeholder Guild", prefix: "PG", color: GUILD_COLOR_PLACEHOLDER.toLowerCase() },
+                { _id: "Rose Guild", prefix: "RG", color: "#c05f5f" },
                 { _id: "Legacy Guild", prefix: "LG", color: "#1234" },
                 { _id: "Blank Guild", prefix: "BG", color: "" },
                 { _id: "No Prefix", color: "#ABCDEF" },
@@ -39,9 +38,9 @@ describe("guild color normalization and Athena parsing", () => {
         expect(result).toEqual({
             guilds: [
                 { name: "Valid Guild", prefix: "VG", color: "#12AB90" },
+                { name: "Rose Guild", prefix: "RG", color: "#C05F5F" },
                 { name: "No Prefix", prefix: "???", color: "#ABCDEF" },
             ],
-            excludedPlaceholderCount: 1,
         });
     });
 
@@ -64,7 +63,6 @@ describe("guild color normalization and Athena parsing", () => {
                 ],
                 fetchedAt: 1,
                 cacheSeconds: 600,
-                excludedPlaceholderCount: 0,
                 stats: null,
                 source: {
                     url: "https://example.com/guilds",
@@ -244,7 +242,7 @@ describe("Wynntils Bot-compatible guild color analysis", () => {
         { name: "Red One", prefix: "R1", color: "#FF0000" },
         { name: "Red Two", prefix: "R2", color: "#FF0000" },
         { name: "Blue", prefix: "BLU", color: "#0000FF" },
-        { name: "Placeholder", prefix: "NOP", color: GUILD_COLOR_PLACEHOLDER },
+        { name: "Rose", prefix: "RSE", color: "#C05F5F" },
     ];
     const palette = createGuildColorPalette(guilds);
 
@@ -266,7 +264,7 @@ describe("Wynntils Bot-compatible guild color analysis", () => {
             distance: 0,
         });
         expect(analysis.conflictingGroups[0].guilds.map((guild) => guild.name)).toEqual(["Red One", "Red Two"]);
-        expect(palette.some((guild) => guild.color === GUILD_COLOR_PLACEHOLDER)).toBe(false);
+        expect(palette.some((guild) => guild.color === "#C05F5F")).toBe(true);
     });
 
     it("preserves guild statistics through closest-color analysis", () => {

@@ -6,7 +6,6 @@ const colors: GuildColorApiResponse = {
     guilds: [{ name: "Active Guild", prefix: "ACT", color: "#FF0000" }],
     fetchedAt: 1,
     cacheSeconds: 600,
-    excludedPlaceholderCount: 0,
     stats: null,
     source: {
         url: "https://example.com/guilds",

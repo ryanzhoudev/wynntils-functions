@@ -1,6 +1,5 @@
 export const MIN_GUILD_COLOR_BRIGHTNESS = 60;
 export const MIN_GUILD_COLOR_DELTA_E = 20;
-export const GUILD_COLOR_PLACEHOLDER = "#C05F5F";
 export const GUILD_ACTIVITY_RATING_THRESHOLD = 10_000;
 export const WYNNCRAFT_GUILD_STATS_BASE_URL = "https://wynncraft.com/stats/guild";
 
@@ -49,7 +48,6 @@ export interface GuildColorApiResponse {
     guilds: GuildColorRecord[];
     fetchedAt: number;
     cacheSeconds: number;
-    excludedPlaceholderCount: number;
     stats: GuildColorStatsMetadata | null;
     source: {
         url: string;
@@ -239,7 +237,6 @@ export interface DirectionalColorSuggestion extends GuildColorVerdict {
 
 export interface ParsedAthenaGuildColors {
     guilds: GuildColorRecord[];
-    excludedPlaceholderCount: number;
 }
 
 export const GUILD_COLOR_DIRECTIONS: ReadonlyArray<{
@@ -428,7 +425,6 @@ export function parseAthenaGuildColors(payload: unknown): ParsedAthenaGuildColor
     }
 
     const guilds: GuildColorRecord[] = [];
-    let excludedPlaceholderCount = 0;
 
     for (const item of possibleCollection) {
         if (typeof item !== "object" || item === null) {
@@ -443,11 +439,6 @@ export function parseAthenaGuildColors(payload: unknown): ParsedAthenaGuildColor
             continue;
         }
 
-        if (color === GUILD_COLOR_PLACEHOLDER) {
-            excludedPlaceholderCount += 1;
-            continue;
-        }
-
         guilds.push({
             name,
             prefix: readString(record.prefix) ?? "???",
@@ -455,7 +446,7 @@ export function parseAthenaGuildColors(payload: unknown): ParsedAthenaGuildColor
         });
     }
 
-    return { guilds, excludedPlaceholderCount };
+    return { guilds };
 }
 
 export function createGuildColorPalette(guilds: GuildColorRecord[]): GuildColorPaletteEntry[] {
@@ -463,7 +454,7 @@ export function createGuildColorPalette(guilds: GuildColorRecord[]): GuildColorP
         const color = normalizeGuildColorHex(guild.color);
         const rgb = color ? hexToRgb(color) : null;
 
-        if (!color || !rgb || color === GUILD_COLOR_PLACEHOLDER) {
+        if (!color || !rgb) {
             return [];
         }
 
