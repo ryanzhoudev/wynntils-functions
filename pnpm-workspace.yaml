@@ -1,6 +1,7 @@
 overrides:
-  "@hono/node-server": "2.1.1"
-  deepmerge-ts: "8.0.1"
-  dompurify: "3.4.16"
-  postcss: "8.5.28"
-  "prisma>mysql2": "3.23.1"
+  "@hono/node-server": "2.1.8"
+  deepmerge-ts: "8.0.2"
+  dompurify: "3.4.18"
+  postcss: "8.5.33"
+  "@typescript-eslint/typescript-estree>minimatch": "11.0.8"
+  "vitest>vite": "8.1.7"
