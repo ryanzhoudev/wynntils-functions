@@ -1,5 +1,4 @@
 import {
-    classifyGuildColorMapPoint,
     createGuildColorMapGroups,
     GUILD_COLOR_MAP_FLAG_CLAIMED,
     guildColorMapFullResolution,
@@ -7,7 +6,7 @@ import {
     shouldApplyGuildColorMapResponse,
 } from "@/lib/guild-color-map";
 import { renderGuildColorMapSlice } from "@/lib/guild-color-map/renderer";
-import { createGuildColorPalette, labToRgb, rgbToLab } from "@/lib/guild-colors";
+import { createGuildColorPalette, evaluateGuildColor, labToRgb, rgbToLab } from "@/lib/guild-colors";
 import { describe, expect, it } from "vitest";
 
 describe("guild color map geometry", () => {
@@ -65,27 +64,24 @@ describe("guild color map geometry", () => {
         expect(groups.find((group) => group.color === "#FF0000")?.guilds[1].stats).toEqual(stats);
     });
 
-    it("classifies exact registered colors as claimed and bright unclaimed colors as allowed", () => {
-        const groups = createGuildColorMapGroups(
-            createGuildColorPalette([{ name: "Red", prefix: "RED", color: "#FF0000" }]),
-        );
-        const red = { lab: rgbToLab({ r: 255, g: 0, b: 0 }), rgb: { r: 255, g: 0, b: 0 }, inGamut: true };
-        const white = {
-            lab: rgbToLab({ r: 255, g: 255, b: 255 }),
-            rgb: { r: 255, g: 255, b: 255 },
-            inGamut: true,
-        };
+    it("evaluates sampled RGB colors against grouped map colors the same as picker hex colors", () => {
+        const palette = createGuildColorPalette([
+            { name: "Red", prefix: "RED", color: "#FF0000" },
+            { name: "Blue", prefix: "BLU", color: "#0000FF" },
+        ]);
+        const groups = createGuildColorMapGroups(palette);
+        const redVerdict = evaluateGuildColor({ r: 255, g: 0, b: 0 }, groups);
 
-        expect(classifyGuildColorMapPoint(red, groups)).toMatchObject({
-            claimed: true,
+        expect(groups[redVerdict.closestIndex].color).toBe("#FF0000");
+        expect(redVerdict).toMatchObject({ allowed: false, uniqueEnough: false, closestDistance: 0 });
+        expect(evaluateGuildColor("#FF0000", palette)).toMatchObject({ allowed: redVerdict.allowed });
+        expect(evaluateGuildColor({ r: 255, g: 255, b: 255 }, groups)).toEqual(
+            evaluateGuildColor("#FFFFFF", groups),
+        );
+        expect(evaluateGuildColor({ r: 0, g: 0, b: 0 }, [])).toMatchObject({
             allowed: false,
-            closestGroupIndex: 0,
-            closestDistance: 0,
-        });
-        expect(classifyGuildColorMapPoint(white, groups)).toMatchObject({
-            brightEnough: true,
-            claimed: false,
-            allowed: true,
+            brightEnough: false,
+            closestIndex: -1,
         });
     });
 
@@ -98,7 +94,7 @@ describe("guild color map geometry", () => {
         const position = labToMapPosition(groups[0].lab, width, height);
         const x = Math.round(position.x);
         const y = Math.round(position.y);
-        const result = renderGuildColorMapSlice({
+        const { response, owners, flags } = renderGuildColorMapSlice({
             type: "render",
             requestId: 1,
             lightness: groups[0].lab.L,
@@ -109,14 +105,14 @@ describe("guild color map geometry", () => {
         const nearbyIndices = Array.from({ length: 9 }, (_, yOffset) =>
             Array.from({ length: 9 }, (_, xOffset) => (y + yOffset - 4) * width + (x + xOffset - 4)),
         ).flat();
-        const claimedIndex = nearbyIndices.find((index) => result.owners[index] === 0);
+        const claimedIndex = nearbyIndices.find((index) => owners[index] === 0);
 
         expect(claimedIndex).toBeDefined();
-        expect(result.flags[claimedIndex!] & GUILD_COLOR_MAP_FLAG_CLAIMED).toBe(
+        expect(flags[claimedIndex!] & GUILD_COLOR_MAP_FLAG_CLAIMED).toBe(
             GUILD_COLOR_MAP_FLAG_CLAIMED,
         );
-        expect(result.statistics.inGamut).toBeGreaterThan(0);
-        expect(result.statistics.claimed).toBeGreaterThan(0);
-        expect(result.statistics.allowed).toBeGreaterThan(0);
+        expect(response.statistics.inGamut).toBeGreaterThan(0);
+        expect(response.statistics.claimed).toBeGreaterThan(0);
+        expect(response.statistics.allowed).toBeGreaterThan(0);
     });
 });

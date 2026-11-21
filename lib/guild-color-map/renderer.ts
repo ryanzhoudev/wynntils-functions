@@ -50,7 +50,7 @@ export function renderGuildColorMapSlice({
     width,
     height,
     groups,
-}: GuildColorMapRenderRequest): GuildColorMapRenderResponse {
+}: GuildColorMapRenderRequest): { response: GuildColorMapRenderResponse; owners: Int32Array; flags: Uint8Array } {
     const startedAt = performance.now();
     const pixelCount = width * height;
     const pixels = new Uint8ClampedArray(pixelCount * 4);
@@ -204,15 +204,17 @@ export function renderGuildColorMapSlice({
     }
 
     return {
-        type: "rendered",
-        requestId,
-        lightness,
-        width,
-        height,
-        pixels,
+        response: {
+            type: "rendered",
+            requestId,
+            lightness,
+            width,
+            height,
+            pixels,
+            statistics,
+            renderTimeMs: performance.now() - startedAt,
+        },
         owners,
         flags,
-        statistics,
-        renderTimeMs: performance.now() - startedAt,
     };
 }

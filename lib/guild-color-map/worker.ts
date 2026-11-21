@@ -2,7 +2,6 @@
 
 import {
     GuildColorMapRenderRequest,
-    GuildColorMapRenderResponse,
     GuildColorMapWorkerResponse,
 } from "@/lib/guild-color-map";
 import { renderGuildColorMapSlice } from "@/lib/guild-color-map/renderer";
@@ -21,12 +20,8 @@ function renderLatestRequest() {
     }
 
     try {
-        const response = renderGuildColorMapSlice(request);
-        worker.postMessage(response satisfies GuildColorMapRenderResponse, [
-            response.pixels.buffer,
-            response.owners.buffer,
-            response.flags.buffer,
-        ]);
+        const { response } = renderGuildColorMapSlice(request);
+        worker.postMessage(response, [response.pixels.buffer]);
     } catch (error) {
         const response: GuildColorMapWorkerResponse = {
             type: "error",

@@ -584,8 +584,10 @@ test("maps allowed and guild-claimed regions across Lab lightness slices", async
     await expect(canvas).toHaveAttribute("width", String(fullResolution));
 });
 
-test("applies the activity filter to map claims and preserves it in navigation", async ({ page }) => {
-    await page.goto("/guild-color/map?hex=00FFFF&ignoreLowActivity=1");
+test("agrees on the hex verdict between the picker and map when filtering guilds", async ({ page }) => {
+    await page.goto("/guild-color?hex=00FFFF&ignoreLowActivity=1");
+    await expect(page.getByText("Allowed? 🟩 Yes")).toBeVisible();
+    await page.getByRole("link", { name: "Color map" }).click();
 
     const activityToggle = page.getByRole("button", { name: "Ignore low-activity guilds" });
     const pointDetails = page.getByTestId("map-point-details");
@@ -610,6 +612,8 @@ test("applies the activity filter to map claims and preserves it in navigation",
     );
     await expect(pointDetails.getByText("Not allowed", { exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("link", { name: /Low Activity \[LOW\]/ })).toBeVisible();
+    await page.getByRole("link", { name: "Back to picker" }).click();
+    await expect(page.getByText("Allowed? 🟥 No")).toBeVisible();
 });
 
 test("jumps directly to a hex on the perceptual color map", async ({ page }) => {

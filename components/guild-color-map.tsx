@@ -8,15 +8,13 @@ import { Label } from "@/components/ui/label";
 import GuildStatsLink from "@/components/guild-stats-link";
 import { loadGuildColorData } from "@/lib/guild-color-client";
 import {
-    classifyGuildColorMapPoint,
     createGuildColorMapGroups,
     GUILD_COLOR_MAP_DEFAULT_LIGHTNESS,
-    GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH,
-    GUILD_COLOR_MAP_FLAG_IN_GAMUT,
     GUILD_COLOR_MAP_PREVIEW_RESOLUTION,
     GUILD_COLOR_MAP_RESOLUTION,
     guildColorMapFullResolution,
     type GuildColorMapGroup,
+    type GuildColorMapPoint,
     type GuildColorMapRenderResponse,
     type GuildColorMapWorkerGroup,
     type GuildColorMapWorkerResponse,
@@ -26,7 +24,7 @@ import {
 } from "@/lib/guild-color-map";
 import {
     createGuildColorPalette,
-    deltaE76,
+    evaluateGuildColor,
     filterGuildColorsByActivity,
     GUILD_ACTIVITY_RATING_THRESHOLD,
     type GuildColorApiResponse,
@@ -48,14 +46,8 @@ import {
     useState,
 } from "react";
 
-interface MapSample {
-    ownerIndex: number;
-    flags: number;
-    point: ReturnType<typeof readGuildColorMapPoint>;
-}
-
 interface MapHoverSample {
-    sample: MapSample;
+    point: GuildColorMapPoint;
     xPercent: number;
     yPercent: number;
 }
@@ -196,40 +188,27 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
     const target = useMemo(() => {
         const rgb = targetColor ? hexToRgb(targetColor) : null;
 
-        return rgb ? { rgb, lab: rgbToLab(rgb) } : null;
+        return rgb ? { rgb, lab: rgbToLab(rgb), inGamut: true } : null;
     }, [targetColor]);
-    const targetSample = useMemo(() => {
-        if (!renderedMap || !target || Math.abs(renderedMap.lightness - lightness) > 0.001) {
-            return null;
-        }
-
-        const point = { ...target, inGamut: true };
-        const classification = classifyGuildColorMapPoint(point, workerGroups);
-
-        return {
-            ownerIndex: classification.claimed ? classification.closestGroupIndex : -1,
-            flags:
-                GUILD_COLOR_MAP_FLAG_IN_GAMUT | (classification.brightEnough ? GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH : 0),
-            point,
-        } satisfies MapSample;
-    }, [lightness, renderedMap, target, workerGroups]);
-    const activeSample = targetColor ? targetSample : (hoverSample?.sample ?? null);
-    const sampleGroup =
-        activeSample?.ownerIndex !== undefined && activeSample.ownerIndex >= 0 ? groups[activeSample.ownerIndex] : null;
-    const sampleInGamut = Boolean(activeSample && (activeSample.flags & GUILD_COLOR_MAP_FLAG_IN_GAMUT) !== 0);
-    const sampleBrightEnough = Boolean(activeSample && (activeSample.flags & GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH) !== 0);
-    const sampleAllowed = sampleInGamut && sampleBrightEnough && !sampleGroup;
-    const sampleDistance = activeSample && sampleGroup ? deltaE76(activeSample.point.lab, sampleGroup.lab) : null;
-    const hoverPoint = hoverSample?.sample ?? null;
-    const hoverInGamut = Boolean(hoverPoint && (hoverPoint.flags & GUILD_COLOR_MAP_FLAG_IN_GAMUT) !== 0);
-    const hoverBrightEnough = Boolean(hoverPoint && (hoverPoint.flags & GUILD_COLOR_MAP_FLAG_BRIGHT_ENOUGH) !== 0);
-    const hoverGroup = hoverPoint && hoverPoint.ownerIndex >= 0 ? groups[hoverPoint.ownerIndex] : null;
-    const hoverColor = hoverInGamut && hoverPoint ? rgbToHex(hoverPoint.point.rgb) : null;
-    const hoverStatus = !hoverInGamut
+    const targetVerdict = useMemo(
+        () => (target && canRenderMap ? evaluateGuildColor(target.rgb, groups) : null),
+        [canRenderMap, groups, target],
+    );
+    const targetVisible = renderedMap && Math.abs(renderedMap.lightness - lightness) <= 0.001;
+    const hoverPoint = hoverSample?.point;
+    const hoverVerdict = useMemo(
+        () => (hoverPoint?.inGamut ? evaluateGuildColor(hoverPoint.rgb, groups) : null),
+        [groups, hoverPoint],
+    );
+    const activePoint = targetColor ? (targetVisible && targetVerdict ? target : null) : hoverPoint;
+    const activeVerdict = targetColor ? targetVerdict : hoverVerdict;
+    const sampleGroup = activeVerdict && !activeVerdict.uniqueEnough ? groups[activeVerdict.closestIndex] : null;
+    const hoverColor = hoverPoint?.inGamut ? rgbToHex(hoverPoint.rgb) : null;
+    const hoverStatus = !hoverVerdict
         ? "Outside RGB"
-        : hoverGroup
+        : !hoverVerdict.uniqueEnough
           ? "Guild claim"
-          : hoverBrightEnough
+          : hoverVerdict.allowed
             ? "Allowed"
             : "Too dark";
     const showHoverTooltip = Boolean(targetColor && hoverSample && hoverColor !== targetColor);
@@ -409,34 +388,22 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
         const yProgress = Math.min(1, Math.max(0, (clientY - bounds.top) / bounds.height));
         const x = Math.min(renderedMap.width - 1, Math.floor(xProgress * renderedMap.width));
         const y = Math.min(renderedMap.height - 1, Math.floor(yProgress * renderedMap.height));
-        const index = y * renderedMap.width + x;
 
         return {
-            sample: {
-                ownerIndex: renderedMap.owners[index],
-                flags: renderedMap.flags[index],
-                point: readGuildColorMapPoint(x, y, renderedMap.width, renderedMap.height, renderedMap.lightness),
-            },
+            point: readGuildColorMapPoint(x, y, renderedMap.width, renderedMap.height, renderedMap.lightness),
             xPercent: xProgress * 100,
             yPercent: yProgress * 100,
         } satisfies MapHoverSample;
     }
 
-    function inspectMap(clientX: number, clientY: number): MapSample | null {
-        const nextHoverSample = readMapPointerSample(clientX, clientY);
-
-        setHoverSample(nextHoverSample);
-        return nextHoverSample?.sample ?? null;
-    }
-
     function selectMapColor(clientX: number, clientY: number) {
-        const selectedSample = readMapPointerSample(clientX, clientY)?.sample;
+        const point = readMapPointerSample(clientX, clientY)?.point;
 
-        if (!selectedSample?.point.inGamut) {
+        if (!point?.inGamut) {
             return;
         }
 
-        const selectedColor = rgbToHex(selectedSample.point.rgb);
+        const selectedColor = rgbToHex(point.rgb);
 
         setHoverSample(null);
         setJumpInput(selectedColor);
@@ -459,7 +426,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
         if (activeMapPointerId.current === event.pointerId) {
             selectMapColor(event.clientX, event.clientY);
         } else {
-            inspectMap(event.clientX, event.clientY);
+            setHoverSample(readMapPointerSample(event.clientX, event.clientY));
         }
     }
 
@@ -671,7 +638,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                     setHoverSample(null);
                                 }}
                             />
-                            {targetColor && targetMarkerPosition && targetSample ? (
+                            {targetColor && targetMarkerPosition && targetVisible && targetVerdict ? (
                                 <span
                                     role="img"
                                     aria-label={`Selected color ${targetColor}`}
@@ -761,28 +728,28 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {activeSample ? (
+                            {activePoint ? (
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-3">
                                         <span
                                             aria-hidden="true"
                                             className="size-12 shrink-0 rounded-lg border border-white/20 shadow-inner"
                                             style={{
-                                                backgroundColor: activeSample.point.inGamut
-                                                    ? rgbToHex(activeSample.point.rgb)
+                                                backgroundColor: activePoint.inGamut
+                                                    ? rgbToHex(activePoint.rgb)
                                                     : undefined,
                                             }}
                                         />
                                         <div className="min-w-0">
                                             <code className="font-semibold" data-testid="map-point-hex">
-                                                {activeSample.point.inGamut
-                                                    ? rgbToHex(activeSample.point.rgb)
+                                                {activePoint.inGamut
+                                                    ? rgbToHex(activePoint.rgb)
                                                     : "Outside RGB"}
                                             </code>
                                             <p className="mt-1 text-xs text-muted-foreground">
-                                                L* {activeSample.point.lab.L.toFixed(1)} · a*{" "}
-                                                {activeSample.point.lab.a.toFixed(1)} · b*{" "}
-                                                {activeSample.point.lab.b.toFixed(1)}
+                                                L* {activePoint.lab.L.toFixed(1)} · a*{" "}
+                                                {activePoint.lab.a.toFixed(1)} · b*{" "}
+                                                {activePoint.lab.b.toFixed(1)}
                                             </p>
                                         </div>
                                         {targetColor ? (
@@ -801,9 +768,9 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                     </div>
 
                                     <div className="flex flex-wrap gap-2">
-                                        {!sampleInGamut ? (
+                                        {!activePoint.inGamut ? (
                                             <Badge variant="secondary">Outside RGB</Badge>
-                                        ) : sampleAllowed ? (
+                                        ) : activeVerdict?.allowed ? (
                                             <Badge className="border-emerald-400/40 bg-emerald-400/15 text-emerald-200">
                                                 Allowed
                                             </Badge>
@@ -812,7 +779,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                                 Not allowed
                                             </Badge>
                                         )}
-                                        {sampleInGamut && !sampleBrightEnough ? (
+                                        {activeVerdict && !activeVerdict.brightEnough ? (
                                             <Badge variant="outline">Too dark</Badge>
                                         ) : null}
                                         {sampleGroup ? <Badge variant="outline">Guild claim</Badge> : null}
@@ -822,7 +789,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                         <div className="rounded-lg border bg-muted/25 p-3">
                                             <p className="text-sm font-semibold">{guildGroupLabel(sampleGroup)}</p>
                                             <p className="mt-1 text-xs text-muted-foreground">
-                                                Registered {sampleGroup.color} · ΔE {sampleDistance?.toFixed(2)}
+                                                Registered {sampleGroup.color} · ΔE {activeVerdict?.closestDistance.toFixed(2)}
                                             </p>
                                             <ul className="mt-3 space-y-1.5 text-sm">
                                                 {sampleGroup.guilds.map((guild) => (
@@ -838,7 +805,7 @@ export default function GuildColorMap({ initialColor, initialIgnoreLowActivity }
                                                 ))}
                                             </ul>
                                         </div>
-                                    ) : sampleInGamut ? (
+                                    ) : activePoint.inGamut ? (
                                         <p className="text-sm text-muted-foreground">
                                             No registered guild color is within ΔE {MIN_GUILD_COLOR_DELTA_E}.
                                         </p>
