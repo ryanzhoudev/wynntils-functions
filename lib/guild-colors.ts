@@ -217,6 +217,7 @@ export interface GuildColorVerdict {
     uniqueEnough: boolean;
     brightness: number;
     closestDistance: number;
+    closestIndex: number;
 }
 
 export interface GuildColorAnalysis extends GuildColorVerdict {
@@ -462,13 +463,19 @@ export function createGuildColorPalette(guilds: GuildColorRecord[]): GuildColorP
     });
 }
 
-function evaluateRgb(rgb: Rgb, palette: GuildColorPaletteEntry[]): GuildColorVerdict {
+function evaluateRgb(rgb: Rgb, palette: ReadonlyArray<{ lab: Lab }>): GuildColorVerdict {
     const brightness = guildColorBrightness(rgb);
     const targetLab = rgbToLab(rgb);
     let closestDistance = Number.POSITIVE_INFINITY;
+    let closestIndex = -1;
 
-    for (const guild of palette) {
-        closestDistance = Math.min(closestDistance, deltaE76(targetLab, guild.lab));
+    for (let index = 0; index < palette.length; index += 1) {
+        const distance = deltaE76(targetLab, palette[index].lab);
+
+        if (distance < closestDistance) {
+            closestDistance = distance;
+            closestIndex = index;
+        }
     }
 
     const brightEnough = brightness >= MIN_GUILD_COLOR_BRIGHTNESS;
@@ -480,11 +487,12 @@ function evaluateRgb(rgb: Rgb, palette: GuildColorPaletteEntry[]): GuildColorVer
         uniqueEnough,
         brightness,
         closestDistance,
+        closestIndex,
     };
 }
 
-export function evaluateGuildColor(hex: string, palette: GuildColorPaletteEntry[]): GuildColorVerdict {
-    const rgb = hexToRgb(hex);
+export function evaluateGuildColor(color: string | Rgb, palette: ReadonlyArray<{ lab: Lab }>): GuildColorVerdict {
+    const rgb = typeof color === "string" ? hexToRgb(color) : color;
 
     if (!rgb) {
         throw new Error("A normalized six-digit hex color is required.");

@@ -1,12 +1,8 @@
 import {
-    deltaE76,
     GuildColorPaletteEntry,
     GuildColorRecord,
-    guildColorBrightness,
     labToRgb,
     Lab,
-    MIN_GUILD_COLOR_BRIGHTNESS,
-    MIN_GUILD_COLOR_DELTA_E,
     rgbToLab,
 } from "@/lib/guild-colors";
 
@@ -41,14 +37,6 @@ export interface GuildColorMapPoint {
     inGamut: boolean;
 }
 
-export interface GuildColorMapClassification {
-    brightEnough: boolean;
-    closestDistance: number;
-    closestGroupIndex: number;
-    claimed: boolean;
-    allowed: boolean;
-}
-
 export interface GuildColorMapRenderRequest {
     type: "render";
     requestId: number;
@@ -65,8 +53,6 @@ export interface GuildColorMapRenderResponse {
     width: number;
     height: number;
     pixels: Uint8ClampedArray;
-    owners: Int32Array;
-    flags: Uint8Array;
     statistics: {
         inGamut: number;
         allowed: number;
@@ -180,35 +166,5 @@ export function readGuildColorMapPoint(
         lab: rgbToLab(rgb),
         rgb,
         inGamut,
-    };
-}
-
-export function classifyGuildColorMapPoint(
-    point: GuildColorMapPoint,
-    groups: ReadonlyArray<GuildColorMapWorkerGroup>,
-): GuildColorMapClassification {
-    const brightEnough = point.inGamut && guildColorBrightness(point.rgb) >= MIN_GUILD_COLOR_BRIGHTNESS;
-    let closestGroupIndex = -1;
-    let closestDistance = Number.POSITIVE_INFINITY;
-
-    if (point.inGamut) {
-        for (const [index, group] of groups.entries()) {
-            const distance = deltaE76(point.lab, group.lab);
-
-            if (distance < closestDistance) {
-                closestDistance = distance;
-                closestGroupIndex = index;
-            }
-        }
-    }
-
-    const claimed = closestDistance < MIN_GUILD_COLOR_DELTA_E;
-
-    return {
-        brightEnough,
-        closestDistance,
-        closestGroupIndex,
-        claimed,
-        allowed: point.inGamut && brightEnough && !claimed,
     };
 }
